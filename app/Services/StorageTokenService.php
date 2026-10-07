@@ -78,8 +78,15 @@ class StorageTokenService
     /**
      * Generate a signed download URL for a file.
      */
-    public function generateDownloadUrl(string $filePath, $userId, ?StorageBox $storageBox = null, int $ttlMinutes = 180, ?string $ticketToken = null): string
-    {
+    public function generateDownloadUrl(
+        string $filePath,
+        $userId,
+        ?StorageBox $storageBox = null,
+        int $ttlMinutes = 180,
+        ?string $ticketToken = null,
+        ?int $mediaFileId = null,
+        ?int $maxParallelDownloads = null
+    ): string {
         $appUrl = config('services.storage.app_url', config('app.url', url('/')));
 
         if ((str_contains($appUrl, '127.0.0.1') || str_contains($appUrl, 'localhost')) && request()->hasHeader('host')) {
@@ -96,6 +103,14 @@ class StorageTokenService
 
         if ($ticketToken) {
             $extraPayload['ticket_token'] = $ticketToken;
+        }
+
+        if ($mediaFileId !== null) {
+            $extraPayload['media_file_id'] = $mediaFileId;
+        }
+
+        if ($maxParallelDownloads !== null) {
+            $extraPayload['max_parallel_downloads'] = $maxParallelDownloads;
         }
 
         return $this->generateApiUrl('/download', $userId, $storageBox, $ttlMinutes, $extraPayload);

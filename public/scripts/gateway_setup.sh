@@ -1297,8 +1297,60 @@ function getEnvConfig() {
     return config;
 }
 
-function reportBytesToLaravel(downloadInfo, bytesSent) {
-    if (!downloadInfo || !downloadInfo.ticket_token || bytesSent <= 0) {
+const activeUserStreamsMap = new Map();
+
+function registerUserStream(userId, mediaFileId, res) {
+    if (!userId || !mediaFileId) return;
+    const strUserId = String(userId);
+    const strFileId = String(mediaFileId);
+
+    if (!activeUserStreamsMap.has(strUserId)) {
+        activeUserStreamsMap.set(strUserId, new Map());
+    }
+    const userFiles = activeUserStreamsMap.get(strUserId);
+    if (!userFiles.has(strFileId)) {
+        userFiles.set(strFileId, new Set());
+    }
+    userFiles.get(strFileId).add(res);
+}
+
+function unregisterUserStream(userId, mediaFileId, res) {
+    if (!userId || !mediaFileId) return;
+    const strUserId = String(userId);
+    const strFileId = String(mediaFileId);
+
+    if (activeUserStreamsMap.has(strUserId)) {
+        const userFiles = activeUserStreamsMap.get(strUserId);
+        if (userFiles.has(strFileId)) {
+            const sockets = userFiles.get(strFileId);
+            sockets.delete(res);
+            if (sockets.size === 0) {
+                userFiles.delete(strFileId);
+            }
+        }
+        if (userFiles.size === 0) {
+            activeUserStreamsMap.delete(strUserId);
+        }
+    }
+}
+
+function getActiveUserFileCount(userId, excludeMediaFileId = null) {
+    const strUserId = String(userId);
+    if (!activeUserStreamsMap.has(strUserId)) return 0;
+    const userFiles = activeUserStreamsMap.get(strUserId);
+    let count = 0;
+    for (const fileId of userFiles.keys()) {
+        if (excludeMediaFileId === null || String(fileId) !== String(excludeMediaFileId)) {
+            if (userFiles.get(fileId).size > 0) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+function reportBytesToLaravel(downloadInfo, bytesSent, isClosed = false) {
+    if (!downloadInfo || !downloadInfo.ticket_token) {
         return;
     }
 
@@ -1310,7 +1362,6 @@ function reportBytesToLaravel(downloadInfo, bytesSent) {
     }
 
     if (!appUrl) {
-        console.error('Laravel log-bytes webhook hatasi: Gecerli Laravel site URL bulunamadi. (Token app_url 127.0.0.1/localhost iceriyor, lutfen Gateway .env dosyasina LARAVEL_WEBHOOK_URL ekleyin).');
         return;
     }
 
@@ -1318,7 +1369,9 @@ function reportBytesToLaravel(downloadInfo, bytesSent) {
         const targetUrl = new URL('/api/internal/downloads/log-bytes', appUrl);
         const postData = JSON.stringify({
             token: downloadInfo.ticket_token,
-            bytes_sent: bytesSent
+            bytes_sent: bytesSent,
+            closed: isClosed,
+            finished: isClosed
         });
 
         const transport = targetUrl.protocol === 'https:' ? https : http;
@@ -1424,6 +1477,21 @@ function getBestTargetDisk() {
 
 app.get('/health', (req, res) => {
     res.json({ success: true, status: 'online', message: 'Servis saglikli ve calisiyor' });
+});
+
+app.get('/active-streams', verifyToken, (req, res) => {
+    const summary = {};
+    for (const [uId, filesMap] of activeUserStreamsMap.entries()) {
+        const fileList = [];
+        for (const [fId, sockets] of filesMap.entries()) {
+            fileList.push({ media_file_id: fId, active_sockets: sockets.size });
+        }
+        summary[uId] = {
+            active_files_count: filesMap.size,
+            files: fileList
+        };
+    }
+    res.json({ success: true, active_users_count: Object.keys(summary).length, users: summary });
 });
 
 app.get('/disks', verifyToken, (req, res) => {
@@ -1537,6 +1605,23 @@ app.get('/scan', verifyToken, (req, res) => {
 });
 
 app.get('/download', verifyToken, (req, res) => {
+    const userId = req.downloadInfo.user_id;
+    const mediaFileId = req.downloadInfo.media_file_id;
+    const maxParallel = parseInt(req.downloadInfo.max_parallel_downloads || 0, 10);
+
+    if (userId && maxParallel > 0) {
+        const activeFilesCount = getActiveUserFileCount(userId, mediaFileId);
+        if (activeFilesCount >= maxParallel) {
+            return res.status(429).json({
+                success: false,
+                code: 'PARALLEL_LIMIT_EXCEEDED',
+                error: `Paketiniz ayni anda en fazla ${maxParallel} farkli dosya indirmenize izin vermektedir. (Su an aktif: ${activeFilesCount} dosya). Lutfen devam eden indirmelerinizin bitmesini veya durdurulmasini bekleyin.`,
+                max_parallel_downloads: maxParallel,
+                active_parallel_downloads: activeFilesCount
+            });
+        }
+    }
+
     const relativePath = req.downloadInfo.file_path || req.query.file_path;
 
     if (!relativePath) {
@@ -1565,10 +1650,13 @@ app.get('/download', verifyToken, (req, res) => {
     let bytesSent = 0;
     let reported = false;
 
+    registerUserStream(userId, mediaFileId, res);
+
     function triggerReport() {
-        if (!reported && bytesSent > 0) {
+        unregisterUserStream(userId, mediaFileId, res);
+        if (!reported) {
             reported = true;
-            reportBytesToLaravel(req.downloadInfo, bytesSent);
+            reportBytesToLaravel(req.downloadInfo, bytesSent, true);
         }
     }
 
