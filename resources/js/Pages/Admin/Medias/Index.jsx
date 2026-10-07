@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import Layout from '../../../Components/Layout';
+import AdminLayout from '../../../Components/AdminLayout';
 import {
     Film,
     Tv,
@@ -686,10 +686,13 @@ export default function MediasIndex({
     };
 
     return (
-        <Layout>
-            <Head title="Storage Box Medya Kataloğu & TMDB - Admin Panel" />
-
-            <div className="min-h-screen bg-[#07090E] text-gray-200">
+        <AdminLayout
+            title="Storage Box Medya Kataloğu & TMDB"
+            subtitle="Hetzner Storage Box ünitelerindeki video dosyaları, otomatik TMDB giydirme ve yapım yılı kontrolü"
+            activeTab="medias"
+            statsSummary={{ total_medias: stats?.total_count || 0 }}
+        >
+            <div className="space-y-6">
 
                 {/* TOAST NOTIFICATION */}
                 {notification && (
@@ -713,73 +716,6 @@ export default function MediasIndex({
                         </div>
                     </div>
                 )}
-
-                {/* SUB-HEADER / CONSOLE NAV */}
-                <div className="border-b border-white/[0.06] bg-[#0A0D14]/80 backdrop-blur-md sticky top-20 z-40">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-
-                        {/* Title & Status */}
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-base font-semibold text-white tracking-tight flex items-center gap-2">
-                                    <Film className="w-4 h-4 text-[#00B074]" />
-                                    <span>Storage Box Medya Kataloğu & TMDB</span>
-                                </h1>
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    {stats?.total_count || 0} Video İndekslendi
-                                </span>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                                Hetzner Storage Box ünitelerindeki video dosyaları, otomatik TMDB giydirme ve yapım yılı kontrolü
-                            </p>
-                        </div>
-
-                        {/* Admin Navigation Tabs */}
-                        <div className="flex items-center gap-1 bg-[#10141F] p-1 rounded-xl border border-white/[0.06] text-xs self-start md:self-auto">
-                            <Link
-                                href="/admin"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium text-gray-400 hover:text-gray-200"
-                            >
-                                Genel Bakış
-                            </Link>
-                            <Link
-                                href="/admin/storage-boxes"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium text-gray-400 hover:text-gray-200"
-                            >
-                                Storage Box
-                            </Link>
-                            <Link
-                                href="/admin/medias"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium bg-white/[0.08] text-white shadow-sm flex items-center gap-1.5"
-                            >
-                                <span>Medya Arşivi</span>
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[#00B074]/20 text-[#00B074] font-mono">
-                                    {stats?.total_count || 0}
-                                </span>
-                            </Link>
-                            <Link
-                                href="/admin/plans"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium text-gray-400 hover:text-gray-200 flex items-center gap-1.5"
-                            >
-                                <span>Paketler</span>
-                            </Link>
-                            <Link
-                                href="/admin"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium text-gray-400 hover:text-gray-200"
-                            >
-                                Kullanıcılar
-                            </Link>
-                            <Link
-                                href="/admin"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium text-gray-400 hover:text-gray-200"
-                            >
-                                Sistem Ayarları
-                            </Link>
-                        </div>
-
-                    </div>
-                </div>
 
                 {/* TMDB NOT CONFIGURED BANNER */}
                 {!stats?.tmdb_is_configured && (
@@ -2434,6 +2370,6 @@ export default function MediasIndex({
                 )}
 
             </div>
-        </Layout>
+        </AdminLayout>
     );
 }

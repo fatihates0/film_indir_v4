@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Head, Link, usePage, router } from '@inertiajs/react';
-import Layout from '../../Components/Layout';
+import AdminLayout from '../../Components/AdminLayout';
 import { 
     Search, 
     SlidersHorizontal, 
@@ -175,97 +175,53 @@ export default function AdminDashboard({
     };
 
     return (
-        <Layout>
-            <Head title="Yönetim Konsolu - SineKutu" />
-
-            <div className="min-h-screen bg-[#07090E] text-gray-200">
-                
-                {/* SUB-HEADER / CONSOLE NAV */}
-                <div className="border-b border-white/[0.06] bg-[#0A0D14]/80 backdrop-blur-md sticky top-20 z-40">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        
-                        {/* Title & Environment Tag */}
-                        <div className="flex items-center gap-3">
-                            <div>
-                                <div className="flex items-center gap-2.5">
-                                    <h1 className="text-base font-semibold text-white tracking-tight">Sistem Yönetim Konsolu</h1>
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                        Canlı v3.4
-                                    </span>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    Oturum: <span className="text-gray-200 font-medium">{currentUser?.name}</span> ({currentUser?.email})
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Segmented Tab Controls (Linear/Vercel Style) */}
-                        <div className="flex items-center gap-1 bg-[#10141F] p-1 rounded-xl border border-white/[0.06] text-xs self-start md:self-auto">
-                            <button
-                                onClick={() => setActiveTab('overview')}
-                                className={`px-3.5 py-1.5 rounded-lg transition-colors font-medium ${
-                                    activeTab === 'overview'
-                                        ? 'bg-white/[0.08] text-white shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-200'
-                                }`}
-                            >
-                                Genel Bakış
-                            </button>
-                            <Link
-                                href="/admin/storage-boxes"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1.5 text-gray-400 hover:text-gray-200"
-                            >
-                                <span>Storage Box</span>
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[#00B074]/20 text-[#00B074] font-mono">
-                                    {stats?.storage?.total_boxes || storageBoxes.length || 0}
-                                </span>
-                            </Link>
-                            <Link
-                                href="/admin/medias"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1.5 text-gray-400 hover:text-gray-200"
-                            >
-                                <span>Medya Arşivi</span>
-                            </Link>
-                            <Link
-                                href="/admin/plans"
-                                className="px-3.5 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1.5 text-gray-400 hover:text-gray-200"
-                            >
-                                <span>Paketler</span>
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[#00B074]/20 text-[#00B074] font-mono">
-                                    {plans?.length || 0}
-                                </span>
-                            </Link>
-                            <button
-                                onClick={() => setActiveTab('users')}
-                                className={`px-3.5 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1.5 ${
-                                    activeTab === 'users'
-                                        ? 'bg-white/[0.08] text-white shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-200'
-                                }`}
-                            >
-                                Kullanıcılar
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/5 text-gray-400">
-                                    {stats?.total_users || 0}
-                                </span>
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('settings')}
-                                className={`px-3.5 py-1.5 rounded-lg transition-colors font-medium ${
-                                    activeTab === 'settings'
-                                        ? 'bg-white/[0.08] text-white shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-200'
-                                }`}
-                            >
-                                Sistem Ayarları
-                            </button>
-                        </div>
-
-                    </div>
+        <AdminLayout
+            title="Genel Bakış"
+            subtitle="Sistem istatistikleri, Hero Karusel ayarları, kullanıcı yetkilendirme ve TMDB entegrasyonu."
+            activeTab="overview"
+            statsSummary={{ 
+                total_boxes: stats?.storage?.total_boxes || storageBoxes.length || 0,
+                total_plans: plans?.length || 0
+            }}
+            headerActions={
+                <div className="flex items-center gap-1 bg-[#10141F] p-1 rounded-xl border border-white/[0.08] text-xs">
+                    <button
+                        onClick={() => setActiveTab('overview')}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all font-semibold ${
+                            activeTab === 'overview'
+                                ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
+                                : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                    >
+                        Genel Bakış
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all font-semibold flex items-center gap-1.5 ${
+                            activeTab === 'users'
+                                ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
+                                : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                    >
+                        Kullanıcılar
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/10 font-mono">
+                            {stats?.total_users || 0}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all font-semibold ${
+                            activeTab === 'settings'
+                                ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
+                                : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                    >
+                        Sistem Ayarları
+                    </button>
                 </div>
-
-                {/* CONTENT CONTAINER */}
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            }
+        >
+            <div className="space-y-8">
 
                     {/* TAB 1: OVERVIEW */}
                     {activeTab === 'overview' && (
@@ -1157,8 +1113,7 @@ export default function AdminDashboard({
                         </div>
                     )}
 
-                </div>
             </div>
-        </Layout>
+        </AdminLayout>
     );
 }
