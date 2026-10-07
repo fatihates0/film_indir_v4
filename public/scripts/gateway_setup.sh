@@ -1581,7 +1581,7 @@ app.get('/download', verifyToken, (req, res) => {
         }
 
         const chunksize = (end - start) + 1;
-        const file = fs.createReadStream(fullPath, { start, end });
+        const file = fs.createReadStream(fullPath, { start, end, highWaterMark: 1024 * 1024 });
         const head = {
             'Content-Range': `bytes ${start}-${end}/${fileSize}`,
             'Accept-Ranges': 'bytes',
@@ -1602,7 +1602,7 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
         res.writeHead(200, head);
-        const stream = fs.createReadStream(fullPath);
+        const stream = fs.createReadStream(fullPath, { highWaterMark: 1024 * 1024 });
         stream.on('data', (chunk) => {
             bytesSent += chunk.length;
         });
@@ -1928,6 +1928,7 @@ server {
         proxy_connect_timeout 60s;
         proxy_buffering off;
         proxy_request_buffering off;
+        proxy_max_temp_file_size 0;
     }
 }
 NGINX_EOF
