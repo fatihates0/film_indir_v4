@@ -1339,6 +1339,8 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const Busboy = require('busboy');
 
 const app = express();
@@ -1360,6 +1362,44 @@ function getEnvConfig() {
         }
     }
     return config;
+}
+
+function reportBytesToLaravel(downloadInfo, bytesSent) {
+    if (!downloadInfo || !downloadInfo.ticket_token || bytesSent <= 0) {
+        return;
+    }
+
+    const appUrl = downloadInfo.app_url || getEnvConfig().LARAVEL_WEBHOOK_URL;
+    if (!appUrl) {
+        return;
+    }
+
+    try {
+        const targetUrl = new URL('/api/internal/downloads/log-bytes', appUrl);
+        const postData = JSON.stringify({
+            token: downloadInfo.ticket_token,
+            bytes_sent: bytesSent
+        });
+
+        const transport = targetUrl.protocol === 'https:' ? https : http;
+        const req = transport.request(targetUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            },
+            timeout: 5000
+        });
+
+        req.on('error', (err) => {
+            console.error('Laravel log-bytes webhook hatasi:', err.message);
+        });
+
+        req.write(postData);
+        req.end();
+    } catch (e) {
+        console.error('reportBytesToLaravel hatasi:', e.message);
+    }
 }
 
 const VIDEO_EXTENSIONS = new Set(['mkv', 'mp4', 'avi', 'mov', 'wmv', 'webm', 'flv', 'm4v', 'ts', 'm2ts', 'iso']);
@@ -1582,6 +1622,19 @@ app.get('/download', verifyToken, (req, res) => {
     const fileSize = stat.size;
     const range = req.headers.range;
 
+    let bytesSent = 0;
+    let reported = false;
+
+    function triggerReport() {
+        if (!reported && bytesSent > 0) {
+            reported = true;
+            reportBytesToLaravel(req.downloadInfo, bytesSent);
+        }
+    }
+
+    res.on('close', triggerReport);
+    res.on('finish', triggerReport);
+
     if (range) {
         const parts = range.replace(/bytes=/, "").split("-");
         const start = parseInt(parts[0], 10);
@@ -1603,6 +1656,9 @@ app.get('/download', verifyToken, (req, res) => {
         };
 
         res.writeHead(206, head);
+        file.on('data', (chunk) => {
+            bytesSent += chunk.length;
+        });
         file.pipe(res);
     } else {
         const head = {
@@ -1611,7 +1667,11 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
         res.writeHead(200, head);
-        fs.createReadStream(fullPath).pipe(res);
+        const stream = fs.createReadStream(fullPath);
+        stream.on('data', (chunk) => {
+            bytesSent += chunk.length;
+        });
+        stream.pipe(res);
     }
 });
 

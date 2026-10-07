@@ -196,4 +196,67 @@ class SubscriptionQuotaTest extends TestCase
             'code' => 'QUOTA_EXHAUSTED',
         ]);
     }
+
+    public function test_stream_url_includes_ticket_token_and_log_bytes_updates_quota(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+        $period = $service->getCurrentPeriod($user);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $file = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Matrix.mkv',
+            'path' => '/movies/Matrix.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 10737418240,
+        ]);
+
+        $prepareRes = $this->actingAs($user)->postJson(route('downloads.prepare', ['mediaFile' => $file->id]));
+        $prepareRes->assertStatus(200);
+        $token = $prepareRes->json('token');
+
+        $streamRes = $this->actingAs($user)->get(route('downloads.stream', ['token' => $token]));
+        $streamRes->assertStatus(302);
+        $targetUrl = $streamRes->headers->get('Location');
+
+        // Parse token from target URL query params
+        parse_str(parse_url($targetUrl, PHP_URL_QUERY), $queryParams);
+        $gatewayToken = $queryParams['token'];
+        [$payloadBase64] = explode('.', $gatewayToken);
+        $payload = json_decode(base64_decode($payloadBase64), true);
+
+        $this->assertEquals($token, $payload['ticket_token']);
+        $this->assertNotEmpty($payload['app_url']);
+
+        // Simulate Storage Gateway webhook callback to log-bytes endpoint
+        $transferredBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+        $webhookRes = $this->postJson(route('downloads.log-bytes'), [
+            'token' => $payload['ticket_token'],
+            'bytes_sent' => $transferredBytes,
+        ]);
+
+        $webhookRes->assertStatus(200);
+        $webhookRes->assertJson(['status' => 'ok']);
+
+        $period->refresh();
+        $this->assertEquals($transferredBytes, $period->used_bytes);
+    }
 }

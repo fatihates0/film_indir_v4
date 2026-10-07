@@ -95,7 +95,7 @@ class DownloadController extends Controller
         $filename = $mediaFile->name;
 
         $ticket->update(['status' => 'active']);
-        $gatewayUrl = $this->gatewayService->generateGatewayUrl($box, $mediaFile->path, $user->id);
+        $gatewayUrl = $this->gatewayService->generateGatewayUrl($box, $mediaFile->path, $user->id, 180, $ticket->token);
 
         Log::info("İndirme Başlatıldı: Kullanıcı '{$user->name}' ({$user->email}), '{$filename}' dosyasını 'Storage Gateway' yöntemiyle indirmeyi başlattı.", [
             'user_id' => $user->id,

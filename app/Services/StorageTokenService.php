@@ -78,10 +78,17 @@ class StorageTokenService
     /**
      * Generate a signed download URL for a file.
      */
-    public function generateDownloadUrl(string $filePath, $userId, ?StorageBox $storageBox = null, int $ttlMinutes = 180): string
+    public function generateDownloadUrl(string $filePath, $userId, ?StorageBox $storageBox = null, int $ttlMinutes = 180, ?string $ticketToken = null): string
     {
-        return $this->generateApiUrl('/download', $userId, $storageBox, $ttlMinutes, [
+        $extraPayload = [
             'file_path' => '/'.ltrim($filePath, '/'),
-        ]);
+            'app_url' => config('app.url', url('/')),
+        ];
+
+        if ($ticketToken) {
+            $extraPayload['ticket_token'] = $ticketToken;
+        }
+
+        return $this->generateApiUrl('/download', $userId, $storageBox, $ttlMinutes, $extraPayload);
     }
 }

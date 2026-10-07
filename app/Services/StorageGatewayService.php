@@ -182,17 +182,17 @@ class StorageGatewayService
     /**
      * Generate a Storage Gateway signed HMAC download URL.
      */
-    public function generateGatewayUrl(StorageBox $box, string $filePath, int|string $userId, int $ttlMinutes = 180): string
+    public function generateGatewayUrl(StorageBox $box, string $filePath, int|string $userId, int $ttlMinutes = 180, ?string $ticketToken = null): string
     {
-        return $this->tokenService->generateDownloadUrl($filePath, $userId, $box, $ttlMinutes);
+        return $this->tokenService->generateDownloadUrl($filePath, $userId, $box, $ttlMinutes, $ticketToken);
     }
 
     /**
      * Alias for backward compatibility.
      */
-    public function generateCustomGatewayUrl(StorageBox $box, string $filePath, int|string $userId, int $ttlMinutes = 180): string
+    public function generateCustomGatewayUrl(StorageBox $box, string $filePath, int|string $userId, int $ttlMinutes = 180, ?string $ticketToken = null): string
     {
-        return $this->generateGatewayUrl($box, $filePath, $userId, $ttlMinutes);
+        return $this->generateGatewayUrl($box, $filePath, $userId, $ttlMinutes, $ticketToken);
     }
 
     /**
