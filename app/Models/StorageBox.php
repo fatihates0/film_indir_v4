@@ -191,8 +191,8 @@ class StorageBox extends Model
      */
     public function formatGb(int $gb): string
     {
-        if ($gb >= 1000) {
-            $tb = round($gb / 1000, 2);
+        if ($gb >= 1024) {
+            $tb = sprintf('%.2f', $gb / 1024);
 
             return "{$tb} TB";
         }

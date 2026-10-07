@@ -314,9 +314,8 @@ export default function StorageBoxesIndex({ boxes = [], stats }) {
                         return (
                             <div
                                 key={box.id}
-                                className={`bg-[#0D111A] border rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 hover:border-white/20 shadow-xl ${
-                                    box.is_default ? 'border-[#00B074]/40 shadow-emerald-950/20' : 'border-white/[0.08]'
-                                }`}
+                                className={`bg-[#0D111A] border rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 hover:border-white/20 shadow-xl ${box.is_default ? 'border-[#00B074]/40 shadow-emerald-950/20' : 'border-white/[0.08]'
+                                    }`}
                             >
                                 {/* CARD HEADER */}
                                 <div className="p-5 border-b border-white/[0.06] space-y-3 bg-[#0A0D14]/50">
@@ -333,13 +332,12 @@ export default function StorageBoxesIndex({ boxes = [], stats }) {
                                                 )}
                                             </div>
                                             <p className="text-[11px] text-gray-400 mt-1">
-                                                Nginx Media Gateway Node
+                                                Gateway Storage
                                             </p>
                                         </div>
 
-                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                            box.use_ssl ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                        }`}>
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${box.use_ssl ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                            }`}>
                                             <Lock className="w-2.5 h-2.5" />
                                             <span>{box.use_ssl ? 'HTTPS' : 'HTTP'}</span>
                                         </span>
@@ -391,9 +389,8 @@ export default function StorageBoxesIndex({ boxes = [], stats }) {
                                         </div>
                                         <div className="w-full h-2.5 bg-[#07090E] rounded-full overflow-hidden border border-white/[0.06]">
                                             <div
-                                                className={`h-full transition-all duration-500 rounded-full ${
-                                                    box.used_percentage > 90 ? 'bg-rose-500' : box.used_percentage > 75 ? 'bg-amber-500' : 'bg-[#00B074]'
-                                                }`}
+                                                className={`h-full transition-all duration-500 rounded-full ${box.used_percentage > 90 ? 'bg-rose-500' : box.used_percentage > 75 ? 'bg-amber-500' : 'bg-[#00B074]'
+                                                    }`}
                                                 style={{ width: `${Math.min(100, box.used_percentage || 0)}%` }}
                                             />
                                         </div>

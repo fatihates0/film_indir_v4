@@ -36,31 +36,38 @@ class HetznerStorageBoxService
         $startTime = microtime(true);
         /** @var StorageTokenService $tokenService */
         $tokenService = app(StorageTokenService::class);
-        $testUrl = $tokenService->generateApiUrl('/download', 0, $box, 5);
+        $baseUrl = $tokenService->getBaseUrl($box);
+        $healthUrl = rtrim($baseUrl, '/').'/health';
 
         try {
             $response = Http::withoutVerifying()
                 ->timeout($this->timeout)
                 ->connectTimeout($this->connectTimeout)
-                ->get($testUrl);
+                ->get($healthUrl);
 
             $latency = (int) round((microtime(true) - $startTime) * 1000);
+            $data = $response->json();
 
-            if (in_array($response->status(), [401, 403, 200, 404], true)) {
+            $isOnline = $response->successful()
+                && is_array($data)
+                && isset($data['success']) && $data['success'] === true
+                && isset($data['status']) && $data['status'] === 'online';
+
+            if ($isOnline) {
                 return [
                     'success' => true,
                     'status' => StorageBoxConnectionStatus::Online,
                     'latency_ms' => $latency,
-                    'message' => "Custom Storage Gateway yanıt verdi (HTTP {$response->status()}). Gecikme: {$latency}ms",
+                    'message' => $data['message'] ?? "Custom Storage Gateway çevrimiçi. Gecikme: {$latency}ms",
                     'server_info' => 'Nginx Gateway Daemon (Node.js/Go/Rust)',
                 ];
             }
 
             return [
                 'success' => false,
-                'status' => StorageBoxConnectionStatus::Error,
+                'status' => StorageBoxConnectionStatus::Offline,
                 'latency_ms' => $latency,
-                'message' => "Custom Gateway beklenmeyen yanıt verdi (HTTP {$response->status()}).",
+                'message' => 'Custom Storage Gateway çevrimdışı veya geçersiz yanıt verdi.',
             ];
         } catch (Throwable $e) {
             $latency = (int) round((microtime(true) - $startTime) * 1000);
@@ -87,18 +94,94 @@ class HetznerStorageBoxService
         $box->last_error = $result['success'] ? null : $result['message'];
 
         if ($result['success']) {
-            $scanResult = $this->fetchNodeMediaUsage($box);
-            if ($scanResult !== null) {
-                $usedGb = (int) round($scanResult['total_bytes'] / (1024 * 1024 * 1024));
-                $box->used_capacity_gb = $usedGb;
-                $totalGb = (int) ($box->total_capacity_gb ?: 1000);
-                $box->free_capacity_gb = max(0, $totalGb - $usedGb);
+            $diskSizeStats = $this->fetchNodeDiskSize($box);
+            if ($diskSizeStats !== null) {
+                $box->total_capacity_gb = $diskSizeStats['total_capacity_gb'];
+                $box->used_capacity_gb = $diskSizeStats['used_capacity_gb'];
+                $box->free_capacity_gb = $diskSizeStats['free_capacity_gb'];
+            } else {
+                $scanResult = $this->fetchNodeMediaUsage($box);
+                if ($scanResult !== null) {
+                    $usedGb = (int) round($scanResult['total_bytes'] / (1024 * 1024 * 1024));
+                    $box->used_capacity_gb = $usedGb;
+                    $totalGb = (int) ($box->total_capacity_gb ?: 1000);
+                    $box->free_capacity_gb = max(0, $totalGb - $usedGb);
+                }
             }
         }
 
         $box->save();
 
         return $box;
+    }
+
+    /**
+     * Fetch total, used, and free disk capacity from storage node /disks endpoint.
+     *
+     * @return array{total_capacity_gb: int, used_capacity_gb: int, free_capacity_gb: int}|null
+     */
+    public function fetchNodeDiskSize(StorageBox $box): ?array
+    {
+        /** @var StorageTokenService $tokenService */
+        $tokenService = app(StorageTokenService::class);
+
+        $endpoints = ['/disks'];
+
+        foreach ($endpoints as $endpoint) {
+            $apiUrl = $tokenService->generateApiUrl($endpoint, 0, $box, 15);
+
+            try {
+                $response = Http::withoutVerifying()
+                    ->timeout($this->timeout)
+                    ->connectTimeout($this->connectTimeout)
+                    ->get($apiUrl);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (is_array($data) && ($data['success'] ?? false) === true) {
+                        $summary = $data['summary'] ?? [];
+
+                        // 1. Try bytes if available
+                        $totalBytes = $data['total_bytes'] ?? $summary['total_bytes'] ?? null;
+                        $usedBytes = $data['used_bytes'] ?? $summary['used_bytes'] ?? null;
+                        $freeBytes = $data['free_bytes'] ?? $summary['free_bytes'] ?? null;
+
+                        if ($totalBytes !== null && (float) $totalBytes > 0) {
+                            $totalGb = (int) round(((float) $totalBytes) / (1024 * 1024 * 1024));
+                            $usedGb = (int) round(((float) ($usedBytes ?? ($totalBytes - ($freeBytes ?? 0)))) / (1024 * 1024 * 1024));
+                            $freeGb = (int) max(0, $totalGb - $usedGb);
+
+                            return [
+                                'total_capacity_gb' => $totalGb,
+                                'used_capacity_gb' => $usedGb,
+                                'free_capacity_gb' => $freeGb,
+                            ];
+                        }
+
+                        // 2. Try MB if bytes not present
+                        $totalMb = (float) ($data['total_mb'] ?? $summary['total_mb'] ?? 0);
+                        $usedMb = (float) ($data['used_mb'] ?? $summary['used_mb'] ?? 0);
+                        $freeMb = (float) ($data['free_mb'] ?? $summary['free_mb'] ?? 0);
+
+                        if ($totalMb > 0) {
+                            $totalGb = (int) round($totalMb / 1024);
+                            $usedGb = (int) round($usedMb / 1024);
+                            $freeGb = (int) max(0, $totalGb - $usedGb);
+
+                            return [
+                                'total_capacity_gb' => $totalGb,
+                                'used_capacity_gb' => $usedGb,
+                                'free_capacity_gb' => $freeGb,
+                            ];
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                Log::warning("StorageBox fetchNodeDiskSize ({$endpoint}) error ({$box->name}): ".$e->getMessage());
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -270,7 +270,7 @@ class StorageBoxController extends Controller
     protected function formatGb(int $gb): string
     {
         if ($gb >= 1000) {
-            $tb = round($gb / 1000, 2);
+            $tb = sprintf('%.2f', $gb / 1000);
 
             return "{$tb} TB";
         }

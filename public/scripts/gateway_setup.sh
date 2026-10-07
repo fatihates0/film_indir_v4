@@ -1471,7 +1471,10 @@ app.get('/disks', verifyToken, (req, res) => {
                 path: diskPath,
                 total_bytes: total,
                 free_bytes: free,
-                used_bytes: used
+                used_bytes: used,
+                total_mb: Math.round(total / (1024 * 1024)),
+                used_mb: Math.round(used / (1024 * 1024)),
+                free_mb: Math.round(free / (1024 * 1024))
             };
         });
 
@@ -1485,7 +1488,10 @@ app.get('/disks', verifyToken, (req, res) => {
                 total_bytes: totalPoolBytes,
                 free_bytes: freePoolBytes,
                 used_bytes: usedPoolBytes,
-                usage_percent: usagePercent
+                usage_percent: usagePercent,
+                total_mb: Math.round(totalPoolBytes / (1024 * 1024)),
+                used_mb: Math.round(usedPoolBytes / (1024 * 1024)),
+                free_mb: Math.round(freePoolBytes / (1024 * 1024))
             },
             physical_disks: disksDetail
         });
@@ -1493,6 +1499,7 @@ app.get('/disks', verifyToken, (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
 
 function scanDirectory(dirPath, relativeDir, fileListMap, visited = new Set()) {
     try {
