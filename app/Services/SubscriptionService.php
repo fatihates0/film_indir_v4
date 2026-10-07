@@ -142,11 +142,14 @@ class SubscriptionService
                 if ($currentPeriod) {
                     $currentPeriod->update(['is_active' => false]);
                     $nextPeriodNum = $currentPeriod->period_number + 1;
-                    $periodStart = $currentPeriod->period_end->copy();
                 } else {
                     $nextPeriodNum = 1;
-                    $periodStart = $subscription->starts_at->copy();
                 }
+
+                // Calculate period start based on anchor date and period number
+                $periodStart = $subscription->is_perpetual
+                    ? $subscription->starts_at->copy()
+                    : $subscription->starts_at->copy()->addMonthsNoOverflow($nextPeriodNum - 1);
 
                 // If next period start is already beyond subscription expiration, subscription is done
                 if (! $subscription->is_perpetual && $periodStart->greaterThanOrEqualTo($subscription->expires_at)) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentMethod;
 use App\Models\PaymentNotification;
@@ -22,10 +23,13 @@ class PlanController extends Controller
     public function index(Request $request): Response
     {
         $plans = Plan::withCount(['subscriptions' => function ($q) {
-            $q->where('status', 'active');
+            $q->where('status', 'active')->whereHas('user', function ($uq) {
+                $uq->where('role', '!=', UserRole::ADMIN);
+            });
         }])->orderBy('sort_order')->get();
 
-        $users = User::orderBy('name')
+        $users = User::where('role', '!=', UserRole::ADMIN)
+            ->orderBy('name')
             ->get()
             ->map(function (User $u) {
                 $period = app(SubscriptionService::class)->getCurrentPeriod($u);
@@ -53,6 +57,9 @@ class PlanController extends Controller
             });
 
         $subscriptionsHistory = Subscription::with(['user', 'plan'])
+            ->whereHas('user', function ($q) {
+                $q->where('role', '!=', UserRole::ADMIN);
+            })
             ->latest('id')
             ->get()
             ->map(function (Subscription $sub) {
@@ -83,6 +90,9 @@ class PlanController extends Controller
         $paymentMethods = PaymentMethod::orderBy('sort_order')->get();
 
         $paymentNotifications = PaymentNotification::with(['user', 'plan', 'paymentMethod'])
+            ->whereHas('user', function ($q) {
+                $q->where('role', '!=', UserRole::ADMIN);
+            })
             ->latest('id')
             ->get()
             ->map(function (PaymentNotification $pn) {
