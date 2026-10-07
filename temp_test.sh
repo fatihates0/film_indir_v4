@@ -30,7 +30,7 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-log_info() { echo -e "${CYAN}[BİLGİ]${NC} $1"; }
+
 log_success() { echo -e "${GREEN}[BAŞARILI]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[UYARI]${NC} $1"; }
 log_error() { echo -e "${RED}[HATA]${NC} $1"; }
@@ -52,18 +52,18 @@ is_installed() {
 get_env_val() {
     local key=$1
     if [ -f "$ENV_FILE" ]; then
-        grep "^${key}=" "$ENV_FILE" | cut -d'=' -f2- | sed -e 's/"//g' -e "s/'//g"
+        grep "^${key}=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'"
     fi
 }
 
 scan_all_block_devices() {
     lsblk -J -b -o NAME,SIZE,FSTYPE,MOUNTPOINT,TYPE,MODEL 2>/dev/null | \
-    python3 - << 'PY_EOF' 2>/dev/null
+    python3 -c '
 import json, sys
 
-SKIP_FS = {'vfat', 'iso9660', 'squashfs', 'tmpfs', 'devtmpfs'}
+SKIP_FS = {"vfat", "iso9660", "squashfs", "tmpfs", "devtmpfs"}
 MIN_SIZE = 100 * 1024 * 1024
-SKIP_DEV = ['sr', 'loop', 'ram', 'zram', 'dm-', 'md']
+SKIP_DEV = ["sr", "loop", "ram", "zram", "dm-", "md"]
 
 def parse_size(s):
     try: return int(s)
@@ -71,47 +71,47 @@ def parse_size(s):
 
 result = []
 
-def walk(devices, parent_model=''):
+def walk(devices, parent_model=""):
     for d in devices:
-        dtype   = d.get('type', '')
-        name    = d.get('name', '')
-        dev     = '/dev/' + name
-        size_b  = parse_size(d.get('size', 0))
-        fs      = (d.get('fstype') or '').strip()
-        mp      = (d.get('mountpoint') or '').strip()
-        model   = ((d.get('model') or '').strip()) or parent_model
-        children = d.get('children') or []
+        dtype   = d.get("type", "")
+        name    = d.get("name", "")
+        dev     = "/dev/" + name
+        size_b  = parse_size(d.get("size", 0))
+        fs      = (d.get("fstype") or "").strip()
+        mp      = (d.get("mountpoint") or "").strip()
+        model   = ((d.get("model") or "").strip()) or parent_model
+        children = d.get("children") or []
 
         if any(name.startswith(x) for x in SKIP_DEV):
             continue
 
-        if dtype == 'disk':
+        if dtype == "disk":
             if children:
                 walk(children, model)
             else:
                 if size_b >= MIN_SIZE and fs not in SKIP_FS:
                     result.append((dev, size_b, fs, mp, model))
-        elif dtype == 'part':
+        elif dtype == "part":
             if size_b < MIN_SIZE:
                 continue
             if fs in SKIP_FS:
                 continue
             result.append((dev, size_b, fs, mp, model))
 
-walk(json.load(sys.stdin).get('blockdevices', []))
+walk(json.load(sys.stdin).get("blockdevices", []))
 result.sort(key=lambda x: x[1], reverse=True)
 
 for dev, size_b, fs, mp, model in result:
     if size_b >= 1024**4:
-        size_str = f'{size_b/1024**4:.1f}T'
+        size_str = f"{size_b/1024**4:.1f}T"
     elif size_b >= 1024**3:
-        size_str = f'{size_b/1024**3:.1f}G'
+        size_str = f"{size_b/1024**3:.1f}G"
     elif size_b >= 1024**2:
-        size_str = f'{size_b/1024**2:.0f}M'
+        size_str = f"{size_b/1024**2:.0f}M"
     else:
-        size_str = f'{size_b}B'
-    print(f'{dev}|{size_str}|{fs}|{mp}|{model}')
-PY_EOF
+        size_str = f"{size_b}B"
+    print(f"{dev}|{size_str}|{fs}|{mp}|{model}")
+' 2>/dev/null
 }
 
 auto_mount_disk() {
@@ -680,7 +680,7 @@ token_management() {
             local token
             token=$(generate_token "$(( $(date +%s) + 300 ))")
             log_info "/scan endpoint test ediliyor..."
-            result=$(curl -sf --max-time 15 "$base_url/scan?token=$token" 2>&1 | python3 -c 'import json,sys; d=json.load(sys.stdin); print("Toplam dosya:", d.get("count", 0))' 2>/dev/null) || result="HATA - servis çalışmıyor olabilir"
+            result=$(curl -sf --max-time 15 "$base_url/scan?token=$token" 2>&1 | python3 -c 'import json,sys; d=json.load(sys.stdin); print(f"Toplam dosya: {d[\"count\"]}")' 2>/dev/null) || result="HATA - servis çalışmıyor olabilir"
             echo -e "  Sonuç: ${GREEN}$result${NC}"
             ;;
         5)
@@ -691,10 +691,10 @@ token_management() {
 import json, sys
 d = json.load(sys.stdin)
 s = d.get("summary", {})
-t = s.get("total_bytes", 0) // (1024*1024*1024)
-f = s.get("free_bytes", 0) // (1024*1024*1024)
-p = s.get("usage_percent", 0)
-print("Toplam:", t, "GB | Boş:", f, "GB | Doluluk: %", p)
+total = s.get("total_bytes", 0)
+free  = s.get("free_bytes", 0)
+pct   = s.get("usage_percent", 0)
+print(f"Toplam: {total//1024**3}GB | Boş: {free//1024**3}GB | Doluluk: %{pct}")
 ' 2>/dev/null) || result="HATA"
             echo -e "  Sonuç: ${GREEN}$result${NC}"
             ;;
@@ -1021,7 +1021,7 @@ quota_label_management() {
 
 notification_settings() {
     show_dashboard
-    log_step "Bildirim Ayarları - Webhook / Telegram"
+    log_step "Bildirim Ayarları (Webhook / Telegram)"
 
     local cur_webhook=$(get_env_val "WEBHOOK_URL")
     local cur_laravel_url=$(get_env_val "LARAVEL_WEBHOOK_URL")
@@ -1029,22 +1029,17 @@ notification_settings() {
     local cur_tg_chat=$(get_env_val "TELEGRAM_CHAT_ID")
     local cur_disk_thr=$(get_env_val "ALERT_DISK_PERCENT"); cur_disk_thr=${cur_disk_thr:-85}
 
-    local wh_disp="${cur_webhook:-tanımlanmamış}"
-    local laravel_disp="${cur_laravel_url:-otomatik alınıyor}"
-    local tg_tok_disp="${cur_tg_token:-tanımlanmamış}"
-    local tg_chat_disp="${cur_tg_chat:-tanımlanmamış}"
-
-    echo -e " Mevcut Sistem Webhook URL : ${CYAN}${wh_disp}${NC}"
-    echo -e " Mevcut Laravel Webhook URL: ${CYAN}${laravel_disp}${NC}"
-    echo -e " Telegram Bot Token        : ${CYAN}${tg_tok_disp}${NC}"
-    echo -e " Telegram Chat ID          : ${CYAN}${tg_chat_disp}${NC}"
+    echo -e " Mevcut Sistem Webhook URL : ${CYAN}${cur_webhook:-(tanımlanmamış)}${NC}"
+    echo -e " Mevcut Laravel Webhook URL: ${CYAN}${cur_laravel_url:-(token'dan otomatik alınır)}${NC}"
+    echo -e " Telegram Bot Token        : ${CYAN}${cur_tg_token:-(tanımlanmamış)}${NC}"
+    echo -e " Telegram Chat ID          : ${CYAN}${cur_tg_chat:-(tanımlanmamış)}${NC}"
     echo -e " Disk Doluluk Eşiği        : ${CYAN}%${cur_disk_thr}${NC}"
     echo ""
-    echo -e "  [${CYAN}1${NC}] Sistem Webhook URL ayarla - Discord / Slack / özel"
-    echo -e "  [${CYAN}2${NC}] Telegram ayarla - Bot Token + Chat ID"
-    echo -e "  [${CYAN}3${NC}] Disk doluluk uyarı eşiğini değiştir - şu an: %${cur_disk_thr}"
+    echo -e "  [${CYAN}1${NC}] Sistem Webhook URL ayarla (Discord / Slack / özel)"
+    echo -e "  [${CYAN}2${NC}] Telegram ayarla (Bot Token + Chat ID)"
+    echo -e "  [${CYAN}3${NC}] Disk doluluk uyarı eşiğini değiştir (şu an: %${cur_disk_thr})"
     echo -e "  [${CYAN}4${NC}] Test bildirimi gönder"
-    echo -e "  [${CYAN}5${NC}] 🎯 Laravel Kota Webhook URL Manuel Ayarla"
+    echo -e "  [${CYAN}5${NC}] 🎯 Laravel Kota Webhook URL Manuel Ayarla (LARAVEL_WEBHOOK_URL)"
     echo -e "  [${CYAN}6${NC}] Tüm bildirimleri devre dışı bırak"
     echo -e "  [${CYAN}0${NC}] Geri"
     echo ""
@@ -1083,7 +1078,7 @@ notification_settings() {
             log_success "Telegram ayarları kaydedildi."
             ;;
         3)
-            read -p "Yeni uyarı eşiği - örn: 80: " NEW_THR
+            read -p "Yeni uyarı eşiği (örn: 80): " NEW_THR
             [[ "$NEW_THR" =~ ^[0-9]+$ ]] || { log_error "Geçersiz değer!"; return; }
             set_env_val "ALERT_DISK_PERCENT" "$NEW_THR"
             log_success "Doluluk uyarı eşiği: %$NEW_THR"
@@ -1091,16 +1086,14 @@ notification_settings() {
         4)
             local hostname_str
             hostname_str=$(hostname 2>/dev/null || echo "sunucu")
-            local dt_str
-            dt_str=$(date '+%d.%m.%Y %H:%M')
-            if send_notification "🔔 [Storage Gateway] Test bildirimi - $hostname_str - $dt_str"; then
+            if send_notification "🔔 [Storage Gateway] Test bildirimi - $hostname_str - $(date '+%d.%m.%Y %H:%M')"; then
                 log_success "Test bildirimi gönderildi!"
             else
                 log_error "Bildirim gönderilemedi. Ayarları kontrol edin."
             fi
             ;;
         5)
-            read -p "Laravel Base URL girin - Örn: https://movie.fatihates.com.tr: " L_URL
+            read -p "Laravel Base URL girin (Örn: https://movie.fatihates.com.tr): " L_URL
             [ -z "$L_URL" ] && return
             L_URL=$(echo "$L_URL" | sed 's|/*$||')
             set_env_val "LARAVEL_WEBHOOK_URL" "$L_URL"
@@ -1152,7 +1145,7 @@ SERVICE_NAME="storage-gateway"
 LOG_FILE="/var/log/storage-gateway-health.log"
 TS=$(date '+%Y-%m-%d %H:%M:%S')
 
-get_val() { grep "^$1=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | sed -e 's/"//g' -e "s/'//g"; }
+get_val() { grep "^$1=" "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'"; }
 
 send_alert() {
     local msg="$1"

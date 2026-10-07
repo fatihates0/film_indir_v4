@@ -41,13 +41,13 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-is_installed() {
-    if [ -d "$INSTALL_DIR" ] && [ -f "$ENV_FILE" ] && systemctl list-unit-files | grep -q "$SERVICE_NAME.service"; then
-        return 0
-    else
-        return 1
-    fi
-}
+
+
+
+
+
+
+
 
 get_env_val() {
     local key=$1

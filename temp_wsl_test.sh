@@ -1021,7 +1021,7 @@ quota_label_management() {
 
 notification_settings() {
     show_dashboard
-    log_step "Bildirim Ayarları - Webhook / Telegram"
+    log_step "Bildirim Ayarları (Webhook / Telegram)"
 
     local cur_webhook=$(get_env_val "WEBHOOK_URL")
     local cur_laravel_url=$(get_env_val "LARAVEL_WEBHOOK_URL")
@@ -1029,22 +1029,17 @@ notification_settings() {
     local cur_tg_chat=$(get_env_val "TELEGRAM_CHAT_ID")
     local cur_disk_thr=$(get_env_val "ALERT_DISK_PERCENT"); cur_disk_thr=${cur_disk_thr:-85}
 
-    local wh_disp="${cur_webhook:-tanımlanmamış}"
-    local laravel_disp="${cur_laravel_url:-otomatik alınıyor}"
-    local tg_tok_disp="${cur_tg_token:-tanımlanmamış}"
-    local tg_chat_disp="${cur_tg_chat:-tanımlanmamış}"
-
-    echo -e " Mevcut Sistem Webhook URL : ${CYAN}${wh_disp}${NC}"
-    echo -e " Mevcut Laravel Webhook URL: ${CYAN}${laravel_disp}${NC}"
-    echo -e " Telegram Bot Token        : ${CYAN}${tg_tok_disp}${NC}"
-    echo -e " Telegram Chat ID          : ${CYAN}${tg_chat_disp}${NC}"
+    echo -e " Mevcut Sistem Webhook URL : ${CYAN}${cur_webhook:-(tanımlanmamış)}${NC}"
+    echo -e " Mevcut Laravel Webhook URL: ${CYAN}${cur_laravel_url:-(token'dan otomatik alınır)}${NC}"
+    echo -e " Telegram Bot Token        : ${CYAN}${cur_tg_token:-(tanımlanmamış)}${NC}"
+    echo -e " Telegram Chat ID          : ${CYAN}${cur_tg_chat:-(tanımlanmamış)}${NC}"
     echo -e " Disk Doluluk Eşiği        : ${CYAN}%${cur_disk_thr}${NC}"
     echo ""
-    echo -e "  [${CYAN}1${NC}] Sistem Webhook URL ayarla - Discord / Slack / özel"
-    echo -e "  [${CYAN}2${NC}] Telegram ayarla - Bot Token + Chat ID"
-    echo -e "  [${CYAN}3${NC}] Disk doluluk uyarı eşiğini değiştir - şu an: %${cur_disk_thr}"
+    echo -e "  [${CYAN}1${NC}] Sistem Webhook URL ayarla (Discord / Slack / özel)"
+    echo -e "  [${CYAN}2${NC}] Telegram ayarla (Bot Token + Chat ID)"
+    echo -e "  [${CYAN}3${NC}] Disk doluluk uyarı eşiğini değiştir (şu an: %${cur_disk_thr})"
     echo -e "  [${CYAN}4${NC}] Test bildirimi gönder"
-    echo -e "  [${CYAN}5${NC}] 🎯 Laravel Kota Webhook URL Manuel Ayarla"
+    echo -e "  [${CYAN}5${NC}] 🎯 Laravel Kota Webhook URL Manuel Ayarla (LARAVEL_WEBHOOK_URL)"
     echo -e "  [${CYAN}6${NC}] Tüm bildirimleri devre dışı bırak"
     echo -e "  [${CYAN}0${NC}] Geri"
     echo ""
@@ -1083,7 +1078,7 @@ notification_settings() {
             log_success "Telegram ayarları kaydedildi."
             ;;
         3)
-            read -p "Yeni uyarı eşiği - örn: 80: " NEW_THR
+            read -p "Yeni uyarı eşiği (örn: 80): " NEW_THR
             [[ "$NEW_THR" =~ ^[0-9]+$ ]] || { log_error "Geçersiz değer!"; return; }
             set_env_val "ALERT_DISK_PERCENT" "$NEW_THR"
             log_success "Doluluk uyarı eşiği: %$NEW_THR"
@@ -1091,16 +1086,14 @@ notification_settings() {
         4)
             local hostname_str
             hostname_str=$(hostname 2>/dev/null || echo "sunucu")
-            local dt_str
-            dt_str=$(date '+%d.%m.%Y %H:%M')
-            if send_notification "🔔 [Storage Gateway] Test bildirimi - $hostname_str - $dt_str"; then
+            if send_notification "🔔 [Storage Gateway] Test bildirimi - $hostname_str - $(date '+%d.%m.%Y %H:%M')"; then
                 log_success "Test bildirimi gönderildi!"
             else
                 log_error "Bildirim gönderilemedi. Ayarları kontrol edin."
             fi
             ;;
         5)
-            read -p "Laravel Base URL girin - Örn: https://movie.fatihates.com.tr: " L_URL
+            read -p "Laravel Base URL girin (Örn: https://movie.fatihates.com.tr): " L_URL
             [ -z "$L_URL" ] && return
             L_URL=$(echo "$L_URL" | sed 's|/*$||')
             set_env_val "LARAVEL_WEBHOOK_URL" "$L_URL"
@@ -2045,18 +2038,19 @@ case "$1" in
         ;;
     healthcheck)
         bash /opt/storage-gateway/healthcheck.sh
-        ;;
-    install|reinstall)
-        install_gateway
-        ;;
-    *)
-        if is_installed; then
-            main_menu
-        else
-            log_info "Sunucuda kurulu Gateway bulunamadı. İlk Kurulum Sihirbazı başlatılıyor..."
-            sleep 1
-            install_gateway
-            main_menu
-        fi
-        ;;
-esac
+#         ;;
+#     install|reinstall)
+#         install_gateway
+#         ;;
+#     *)
+#         if is_installed; then
+#             main_menu
+#         else
+#             log_info "Sunucuda kurulu Gateway bulunamadı. İlk Kurulum Sihirbazı başlatılıyor..."
+#             sleep 1
+#             install_gateway
+#             main_menu
+#         fi
+#         ;;
+# esac
+# 
