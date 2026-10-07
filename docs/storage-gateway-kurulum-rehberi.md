@@ -113,6 +113,7 @@ Scripti menüsüz olarak doğrudan özel parametrelerle de çalıştırabilirsin
 | Komut | Açıklama |
 | :--- | :--- |
 | `sudo bash gateway_setup.sh update` | **⚡ Hızlı Güncelleme (1 Saniye):** Ağ, SSL ve disk ayarlarına dokunmadan sadece `server.js` ve daemon kodunu günceller. |
+| `sudo bash gateway_setup.sh test-webhook` | **🎯 Kota Webhook Testi:** Gateway sunucusundan Laravel `/api/internal/downloads/log-bytes` ucuna test harcama isteği atar. |
 | `sudo bash gateway_setup.sh status` | Servis, Nginx, SSL ve Disk genel durum özetini gösterir. |
 | `sudo bash gateway_command.sh install` | Sıfırdan veya tam yeniden kurulum sihirbazını başlatır. |
 | `sudo bash gateway_setup.sh list-disks` | Havuzdaki aktif disklerin boyut, kullanılan ve boş alan analizi. |

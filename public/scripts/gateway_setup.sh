@@ -515,9 +515,64 @@ view_logs() {
     journalctl -u "$SERVICE_NAME" -f -n 50
 }
 
+test_quota_webhook() {
+    show_dashboard
+    log_step "Laravel Kota Düşüm Webhook Test Aracı (POST /api/internal/downloads/log-bytes)"
+
+    echo -e "${YELLOW}Bu araç, Storage Gateway'in indirme tamamlandığında Laravel backend'e gönderdiği${NC}"
+    echo -e "${YELLOW}harcanan bayt bildirimini (log-bytes webhook) simüle ederek test eder.${NC}"
+    echo ""
+
+    local cur_laravel_url=$(get_env_val "LARAVEL_WEBHOOK_URL")
+    read -p "1. Laravel Site Base URL [Varsayılan: ${cur_laravel_url:-https://filmindir.com}]: " TARGET_URL
+    TARGET_URL=${TARGET_URL:-$cur_laravel_url}
+    TARGET_URL=${TARGET_URL:-https://filmindir.com}
+
+    TARGET_URL=$(echo "$TARGET_URL" | sed 's|/*$||')
+
+    read -p "2. İndirme Bileti Token'ı (DownloadTicket Token) [Boş bırakırsanız test token üretilir]: " TICKET_TOKEN
+    if [ -z "$TICKET_TOKEN" ]; then
+        TICKET_TOKEN="TEST_TOKEN_$(date +%s)_$RANDOM"
+    fi
+
+    read -p "3. Test Edilecek İndirme Boyutu (MB cinsinden) [Varsayılan: 500 MB]: " SIZE_MB
+    SIZE_MB=${SIZE_MB:-500}
+
+    local bytes_sent=$(( SIZE_MB * 1024 * 1024 ))
+    local full_endpoint="${TARGET_URL}/api/internal/downloads/log-bytes"
+
+    log_info "İstek gönderiliyor -> POST $full_endpoint"
+    log_info "Payload: {\"token\":\"$TICKET_TOKEN\", \"bytes_sent\":$bytes_sent} (${SIZE_MB} MB)"
+    echo ""
+
+    local http_response
+    http_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"token\":\"$TICKET_TOKEN\",\"bytes_sent\":$bytes_sent}" \
+        --max-time 10 "$full_endpoint" 2>&1) || true
+
+    local body
+    body=$(echo "$http_response" | head -n -1)
+    local code
+    code=$(echo "$http_response" | tail -n 1 | cut -d: -f2)
+
+    echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
+    if [ "$code" = "200" ]; then
+        log_success "HTTP $code OK - Webhook isteği Laravel'e başarıyla ulaştı!"
+        echo -e "  Laravel Yanıtı: ${GREEN}$body${NC}"
+        log_info "Eğer bu gerçek bir bilet ise, kullanıcının kotasından ${SIZE_MB} MB düşülmüştür."
+    else
+        log_error "HTTP $code - Webhook isteği başarısız oldu!"
+        echo -e "  Sunucu Yanıtı: ${RED}$body${NC}"
+        log_warn "İpucu: Laravel sitenizin URL'sini ve /api/internal/downloads/log-bytes rotasını kontrol edin."
+    fi
+    echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
+    echo ""
+}
+
 token_management() {
     show_dashboard
-    log_step "Token Yönetimi Paneli"
+    log_step "Token ve Webhook Yönetim Paneli"
     local secret=$(get_env_val "STORAGE_SECRET_KEY")
     local domain=$(get_env_val "STORAGE_DOMAIN")
     local port=$(get_env_val "PORT")
@@ -534,6 +589,7 @@ token_management() {
     echo -e "  [${CYAN}4${NC}] Token ile /scan endpoint test et"
     echo -e "  [${CYAN}5${NC}] Token ile /disks endpoint test et"
     echo -e "  [${CYAN}6${NC}] Var olan token'ı decode et"
+    echo -e "  [${CYAN}7${NC}] 🎯 Laravel Kota Düşüm Webhook'unu Test Et (POST /log-bytes)"
     echo -e "  [${CYAN}0${NC}] Geri"
     echo ""
     read -p "Seçiminiz: " T_CHOICE
@@ -610,6 +666,9 @@ print(f'Toplam: {total//1024**3}GB | Boş: {free//1024**3}GB | Doluluk: %{pct}')
             echo ""
             log_info "Token içeriği:"
             echo -e "${CYAN}$decoded${NC}"
+            ;;
+        7)
+            test_quota_webhook
             ;;
         0) return ;;
         *) log_error "Geçersiz seçim!" ;;
@@ -1901,6 +1960,9 @@ case "$1" in
         ;;
     update|quick-update|code-update)
         quick_update
+        ;;
+    webhook-test|test-webhook|quota-test)
+        test_quota_webhook
         ;;
     token)
         token_management
