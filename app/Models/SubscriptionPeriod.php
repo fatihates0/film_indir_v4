@@ -168,6 +168,14 @@ class SubscriptionPeriod extends Model
     }
 
     /**
+     * Check if remaining quota is sufficient for a given file size in bytes.
+     */
+    public function hasQuotaForFile(int $fileSizeBytes): bool
+    {
+        return $this->remaining_bytes >= $fileSizeBytes;
+    }
+
+    /**
      * Format raw bytes into human readable format (GB / MB / TB).
      */
     public static function formatBytes(int $bytes, int $precision = 2): string

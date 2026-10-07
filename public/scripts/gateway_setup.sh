@@ -1572,6 +1572,10 @@ app.get('/download', verifyToken, (req, res) => {
         }
     }
 
+    if (res.socket && typeof res.socket.setNoDelay === 'function') {
+        try { res.socket.setNoDelay(true); } catch(e) {}
+    }
+
     res.on('close', triggerReport);
     res.on('finish', triggerReport);
 
@@ -1586,7 +1590,7 @@ app.get('/download', verifyToken, (req, res) => {
         }
 
         const chunksize = (end - start) + 1;
-        const file = fs.createReadStream(fullPath, { start, end, highWaterMark: 1024 * 1024 });
+        const file = fs.createReadStream(fullPath, { start, end, highWaterMark: 256 * 1024 });
         const head = {
             'Content-Range': `bytes ${start}-${end}/${fileSize}`,
             'Accept-Ranges': 'bytes',
@@ -1607,7 +1611,7 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
         res.writeHead(200, head);
-        const stream = fs.createReadStream(fullPath, { highWaterMark: 1024 * 1024 });
+        const stream = fs.createReadStream(fullPath, { highWaterMark: 256 * 1024 });
         stream.on('data', (chunk) => {
             bytesSent += chunk.length;
         });
@@ -1740,6 +1744,12 @@ quick_update() {
 
     log_step "Server.js ve Gateway Daemon Kodu Yenileniyor..."
     write_gateway_files
+
+    log_info "Ağ ve TCP İşletim Sistemi Tamponları Optimize Ediliyor..."
+    sysctl -w net.core.rmem_max=16777216 >/dev/null 2>&1 || true
+    sysctl -w net.core.wmem_max=16777216 >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" >/dev/null 2>&1 || true
+    sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" >/dev/null 2>&1 || true
 
     log_info "Gateway servisi yeniden başlatılıyor..."
     systemctl restart "$SERVICE_NAME"
@@ -1917,12 +1927,15 @@ server {
     server_name $DOMAIN;
 
     client_max_body_size 0;
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
 
     location / {
         proxy_pass http://127.0.0.1:$PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'keep-alive';
+        proxy_set_header Connection '';
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -1934,6 +1947,7 @@ server {
         proxy_buffering off;
         proxy_request_buffering off;
         proxy_max_temp_file_size 0;
+        sendfile_max_chunk 2m;
     }
 }
 NGINX_EOF

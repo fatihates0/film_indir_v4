@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserRole;
 use App\Models\DownloadTicket;
 use App\Models\MediaFile;
 use App\Models\Plan;
@@ -315,5 +316,89 @@ class SubscriptionQuotaTest extends TestCase
         // Total recorded bytes for this ticket must equal fileSizeBytes exactly, not exceeding it!
         $this->assertEquals($fileSizeBytes, $ticket->bytes_downloaded);
         $this->assertEquals($fileSizeBytes, $period->used_bytes);
+    }
+
+    public function test_download_prepare_fails_when_file_size_exceeds_remaining_quota(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+        $period = $service->getCurrentPeriod($user);
+
+        // User has 15 GB remaining quota
+        $fifteenGb = 15 * 1024 * 1024 * 1024;
+        $usedBytes = $plan->monthly_quota_bytes - $fifteenGb;
+        $period->update(['used_bytes' => $usedBytes]);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        // File is 18 GB
+        $eighteenGb = 18 * 1024 * 1024 * 1024;
+        $largeFile = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Oppenheimer.2023.2160p.4K.mkv',
+            'path' => '/movies/Oppenheimer.2023.2160p.4K.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => $eighteenGb,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('downloads.prepare', ['mediaFile' => $largeFile->id]));
+
+        $response->assertStatus(403);
+        $response->assertJson([
+            'success' => false,
+            'code' => 'INSUFFICIENT_QUOTA',
+        ]);
+
+        $this->assertStringContainsString('15,00 GB', $response->json('message'));
+        $this->assertStringContainsString('18,00 GB', $response->json('message'));
+    }
+
+    public function test_admin_can_download_file_larger_than_user_quota(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::ADMIN]);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $largeFile = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Avatar.2009.4K.mkv',
+            'path' => '/movies/Avatar.2009.4K.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 100 * 1024 * 1024 * 1024, // 100 GB
+        ]);
+
+        $response = $this->actingAs($admin)->postJson(route('downloads.prepare', ['mediaFile' => $largeFile->id]));
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
     }
 }

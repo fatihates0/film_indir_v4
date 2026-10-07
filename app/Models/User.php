@@ -138,4 +138,18 @@ class User extends Authenticatable
 
         return $period !== null && $period->hasAvailableQuota();
     }
+
+    /**
+     * Check if user has sufficient quota to download a specific file size.
+     */
+    public function hasQuotaForFile(int $fileSizeBytes): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $period = app(SubscriptionService::class)->getCurrentPeriod($this);
+
+        return $period !== null && $period->remaining_bytes >= $fileSizeBytes;
+    }
 }
