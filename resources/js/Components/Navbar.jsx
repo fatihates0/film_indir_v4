@@ -419,11 +419,11 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                         </div>
 
                         {/* Navigation Links */}
-                        <nav className="py-4 space-y-1">
+                        <nav className="py-2.5 space-y-0.5">
                             <Link
                                 href="/"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -434,7 +434,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                             <Link
                                 href="/movies"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/movies')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -445,7 +445,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                             <Link
                                 href="/series"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/series')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -456,7 +456,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                             <Link
                                 href="/pricing"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/pricing')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -467,7 +467,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                             <Link
                                 href="/releases"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/releases')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -478,7 +478,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                             <Link
                                 href="/forum"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/forum')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
@@ -489,7 +489,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                             <Link
                                 href="/about"
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-3 rounded-xl text-base font-semibold transition-all ${
+                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
                                     isActive('/about')
                                         ? 'bg-[#00B074]/10 text-[#00B074]'
                                         : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
