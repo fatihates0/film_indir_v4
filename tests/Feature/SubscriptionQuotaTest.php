@@ -401,4 +401,114 @@ class SubscriptionQuotaTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson(['success' => true]);
     }
+
+    public function test_user_is_restricted_by_max_parallel_downloads_limit(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+        $plan->update(['max_parallel_downloads' => 1]);
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $file1 = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Movie1.mkv',
+            'path' => '/movies/Movie1.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 2000000000,
+        ]);
+
+        $file2 = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Movie2.mkv',
+            'path' => '/movies/Movie2.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 2000000000,
+        ]);
+
+        // Start active download for File 1
+        DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file1->id,
+            'bytes_downloaded' => 100,
+            'status' => 'active',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        // Attempting to download File 2 should fail due to parallel limit (max_parallel_downloads = 1)
+        $response = $this->actingAs($user)->postJson(route('downloads.prepare', ['mediaFile' => $file2->id]));
+
+        $response->assertStatus(403);
+        $response->assertJson([
+            'success' => false,
+            'code' => 'PARALLEL_LIMIT_EXCEEDED',
+        ]);
+    }
+
+    public function test_user_can_request_same_media_file_multiple_times_without_parallel_limit_block(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+        $plan->update(['max_parallel_downloads' => 1]);
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $file1 = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Movie1.mkv',
+            'path' => '/movies/Movie1.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 2000000000,
+        ]);
+
+        // Active ticket for File 1
+        DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file1->id,
+            'bytes_downloaded' => 100,
+            'status' => 'active',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        // Requesting File 1 again (e.g. IDM connection or resume) should be ALLOWED because it's the SAME file
+        $response = $this->actingAs($user)->postJson(route('downloads.prepare', ['mediaFile' => $file1->id]));
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+    }
 }

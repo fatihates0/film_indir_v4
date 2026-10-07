@@ -221,13 +221,19 @@ class SubscriptionService
             return true;
         }
 
-        DB::transaction(function () use ($ticket, $actualIncrement) {
+        DB::transaction(function () use ($ticket, $actualIncrement, $fileSizeBytes) {
             // Update ticket
-            $ticket->increment('bytes_downloaded', $actualIncrement);
-            if ($ticket->status === 'pending') {
+            $newTotal = $ticket->bytes_downloaded + $actualIncrement;
+            $ticket->bytes_downloaded = $newTotal;
+
+            if ($fileSizeBytes > 0 && $newTotal >= (int) ($fileSizeBytes * 0.98)) {
                 $ticket->status = 'completed';
-                $ticket->save();
+            } else {
+                $ticket->status = 'active';
             }
+
+            $ticket->touch();
+            $ticket->save();
 
             // Update user subscription period used_bytes
             if ($ticket->subscription_period_id) {
@@ -238,6 +244,67 @@ class SubscriptionService
         });
 
         return true;
+    }
+
+    /**
+     * Get maximum allowed parallel (concurrent different files) downloads for a user.
+     */
+    public function getMaxParallelDownloads(User $user): int
+    {
+        if ($user->isAdmin()) {
+            return 99;
+        }
+
+        $period = $this->getCurrentPeriod($user);
+        if ($period && $period->subscription && $period->subscription->plan) {
+            $maxPlan = $period->subscription->plan->max_parallel_downloads;
+            if ($maxPlan > 0) {
+                return $maxPlan;
+            }
+        }
+
+        if ($user->plan) {
+            return match ($user->plan->value) {
+                'free' => 1,
+                'basic' => 2,
+                'vip' => 5,
+                default => 3, // premium
+            };
+        }
+
+        return 1;
+    }
+
+    /**
+     * Get the count of distinct active media files currently being downloaded by a user.
+     */
+    public function getActiveParallelDownloadsCount(User $user, ?int $excludeMediaFileId = null): int
+    {
+        $query = DownloadTicket::where('user_id', $user->id)
+            ->whereIn('status', ['active', 'pending'])
+            ->where('expires_at', '>', now())
+            ->where('updated_at', '>=', now()->subMinutes(15));
+
+        if ($excludeMediaFileId !== null) {
+            $query->where('media_file_id', '!=', $excludeMediaFileId);
+        }
+
+        return (int) $query->distinct('media_file_id')->count('media_file_id');
+    }
+
+    /**
+     * Check if user can start downloading a new media file given their plan's max parallel download limit.
+     */
+    public function canStartParallelDownload(User $user, int $mediaFileId): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $maxAllowed = $this->getMaxParallelDownloads($user);
+        $activeCount = $this->getActiveParallelDownloadsCount($user, $mediaFileId);
+
+        return $activeCount < $maxAllowed;
     }
 
     /**
@@ -264,6 +331,8 @@ class SubscriptionService
                 'period_end_formatted' => 'Süresiz',
                 'subscription_expires_at' => null,
                 'can_download' => true,
+                'max_parallel_downloads' => 99,
+                'active_parallel_downloads' => 0,
             ];
         }
 
@@ -286,6 +355,8 @@ class SubscriptionService
                 'period_end_formatted' => null,
                 'subscription_expires_at' => null,
                 'can_download' => false,
+                'max_parallel_downloads' => $this->getMaxParallelDownloads($user),
+                'active_parallel_downloads' => $this->getActiveParallelDownloadsCount($user),
             ];
         }
 
@@ -295,6 +366,8 @@ class SubscriptionService
         $planName = $plan ? $plan->name : ($subscription->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası');
         $monthlyQuotaGb = $plan ? $plan->monthly_quota_gb : (int) round($period->allocated_bytes / (1024 * 1024 * 1024));
         $periodEndFormatted = $subscription->is_perpetual ? 'Süresiz (Sınırsız Süre)' : $period->period_end->format('d.m.Y H:i');
+        $maxParallel = $this->getMaxParallelDownloads($user);
+        $activeParallel = $this->getActiveParallelDownloadsCount($user);
 
         return [
             'has_subscription' => true,
@@ -313,6 +386,8 @@ class SubscriptionService
             'subscription_expires_at' => $subscription->is_perpetual ? null : $subscription->expires_at->toIso8601String(),
             'is_perpetual' => $subscription->is_perpetual,
             'can_download' => $period->hasAvailableQuota(),
+            'max_parallel_downloads' => $maxParallel,
+            'active_parallel_downloads' => $activeParallel,
         ];
     }
 }

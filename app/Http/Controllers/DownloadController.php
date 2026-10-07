@@ -43,6 +43,20 @@ class DownloadController extends Controller
             ], 403);
         }
 
+        // Check if user has reached max parallel (concurrent different files) download limit
+        if (! $user->isAdmin() && ! $this->subscriptionService->canStartParallelDownload($user, $mediaFile->id)) {
+            $maxParallel = $this->subscriptionService->getMaxParallelDownloads($user);
+            $activeParallel = $this->subscriptionService->getActiveParallelDownloadsCount($user);
+
+            return response()->json([
+                'success' => false,
+                'code' => 'PARALLEL_LIMIT_EXCEEDED',
+                'message' => "Paketiniz aynı anda en fazla {$maxParallel} farklı dosya indirmenize izin vermektedir. (Şu an aktif: {$activeParallel} dosya). Lütfen devam eden indirmelerinizin tamamlanmasını bekleyin.",
+                'max_parallel_downloads' => $maxParallel,
+                'active_parallel_downloads' => $activeParallel,
+            ], 403);
+        }
+
         $activePeriod = $this->subscriptionService->getCurrentPeriod($user);
 
         // Check if remaining quota is sufficient for this specific media file size
@@ -118,6 +132,14 @@ class DownloadController extends Controller
                 $fileSizeFormatted = SubscriptionPeriod::formatBytes($mediaFile->size_bytes);
                 abort(403, "Kalan indirme kotanız ({$remFormatted}), indirmek istediğiniz içerik boyutu ({$fileSizeFormatted}) için yeterli değildir.");
             }
+        }
+
+        // Check if user has reached max parallel download limit
+        if (! $user->isAdmin() && ! $this->subscriptionService->canStartParallelDownload($user, $mediaFile->id)) {
+            $maxParallel = $this->subscriptionService->getMaxParallelDownloads($user);
+            $activeParallel = $this->subscriptionService->getActiveParallelDownloadsCount($user);
+
+            abort(403, "Paketiniz aynı anda en fazla {$maxParallel} farklı dosya indirmenize izin vermektedir. (Şu an aktif: {$activeParallel} dosya). Lütfen devam eden indirmelerinizin tamamlanmasını bekleyin.");
         }
 
         $box = $mediaFile->storageBox;
