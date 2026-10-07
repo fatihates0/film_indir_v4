@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+@variant light (&:where(.light, .light *));
+
+@layer base {
+  :root, html.dark {
+    --bg-primary: #07080c;
+    --bg-secondary: #0f121a;
+    --bg-card: #131722;
+    --bg-card-hover: #1a202e;
+    --bg-glass: rgba(19, 23, 34, 0.85);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-color-hover: rgba(255, 255, 255, 0.18);
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --overlay-gradient-bottom: linear-gradient(180deg, rgba(7, 8, 12, 0) 0%, rgba(7, 8, 12, 0.8) 60%, #07080c 100%);
+    --overlay-gradient-top: linear-gradient(0deg, rgba(7, 8, 12, 0) 0%, rgba(7, 8, 12, 0.85) 100%);
+    --hero-gradient: linear-gradient(90deg, #07080c 0%, rgba(7, 8, 12, 0.6) 40%, rgba(7, 8, 12, 0.2) 100%);
+    --accent: #00B074;
+    --accent-hover: #009663;
+  }
+
+  html.light {
+    --bg-primary: #f4f5f8;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --bg-glass: rgba(255, 255, 255, 0.9);
+    --border-color: rgba(0, 0, 0, 0.08);
+    --border-color-hover: rgba(0, 0, 0, 0.16);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --overlay-gradient-bottom: linear-gradient(180deg, rgba(244, 245, 248, 0) 0%, rgba(244, 245, 248, 0.85) 60%, #f4f5f8 100%);
+    --overlay-gradient-top: linear-gradient(0deg, rgba(244, 245, 248, 0) 0%, rgba(244, 245, 248, 0.85) 100%);
+    --hero-gradient: linear-gradient(90deg, #f4f5f8 0%, rgba(244, 245, 248, 0.75) 45%, rgba(244, 245, 248, 0.15) 100%);
+    --accent: #00B074;
+    --accent-hover: #009663;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #07080c;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #f4f5f8;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #222938;
+  border-radius: 4px;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00B074;
+}
+
+/* Hide scrollbar for clean horizontal carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glass & Card styles */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+}
+
+.modal-glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+}
+
+.gradient-overlay-bottom {
+  background: var(--overlay-gradient-bottom);
+}
+
+.gradient-overlay-top {
+  background: var(--overlay-gradient-top);
+}
+
+.hero-gradient {
+  background: var(--hero-gradient);
+}
+
+/* Infinite Marquee Animation for Streaming Platforms */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 140s linear infinite;
+}
+

@@ -1,0 +1,1336 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+# TSI Medya Dosyası Otomatik İsim Güncelleme ve TMDB Modülü (WebDAV / FTP / Local)
+# ==============================================================================
+# Çalıştırma:
+#   curl -sSL https://movie.fatihates.com.tr/scripts/rename_media.sh | sudo bash
+# ==============================================================================
+
+set -e
+
+# Renkli Çıktı Tanımlamaları
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
+
+# Varsayılan Ayarlar
+PROTOCOL=""
+REMOTE_HOST=""
+REMOTE_URL=""
+REMOTE_USER=""
+REMOTE_PASS=""
+REMOTE_PORT="21"
+REMOTE_DIR="/"
+DRY_RUN=false
+RECURSIVE=true
+TMDB_API_KEY="d58049c10606da5d58e6081d106fed10"
+
+# TTY Üzerinden Girdi Okuma Fonksiyonu (curl | sudo bash desteği için)
+read_tty() {
+    local prompt="$1"
+    local var_name="$2"
+    local is_secret="${3:-false}"
+    
+    if [ "$is_secret" = true ]; then
+        stty -echo 2>/dev/null || true
+        printf "${CYAN}%s${NC}" "$prompt" > /dev/tty
+        read -r val < /dev/tty
+        stty echo 2>/dev/null || true
+        echo "" > /dev/tty
+    else
+        printf "${CYAN}%s${NC}" "$prompt" > /dev/tty
+        read -r val < /dev/tty
+    fi
+    eval "$var_name=\"\$val\""
+}
+
+# Başlık Banner Gösterimi
+show_banner() {
+    clear 2>/dev/null || true
+    echo -e "${MAGENTA}================================================================${NC}"
+    echo -e "${CYAN}   🚀 TSI Medya Otomatik İsim Güncelleme & TMDB Ayrıştırma    ${NC}"
+    echo -e "${MAGENTA}================================================================${NC}"
+    echo ""
+}
+
+# Bağımlılık Kontrolü & Otomatik Yükleme
+check_dependencies() {
+    echo -e "${BLUE}[+] Gerekli sistem araçları kontrol ediliyor...${NC}"
+    local missing_pkgs=()
+
+    for cmd in curl php ffprobe; do
+        if ! command -v $cmd &> /dev/null; then
+            missing_pkgs+=("$cmd")
+        fi
+    done
+
+    if [ ${#missing_pkgs[@]} -gt 0 ]; then
+        echo -e "${YELLOW}[!] Eksik paketler tespit edildi: ${missing_pkgs[*]}${NC}"
+        if command -v apt-get &> /dev/null; then
+            echo -e "${BLUE}[+] apt-get ile paketler yükleniyor...${NC}"
+            apt-get update -qq && apt-get install -y -qq curl php-cli ffmpeg php-curl php-mbstring php-xml || true
+        elif command -v yum &> /dev/null; then
+            echo -e "${BLUE}[+] yum ile paketler yükleniyor...${NC}"
+            yum install -y -q curl php-cli ffmpeg || true
+        fi
+    fi
+
+    # ffprobe yolunu garanti et
+    FFPROBE_CMD="ffprobe"
+    if ! command -v ffprobe &> /dev/null; then
+        if [ -f "/c/ffmpeg/bin/ffprobe.exe" ]; then
+            FFPROBE_CMD="/c/ffmpeg/bin/ffprobe.exe"
+        elif [ -f "C:/ffmpeg/bin/ffprobe.exe" ]; then
+            FFPROBE_CMD="C:/ffmpeg/bin/ffprobe.exe"
+        elif [ -f "/usr/bin/ffprobe" ]; then
+            FFPROBE_CMD="/usr/bin/ffprobe"
+        elif [ -f "/usr/local/bin/ffprobe" ]; then
+            FFPROBE_CMD="/usr/local/bin/ffprobe"
+        fi
+    fi
+}
+
+# Önbellek (Cache) Kurulumu (Linux & Windows Uyumlu)
+setup_cache() {
+    local base_cache="${XDG_CACHE_HOME:-$HOME/.cache}"
+    if [ -z "$HOME" ] && [ -n "$USERPROFILE" ]; then
+        base_cache="$USERPROFILE/.cache"
+    fi
+    CACHE_DIR="${base_cache}/tsi_rename"
+    if ! mkdir -p "$CACHE_DIR" 2>/dev/null; then
+        CACHE_DIR="/tmp/.tsi_rename_cache"
+        mkdir -p "$CACHE_DIR" 2>/dev/null || true
+    fi
+    CACHE_FILE="${CACHE_DIR}/processed_files.log"
+    touch "$CACHE_FILE" 2>/dev/null || true
+}
+
+# Önbellek Sorgulama (Dosya daha önce işlendi mi?)
+is_cached() {
+    local key="$1"
+    if [ -z "$key" ] || [ ! -f "$CACHE_FILE" ]; then
+        return 1
+    fi
+    if grep -qFx "$key" "$CACHE_FILE" 2>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Önbelleğe Ekleme
+add_to_cache() {
+    local key="$1"
+    if [ -n "$key" ] && [ -f "$CACHE_FILE" ]; then
+        if ! is_cached "$key"; then
+            echo "$key" >> "$CACHE_FILE"
+        fi
+    fi
+}
+
+# Önbelleği Temizleme
+clear_cache() {
+    if [ -f "$CACHE_FILE" ]; then
+        rm -f "$CACHE_FILE"
+        touch "$CACHE_FILE" 2>/dev/null || true
+        echo -e "${GREEN}[+] Önbellek kaydı başarıyla temizlendi: ${CACHE_FILE}${NC}"
+    else
+        echo -e "${YELLOW}[!] Temizlenecek önbellek dosyası bulunamadı.${NC}"
+    fi
+}
+
+# Parametre Ayrıştırma (CLI Üzerinden Verilmişse)
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --protocol|--type) PROTOCOL="$2"; shift 2 ;;
+            --url) REMOTE_URL="$2"; shift 2 ;;
+            --host) REMOTE_HOST="$2"; shift 2 ;;
+            --port) REMOTE_PORT="$2"; shift 2 ;;
+            --user) REMOTE_USER="$2"; shift 2 ;;
+            --pass) REMOTE_PASS="$2"; shift 2 ;;
+            --dir|--remote-dir) REMOTE_DIR="$2"; shift 2 ;;
+            --dry-run) DRY_RUN=true; shift ;;
+            --tmdb-key) TMDB_API_KEY="$2"; shift 2 ;;
+            --clear-cache) clear_cache; exit 0 ;;
+            *) shift ;;
+        esac
+    done
+}
+
+# İnteraktif Sunucu ve Bağlantı Seçim Menüsü
+interactive_setup() {
+    show_banner
+
+    if [ -z "$PROTOCOL" ]; then
+        echo -e "${YELLOW}Lütfen işlem yapacağınız bağlantı türünü seçin:${NC}"
+        echo "  [1] WebDAV Sunucusu (Hetzner Storage Box, Nextcloud, ownCloud vb.)"
+        echo "  [2] FTP / FTPS Sunucusu"
+        echo "  [3] Yerel Dizin / Mount Alanı"
+        echo "  [4] 🧹 Önbelleği Temizle (Tüm İşlem Önbelleğini Sıfırla)"
+        echo ""
+        read_tty "Seçiminiz (1-4) [Varsayılan: 1]: " choice
+        case "$choice" in
+            2) PROTOCOL="ftp" ;;
+            3) PROTOCOL="local" ;;
+            4) 
+                clear_cache
+                echo ""
+                read_tty "Yeniden adlandırma işlemine devam etmek istiyor musunuz [E/h]? " continue_choice
+                case "$continue_choice" in
+                    [hH]|hayir|Hayir) exit 0 ;;
+                esac
+                PROTOCOL=""
+                interactive_setup
+                return
+                ;;
+            *) PROTOCOL="webdav" ;;
+        esac
+    fi
+
+    echo ""
+    case "$PROTOCOL" in
+        webdav)
+            echo -e "${GREEN}--- WebDAV Bağlantı Bilgileri ---${NC}"
+            if [ -z "$REMOTE_URL" ]; then
+                read_tty "WebDAV URL (Örn: https://u123456.your-storagebox.de): " REMOTE_URL
+            fi
+            if [ -z "$REMOTE_USER" ]; then
+                read_tty "Kullanıcı Adı: " REMOTE_USER
+            fi
+            if [ -z "$REMOTE_PASS" ]; then
+                read_tty "Şifre: " REMOTE_PASS true
+            fi
+            if [ "$REMOTE_DIR" = "/" ]; then
+                read_tty "Hedef Klasör Yolu (Örn: /film veya /) [Varsayılan: /]: " input_dir
+                REMOTE_DIR="${input_dir:-/}"
+            fi
+            ;;
+
+        ftp)
+            echo -e "${GREEN}--- FTP Bağlantı Bilgileri ---${NC}"
+            if [ -z "$REMOTE_HOST" ]; then
+                read_tty "FTP Sunucu Adresi / IP (Örn: ftp.example.com): " REMOTE_HOST
+            fi
+            if [ "$REMOTE_PORT" = "21" ]; then
+                read_tty "Port [Varsayılan: 21]: " input_port
+                REMOTE_PORT="${input_port:-21}"
+            fi
+            if [ -z "$REMOTE_USER" ]; then
+                read_tty "Kullanıcı Adı: " REMOTE_USER
+            fi
+            if [ -z "$REMOTE_PASS" ]; then
+                read_tty "Şifre: " REMOTE_PASS true
+            fi
+            if [ "$REMOTE_DIR" = "/" ]; then
+                read_tty "Hedef Klasör Yolu (Örn: /film) [Varsayılan: /]: " input_dir
+                REMOTE_DIR="${input_dir:-/}"
+            fi
+            ;;
+
+        local)
+            echo -e "${GREEN}--- Yerel Dizin Bilgileri ---${NC}"
+            if [ "$REMOTE_DIR" = "/" ]; then
+                read_tty "Taranacak Klasör Yolu (Örn: /mnt/storagebox/filmler): " input_dir
+                REMOTE_DIR="$input_dir"
+            fi
+            ;;
+    esac
+
+    echo ""
+    read_tty "Simülasyon Modu (Değişiklik yapmadan test et) [e/H]? " dry_choice
+    case "$dry_choice" in
+        [eE]|[yY]|evet|Evet) DRY_RUN=true ;;
+        *) DRY_RUN=false ;;
+    esac
+}
+
+# ==============================================================================
+# TMDB ve İsim Ayrıştırma Yardımcı Fonksiyonları
+# ==============================================================================
+
+# Başlık Metnini Nokta İle Ayrılmış Standardize Formata Dönüştürme (Latin ASCII)
+sanitize_title() {
+    local text="$1"
+    if command -v php &> /dev/null; then
+        php -r '
+            $str = $argv[1];
+            $sq = chr(39);
+            $map = array(
+                "ç"=>"c", "Ç"=>"C", "ğ"=>"g", "Ğ"=>"G", "ı"=>"i", "İ"=>"I",
+                "ö"=>"o", "Ö"=>"O", "ş"=>"s", "Ş"=>"S", "ü"=>"u", "Ü"=>"U",
+                "â"=>"a", "Â"=>"A", "î"=>"i", "Î"=>"I", "û"=>"u", "Û"=>"U",
+                "é"=>"e", "è"=>"e", "ê"=>"e", "à"=>"a", "á"=>"a", "ñ"=>"n",
+                "’"=>$sq, "‘"=>$sq, "`"=>$sq, "´"=>$sq
+            );
+            $str = strtr($str, $map);
+            if (function_exists("iconv")) {
+                $conv = @iconv("UTF-8", "ASCII//TRANSLIT//IGNORE", $str);
+                if ($conv !== false && !empty($conv)) {
+                    $str = $conv;
+                }
+            }
+            $str = preg_replace("/[^a-zA-Z0-9\x27]+/", ".", $str);
+            $str = preg_replace("/\.\.+/", ".", $str);
+            echo trim($str, ".");
+        ' "$text" 2>/dev/null
+    else
+        echo "$text" | sed \
+            -e "s/[’‘\`´]/'/g" \
+            -e 's/ç/c/g' -e 's/Ç/C/g' \
+            -e 's/ğ/g/g' -e 's/Ğ/G/g' \
+            -e 's/ı/i/g' -e 's/İ/I/g' \
+            -e 's/ö/o/g' -e 's/Ö/O/g' \
+            -e 's/ş/s/g' -e 's/Ş/S/g' \
+            -e 's/ü/u/g' -e 's/Ü/U/g' \
+            -e "s/[^a-zA-Z0-9']\+/./g" -e 's/\.\.\+/./g' -e 's/^\.//' -e 's/\.$//'
+    fi
+}
+
+# Medya Tipi Tespiti (Film vs Dizi)
+detect_media_type() {
+    local filepath="$1"
+    local filename="$2"
+    
+    if echo "$filename" | grep -iqE '\bS[0-9]{1,2}E[0-9]{1,2}\b|\b[0-9]{1,2}x[0-9]{1,2}\b'; then
+        echo "series"
+        return
+    fi
+
+    if echo "$filepath/$filename" | grep -iqE 'dizi|series|tv.shows|season|sezon'; then
+        echo "series"
+        return
+    fi
+
+    echo "movie"
+}
+
+# Sezon ve Bölüm Etiketini Çıkarma (Örn: S01E05)
+extract_season_episode() {
+    local filename="$1"
+    
+    if echo "$filename" | grep -iqE '\bS([0-9]{1,2})E([0-9]{1,2})\b'; then
+        local s=$(echo "$filename" | grep -ioE '\bS[0-9]{1,2}E[0-9]{1,2}\b' | head -n1 | tr '[:lower:]' '[:upper:]')
+        local season_num=$(echo "$s" | sed -E 's/S([0-9]+)E[0-9]+/\1/')
+        local episode_num=$(echo "$s" | sed -E 's/S[0-9]+E([0-9]+)/\1/')
+        printf "S%02dE%02d" "$season_num" "$episode_num"
+        return
+    fi
+
+    if echo "$filename" | grep -iqE '\b([0-9]{1,2})x([0-9]{1,2})\b'; then
+        local match=$(echo "$filename" | grep -ioE '\b[0-9]{1,2}x[0-9]{1,2}\b' | head -n1)
+        local season_num=$(echo "$match" | cut -d'x' -f1)
+        local episode_num=$(echo "$match" | cut -d'x' -f2)
+        printf "S%02dE%02d" "$season_num" "$episode_num"
+        return
+    fi
+
+    echo ""
+}
+
+# Sezon Klasörü İsmi Oluşturma (Örn: Sezon 01)
+extract_season_folder() {
+    local filename="$1"
+    local se_tag=$(extract_season_episode "$filename")
+    if [ -n "$se_tag" ]; then
+        local s_num=$(echo "$se_tag" | grep -oE '^S[0-9]+' | sed 's/S//')
+        if [ -n "$s_num" ]; then
+            printf "Sezon %02d" "$((10#$s_num))"
+            return
+        fi
+    fi
+    echo ""
+}
+
+# Dizi veya Film Klasör Hiyerarşisini Hesaplama (Dizi -> /Diziler/Dizi İsmi/Sezon XX, Film -> /Filmler)
+compute_target_dir() {
+    local current_dir_path="$1"   # e.g. /Filmler veya /Diziler
+    local sanitized_title="$2"    # e.g. LEGO.Ninjago.Dragons.Rising
+    local season_folder_name="$3" # e.g. Sezon 01
+    local media_type="$4"         # movie veya series
+
+    local dir_path="$current_dir_path"
+
+    if [ "$media_type" = "series" ]; then
+        # Eğer dizi bir Film klasöründeyse (örn: /Filmler, /Film, /movies), bunu /Diziler alanına yönlendir
+        if echo "$dir_path" | grep -iqE '\b(filmler|film|movies|movie)\b'; then
+            dir_path=$(echo "$dir_path" | sed -E 's/\bFilmler\b/Diziler/g' | sed -E 's/\bfilmler\b/diziler/g' | sed -E 's/\bFilm\b/Diziler/g' | sed -E 's/\bfilm\b/diziler/g' | sed -E 's/\bMovies\b/Diziler/g' | sed -E 's/\bmovies\b/diziler/g')
+        fi
+
+        local current_dir_name=$(basename "$dir_path")
+
+        # 1. Eğer dosya zaten bir Sezon klasörünün içindeyse
+        if echo "$current_dir_name" | grep -iqE '^(sezon|season|s)[ ._-]*[0-9]{1,2}$'; then
+            echo "$dir_path"
+            return
+        fi
+
+        local norm_curr=$(echo "$current_dir_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]//g')
+        local norm_title=$(echo "$sanitized_title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]//g')
+
+        # 2. Eğer dosya doğrudan Dizi klasörünün içindeyse (ama Sezon klasörü yoksa)
+        if [ -n "$norm_curr" ] && [ "$norm_curr" = "$norm_title" ]; then
+            if [ -n "$season_folder_name" ]; then
+                echo "${dir_path}/${season_folder_name}"
+            else
+                echo "$dir_path"
+            fi
+            return
+        fi
+
+        # 3. Eğer dosya ana dizindeyse (örn: /Diziler altında)
+        if [ -n "$season_folder_name" ]; then
+            echo "${dir_path}/${sanitized_title}/${season_folder_name}"
+        else
+            echo "${dir_path}/${sanitized_title}"
+        fi
+    else
+        # Eğer film bir Dizi klasöründeyse (örn: /Diziler, /Series), bunu /Filmler alanına yönlendir
+        if echo "$dir_path" | grep -iqE '\b(diziler|dizi|series|tv.shows|season|sezon)\b'; then
+            dir_path=$(echo "$dir_path" | sed -E 's/\bDiziler\b/Filmler/g' | sed -E 's/\bdiziler\b/filmler/g' | sed -E 's/\bDizi\b/Filmler/g' | sed -E 's/\bdizi\b/filmler/g' | sed -E 's/\bSeries\b/Filmler/g' | sed -E 's/\bseries\b/filmler/g')
+            # Eğer Sezon klasörü altındaysa üst klasöre (Film köküne) çıkar
+            dir_path=$(echo "$dir_path" | sed -E 's#/(sezon|season|s)[ ._-]*[0-9]{1,2}$##i')
+        fi
+        echo "$dir_path"
+    fi
+}
+
+# Ses Etiketini Tespit Etme (DUAL / TR / TR_Altyazili)
+detect_audio_tag() {
+    local full_target="$1" # Uzak URL veya yerel dosya yolu
+    local filename="$2"
+
+    # 1. Dosya isminde "DUAL" geçiyorsa doğrudan DUAL
+    if echo "$filename" | grep -iq "DUAL"; then
+        echo "DUAL"
+        return
+    fi
+
+    # 2. ffprobe ile uzaktan HTTP/FTP veya yerel dosya ses kanallarını incele
+    if command -v "$FFPROBE_CMD" &> /dev/null || [ -x "$FFPROBE_CMD" ]; then
+        local probe_json=""
+        probe_json=$("$FFPROBE_CMD" -v error -show_entries stream=index,codec_type:stream_tags=language -select_streams a -of json "$full_target" 2>/dev/null || echo "")
+
+        if [ -n "$probe_json" ]; then
+            if command -v php &> /dev/null; then
+                local res=$(php -r '
+                    $data = json_decode($argv[1], true);
+                    $streams = $data["streams"] ?? array();
+                    $count = count($streams);
+                    if ($count > 1) {
+                        echo "DUAL";
+                    } elseif ($count === 1) {
+                        $lang = strtolower($streams[0]["tags"]["language"] ?? "");
+                        if (in_array($lang, array("tur", "tr", "turkish"))) {
+                            echo "TR";
+                        } elseif (!empty($lang)) {
+                            echo "TR_Altyazili";
+                        } else {
+                            echo "UNK";
+                        }
+                    } else {
+                        echo "NONE";
+                    }
+                ' "$probe_json" 2>/dev/null || echo "UNK")
+
+                if [ "$res" = "DUAL" ] || [ "$res" = "TR" ] || [ "$res" = "TR_Altyazili" ]; then
+                    echo "$res"
+                    return
+                fi
+            fi
+        fi
+    fi
+
+    # 3. İsim bazlı yedek kontrol
+    if echo "$filename" | grep -iqE '\b(TR|TURKCE|TURKISH|TSI)\b'; then
+        echo "TR"
+    elif echo "$filename" | grep -iqE '\b(ALTYAZILI|SUBBED|ENG|ENGLISH)\b'; then
+        echo "TR_Altyazili"
+    else
+        echo "TR"
+    fi
+}
+
+# Çözünürlük / Sürüm Tespit Etme
+detect_resolution() {
+    local full_target="$1"
+    local filename="$2"
+
+    if echo "$filename" | grep -iqE '\bm1080p\b'; then echo "m1080p"; return; fi
+    if echo "$filename" | grep -iqE '\bm720p\b'; then echo "m720p"; return; fi
+    if echo "$filename" | grep -iqE '\bm2160p\b'; then echo "m2160p"; return; fi
+    if echo "$filename" | grep -iqE '\b1080p\b'; then echo "1080p"; return; fi
+    if echo "$filename" | grep -iqE '\b2160p|4k|m4k\b'; then echo "2160p"; return; fi
+    if echo "$filename" | grep -iqE '\b720p\b'; then echo "720p"; return; fi
+    if echo "$filename" | grep -iqE '\b480p\b'; then echo "480p"; return; fi
+
+    if command -v "$FFPROBE_CMD" &> /dev/null || [ -x "$FFPROBE_CMD" ]; then
+        local height=$("$FFPROBE_CMD" -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$full_target" 2>/dev/null || echo "")
+        if [ -n "$height" ] && [ "$height" -eq "$height" ] 2>/dev/null; then
+            if [ "$height" -ge 1400 ]; then echo "2160p"; return; fi
+            if [ "$height" -ge 900 ]; then echo "1080p"; return; fi
+            if [ "$height" -ge 600 ]; then echo "720p"; return; fi
+            if [ "$height" -lt 600 ]; then echo "480p"; return; fi
+        fi
+    fi
+
+    echo "1080p"
+}
+
+# Kaynak / Kalite Tespiti
+detect_source() {
+    local filename="$1"
+    
+    if echo "$filename" | grep -iqE 'web-dl|webdl'; then echo "Web-DL"; return; fi
+    if echo "$filename" | grep -iqE 'webrip|web-rip'; then echo "WEBRip"; return; fi
+    if echo "$filename" | grep -iqE 'bluray|blu-ray|bdrip|brrip'; then echo "BluRay"; return; fi
+    if echo "$filename" | grep -iqE 'hdtv'; then echo "HDTV"; return; fi
+    if echo "$filename" | grep -iqE 'remux'; then echo "REMUX"; return; fi
+    if echo "$filename" | grep -iqE 'dvdrip|dvd'; then echo "DVDRip"; return; fi
+
+    echo "Web-DL"
+}
+
+# Kodek Tespiti
+detect_codec() {
+    local full_target="$1"
+    local filename="$2"
+
+    if echo "$filename" | grep -iqE '\bx265\b'; then echo "x265"; return; fi
+    if echo "$filename" | grep -iqE '\bx264\b'; then echo "x264"; return; fi
+    if echo "$filename" | grep -iqE '\bh265|hevc\b'; then echo "h265"; return; fi
+    if echo "$filename" | grep -iqE '\bh264|avc\b'; then echo "h264"; return; fi
+
+    if command -v "$FFPROBE_CMD" &> /dev/null || [ -x "$FFPROBE_CMD" ]; then
+        local codec=$("$FFPROBE_CMD" -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "$full_target" 2>/dev/null || echo "")
+        if [ "$codec" = "hevc" ]; then echo "x265"; return; fi
+        if [ "$codec" = "h264" ]; then echo "x264"; return; fi
+    fi
+
+    echo "x264"
+}
+
+# Temiz Arama Başlığı ve Yıl Çıkarma
+clean_search_title() {
+    local filename="$1"
+    local base_name="${filename%.*}"
+
+    # Baştaki '---' öneklerini temizle
+    base_name=$(echo "$base_name" | sed -E 's/^-+//')
+
+    local year=""
+    if echo "$base_name" | grep -qE '\b(19[0-9]{2}|20[0-9]{2})\b'; then
+        year=$(echo "$base_name" | grep -oE '\b(19[0-9]{2}|20[0-9]{2})\b' | tail -n1)
+    fi
+
+    local title_part="$base_name"
+    if [ -n "$year" ]; then
+        title_part=$(echo "$base_name" | sed -E "s/(.*)\b$year\b.*/\1/")
+    fi
+    title_part=$(echo "$title_part" | sed -E 's/\b(S[0-9]{1,2}E[0-9]{1,2}|[0-9]{1,2}x[0-9]{1,2}).*//i')
+
+    title_part=$(echo "$title_part" | sed -E \
+        -e 's/uHDFilmindir|Filmindir|DivxUp|TSI|uHD//gi' \
+        -e 's/\b(m1080p|m720p|m2160p|1080p|720p|2160p|4k|web-dl|webdl|webrip|bluray|bdrip|hdtv|remux)\b//gi' \
+        -e 's/\b(x264|x265|h264|h265|hevc|avc|10bit|dual|tr|eng|turkish|english)\b//gi' \
+        -e 's/\[[^]]*\]//g' -e 's/\([^)]*\)//g' \
+        -e 's/[._+-]/ /g')
+
+    local clean_title=$(echo "$title_part" | awk '{$1=$1;print}')
+    
+    echo "$clean_title|$year"
+}
+
+# TMDB API Üzerinden Orijinal / İngilizce İsmi Bulma
+query_tmdb() {
+    local title="$1"
+    local year="$2"
+    local media_type="$3"
+
+    if [ -z "$TMDB_API_KEY" ]; then
+        echo ""
+        return
+    fi
+
+    if command -v php &> /dev/null; then
+        php -r '
+            $title = $argv[1];
+            $year = $argv[2];
+            $mediaType = $argv[3];
+            $apiKey = $argv[4];
+
+            $endpoint = ($mediaType === "series") ? "tv" : "movie";
+
+            $fetchUrl = function($url) {
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                $json = curl_exec($ch);
+                curl_close($ch);
+                return json_decode($json, true);
+            };
+
+            $buildUrl = function($q, $lang = "en-US", $y = "") use ($endpoint, $apiKey) {
+                $u = "https://api.themoviedb.org/3/search/{$endpoint}?api_key={$apiKey}&query=" . urlencode($q) . "&language={$lang}";
+                if (!empty($y)) {
+                    $param = ($endpoint === "tv") ? "first_air_date_year" : "primary_release_year";
+                    $u .= "&{$param}={$y}";
+                }
+                return $u;
+            };
+
+            $results = array();
+
+            // 1. Arama: en-US + year (primary_release_year / first_air_date_year)
+            $data = $fetchUrl($buildUrl($title, "en-US", $year));
+            $results = $data["results"] ?? array();
+
+            // 2. Arama: tr-TR + year
+            if (empty($results)) {
+                $data = $fetchUrl($buildUrl($title, "tr-TR", $year));
+                $results = $data["results"] ?? array();
+            }
+
+            // 3. Arama: en-US (yıl olmadan)
+            if (empty($results) && !empty($year)) {
+                $data = $fetchUrl($buildUrl($title, "en-US", ""));
+                $results = $data["results"] ?? array();
+            }
+
+            // 4. Arama: tr-TR (yıl olmadan)
+            if (empty($results) && !empty($year)) {
+                $data = $fetchUrl($buildUrl($title, "tr-TR", ""));
+                $results = $data["results"] ?? array();
+            }
+
+            // 5. Kelime çıkarma toleransı (Yazım hataları/Typo toleransı için)
+            if (empty($results)) {
+                $words = preg_split("/\s+/", $title);
+                if (count($words) > 2) {
+                    for ($i = 0; $i < count($words); $i++) {
+                        $subWords = $words;
+                        unset($subWords[$i]);
+                        $subTitle = implode(" ", $subWords);
+                        if (strlen($subTitle) >= 3) {
+                            $data = $fetchUrl($buildUrl($subTitle, "en-US", ""));
+                            $res = $data["results"] ?? array();
+                            if (!empty($res)) {
+                                $results = $res;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (empty($results)) {
+                echo "";
+                exit;
+            }
+
+            $sq = chr(39);
+            $map = array(
+                "’"=>$sq, "‘"=>$sq, "`"=>$sq, "´"=>$sq,
+                "ç"=>"c", "Ç"=>"C", "ğ"=>"g", "Ğ"=>"G", "ı"=>"i", "İ"=>"I",
+                "ö"=>"o", "Ö"=>"O", "ş"=>"s", "Ş"=>"S", "ü"=>"u", "Ü"=>"U",
+                "â"=>"a", "Â"=>"A", "î"=>"i", "Î"=>"I", "û"=>"u", "Û"=>"U"
+            );
+
+            $normalize = function($str) use ($map) {
+                $str = strtr($str, $map);
+                return preg_replace("/[^a-z0-9]/", "", strtolower($str));
+            };
+
+            $getWords = function($str) use ($map) {
+                $str = strtr($str, $map);
+                $clean = preg_replace("/[^a-z0-9\s]/", " ", strtolower($str));
+                $w = preg_split("/\s+/", $clean);
+                return array_values(array_filter($w, function($item) { return strlen($item) > 1; }));
+            };
+
+            $nSearch = $normalize($title);
+            $searchWords = $getWords($title);
+
+            $bestCandidate = null;
+            $bestScore = -999;
+
+            foreach (array_slice($results, 0, 10) as $itemCandidate) {
+                if ($endpoint === "tv") {
+                    $cTitle = $itemCandidate["name"] ?? $itemCandidate["original_name"] ?? "";
+                    $cOrig  = $itemCandidate["original_name"] ?? "";
+                    $cDate  = $itemCandidate["first_air_date"] ?? "";
+                } else {
+                    $cTitle = $itemCandidate["title"] ?? $itemCandidate["original_title"] ?? "";
+                    $cOrig  = $itemCandidate["original_title"] ?? "";
+                    $cDate  = $itemCandidate["release_date"] ?? "";
+                }
+                $cYear = !empty($cDate) ? explode("-", $cDate)[0] : "";
+
+                $nEn   = $normalize($cTitle);
+                $nOrig = $normalize($cOrig);
+
+                $score = 0;
+                $isExactMatch = ($nSearch === $nEn || $nSearch === $nOrig);
+
+                if ($isExactMatch) {
+                    $score += 100;
+                } else {
+                    similar_text($nSearch, $nEn, $p1);
+                    similar_text($nSearch, $nOrig, $p2);
+                    $maxPct = max($p1, $p2);
+                    $score += ($maxPct * 0.7);
+
+                    // Kelime çakışması hesabı
+                    $cWords = $getWords($cTitle . " " . $cOrig);
+                    $matches = 0;
+                    foreach ($searchWords as $sw) {
+                        foreach ($cWords as $cw) {
+                            if ($sw === $cw || (strlen($sw) >= 4 && strlen($cw) >= 4 && levenshtein($sw, $cw) <= 2)) {
+                                $matches++;
+                                break;
+                            }
+                        }
+                    }
+                    if (!empty($searchWords)) {
+                        $overlapRatio = $matches / count($searchWords);
+                        $score += ($overlapRatio * 30);
+                    }
+                }
+
+                if (!empty($year) && !empty($cYear)) {
+                    $yearDiff = abs((int)$year - (int)$cYear);
+                    if ($yearDiff === 0) {
+                        $score += 30;
+                    } elseif ($yearDiff === 1) {
+                        $score += 15;
+                    } elseif ($yearDiff > 5 && !$isExactMatch) {
+                        $score -= 60;
+                    }
+                }
+
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestCandidate = array(
+                        "item" => $itemCandidate,
+                        "title" => $cTitle,
+                        "orig" => $cOrig,
+                        "year" => $cYear,
+                        "score" => $score,
+                        "confident" => ($score >= 35) ? 1 : 0
+                    );
+                }
+            }
+
+            if (!$bestCandidate) {
+                echo "";
+                exit;
+            }
+
+            $selectedTitle = $bestCandidate["title"];
+            $selectedYear  = $bestCandidate["year"];
+            $isConfident   = $bestCandidate["confident"];
+
+            echo "{$selectedTitle}|{$selectedYear}|{$isConfident}";
+        ' "$title" "$year" "$media_type" "$TMDB_API_KEY" 2>/dev/null
+    fi
+}
+
+# ==============================================================================
+# Uzak Sunucu İşlem Mantığı (WebDAV / FTP / Local)
+# ==============================================================================
+
+# Tekil Dosya İsim Hesaplama ve Yeniden Adlandırma Komutu Oluşturma
+compute_new_filename() {
+    local file_path="$1"       # Uzak veya yerel göreli dosya yolu
+    local full_probe_url="$2"  # ffprobe için URL veya yerel yol
+    local current_idx="$3"     # İşlenen dosya sırası (örn: 35)
+    local total_count="$4"     # Toplam dosya sayısı (örn: 231)
+    local file_name=$(basename "$file_path")
+    local ext="${file_name##*.}"
+    local ext_lower=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+
+    # Video uzantısı kontrolü
+    case "$ext_lower" in
+        mkv|mp4|avi|m4v|ts|m2ts|mov|webm|flv|wmv|iso) ;;
+        *) echo ""; return ;;
+    esac
+
+    echo -e "${BLUE}------------------------------------------------------------${NC}" >&2
+    if [ -n "$current_idx" ] && [ -n "$total_count" ] && [ "$total_count" -gt 0 ]; then
+        echo -e "${CYAN}[${current_idx}/${total_count}] İşleniyor:${NC} $file_name" >&2
+    else
+        echo -e "${CYAN}İşleniyor:${NC} $file_name" >&2
+    fi
+
+    local media_type=$(detect_media_type "$file_path" "$file_name")
+    local search_info=$(clean_search_title "$file_name")
+    local parsed_title=$(echo "$search_info" | cut -d'|' -f1)
+    local parsed_year=$(echo "$search_info" | cut -d'|' -f2)
+
+    echo -n "TMDB sorgulanıyor... " >&2
+    local tmdb_result=$(query_tmdb "$parsed_title" "$parsed_year" "$media_type")
+    local tmdb_title=""
+    local tmdb_year=""
+    local tmdb_status="0"
+
+    if [ -n "$tmdb_result" ]; then
+        tmdb_title=$(echo "$tmdb_result" | cut -d'|' -f1)
+        tmdb_year=$(echo "$tmdb_result" | cut -d'|' -f2)
+        tmdb_status=$(echo "$tmdb_result" | cut -d'|' -f3)
+    fi
+
+    local is_uncertain=false
+    if [ -z "$tmdb_result" ] || [ "$tmdb_status" = "0" ]; then
+        is_uncertain=true
+    fi
+
+    if [ "$is_uncertain" = true ]; then
+        if [ -n "$tmdb_title" ]; then
+            echo -e "${YELLOW}EMİN OLUNAMADI [TMDB: $tmdb_title (${tmdb_year:-N/A})] (Dosya ismine '---' eklenecek)${NC}" >&2
+        else
+            echo -e "${YELLOW}BULUNAMADI (TMDB kaydı bulunamadı, dosya ismine '---' eklenecek)${NC}" >&2
+        fi
+
+        if [[ "$file_name" == ---* ]]; then
+            echo -e "${YELLOW}--> Dosya zaten '---' önekiyle işaretlenmiş, değişiklik yapılmadı.${NC}" >&2
+            echo "" >&2
+            return
+        else
+            local uncert_name="---${file_name}"
+            echo -e "   - Durum      : ${YELLOW}Emin olunamadı (İsim değiştirilmedi, önek eklendi)${NC}" >&2
+            echo -e "   - Yeni İsim  : ${YELLOW}${uncert_name}${NC}" >&2
+            echo "$uncert_name"
+            return
+        fi
+    else
+        echo -e "${GREEN}BAŞARILI [TMDB: $tmdb_title (${tmdb_year:-N/A})]${NC}" >&2
+    fi
+
+    local final_title_raw="${tmdb_title:-$parsed_title}"
+    local final_year="${tmdb_year:-$parsed_year}"
+    local sanitized_title=$(sanitize_title "$final_title_raw")
+
+    if [ -z "$sanitized_title" ]; then
+        echo -e "${RED}Uyarı: Başlık ayrıştırılamadı, atlanıyor.${NC}" >&2
+        echo "" >&2
+        return
+    fi
+
+    local resolution=$(detect_resolution "$full_probe_url" "$file_name")
+    local source=$(detect_source "$file_name")
+    local codec=$(detect_codec "$full_probe_url" "$file_name")
+    local audio_tag=$(detect_audio_tag "$full_probe_url" "$file_name")
+
+    local new_name=""
+    if [ "$media_type" = "series" ]; then
+        local se_tag=$(extract_season_episode "$file_name")
+        if [ -n "$se_tag" ]; then
+            if [ -n "$final_year" ]; then
+                new_name="${sanitized_title}.${se_tag}.${final_year}.${resolution}.${source}.${codec}.${audio_tag}.TSI.${ext_lower}"
+            else
+                new_name="${sanitized_title}.${se_tag}.${resolution}.${source}.${codec}.${audio_tag}.TSI.${ext_lower}"
+            fi
+        else
+            if [ -n "$final_year" ]; then
+                new_name="${sanitized_title}.${final_year}.${resolution}.${source}.${codec}.${audio_tag}.TSI.${ext_lower}"
+            else
+                new_name="${sanitized_title}.${resolution}.${source}.${codec}.${audio_tag}.TSI.${ext_lower}"
+            fi
+        fi
+    else
+        if [ -n "$final_year" ]; then
+            new_name="${sanitized_title}.${final_year}.${resolution}.${source}.${codec}.${audio_tag}.TSI.${ext_lower}"
+        else
+            new_name="${sanitized_title}.${resolution}.${source}.${codec}.${audio_tag}.TSI.${ext_lower}"
+        fi
+    fi
+
+    echo -e "   - Tür        : ${YELLOW}${media_type}${NC}" >&2
+    echo -e "   - Başlık     : ${YELLOW}${final_title_raw}${NC} -> ${GREEN}${sanitized_title}${NC}" >&2
+    echo -e "   - Yıl        : ${YELLOW}${final_year:-Belirtilmedi}${NC}" >&2
+    echo -e "   - Sürüm/Çöz  : ${YELLOW}${resolution}${NC}" >&2
+    echo -e "   - Kaynak     : ${YELLOW}${source}${NC}" >&2
+    echo -e "   - Kodek      : ${YELLOW}${codec}${NC}" >&2
+    echo -e "   - Ses Etiketi: ${YELLOW}${audio_tag}${NC}" >&2
+    echo -e "   - Yeni İsim  : ${GREEN}${new_name}${NC}" >&2
+
+    if [ "$file_name" = "$new_name" ]; then
+        echo -e "${YELLOW}--> Dosya ismi zaten standart biçimde, değişiklik yapılmadı.${NC}" >&2
+        echo "" >&2
+        return
+    fi
+
+    echo "$new_name"
+}
+
+# WebDAV İşlemleri
+process_webdav() {
+    local base_url="${REMOTE_URL%/}"
+    local target_dir="${REMOTE_DIR#/}"
+    local full_url="${base_url}/${target_dir}"
+    full_url="${full_url%/}"
+
+    echo -e "${BLUE}[+] WebDAV Sunucusuna bağlanılıyor: ${full_url}${NC}"
+
+    # PROPFIND ile (Depth: infinity) tüm alt klasörler dahil dosya listesini çek
+    local propfind_xml=""
+    propfind_xml=$(curl -s -k -u "${REMOTE_USER}:${REMOTE_PASS}" -X PROPFIND -H "Depth: infinity" "${full_url}/" || echo "")
+
+    # Eğer Depth: infinity kabul edilmediyse Depth: 1 deneyelim
+    if [ -z "$propfind_xml" ]; then
+        propfind_xml=$(curl -s -k -u "${REMOTE_USER}:${REMOTE_PASS}" -X PROPFIND -H "Depth: 1" "${full_url}/" || echo "")
+    fi
+
+    if [ -z "$propfind_xml" ]; then
+        echo -e "${RED}Hata: WebDAV sunucusundan dosya listesi alınamadı. Lütfen URL ve giriş bilgilerini kontrol edin.${NC}"
+        exit 1
+    fi
+
+    # XML yanıtındaki dosya href yollarını PHP ile parse et
+    local file_paths=$(php -r '
+        $xmlStr = $argv[1];
+        if (empty($xmlStr)) exit;
+        $xml = @simplexml_load_string($xmlStr);
+        if (!$xml) exit;
+        $xml->registerXPathNamespace("d", "DAV:");
+        $nodes = $xml->xpath("//d:response/d:href");
+        foreach ($nodes as $node) {
+            $path = (string)$node;
+            $decoded = urldecode($path);
+            if (!preg_match("/\.(mkv|mp4|avi|m4v|ts|m2ts|mov|webm|flv|wmv|iso)$/i", $decoded)) continue;
+            echo $decoded . "\n";
+        }
+    ' "$propfind_xml" 2>/dev/null || echo "")
+
+    if [ -z "$file_paths" ]; then
+        echo -e "${YELLOW}WebDAV dizininde işlenecek video dosyası bulunamadı.${NC}"
+        return
+    fi
+
+    # Alfabetik Sıralama (A-Z)
+    file_paths=$(echo "$file_paths" | sort -f)
+
+    local total_count=$(echo "$file_paths" | grep -c . || echo 0)
+    local current_idx=0
+    local cached_count=0
+
+    while read -r raw_href; do
+        if [ -z "$raw_href" ]; then continue; fi
+        local cache_key="webdav_${REMOTE_URL}_${raw_href}"
+        if is_cached "$cache_key"; then
+            cached_count=$((cached_count + 1))
+        fi
+    done <<< "$file_paths"
+
+    if [ "$cached_count" -gt 0 ]; then
+        echo -e "${YELLOW}Önbellekteki ${cached_count} içerik atlandı.${NC}"
+        echo ""
+    fi
+
+    if [ "$cached_count" -eq "$total_count" ] && [ "$total_count" -gt 0 ]; then
+        echo -e "${GREEN}Tüm dosyalar daha önce işlenmiş (Yeni dosya yok).${NC}"
+        return
+    fi
+
+    echo "$file_paths" | while read -r raw_href; do
+        if [ -z "$raw_href" ]; then continue; fi
+        current_idx=$((current_idx + 1))
+
+        local file_name=$(basename "$raw_href")
+        local dir_path=$(dirname "$raw_href")
+
+        # Önbellek (Cache) Kontrolü
+        local cache_key="webdav_${REMOTE_URL}_${raw_href}"
+        if is_cached "$cache_key"; then
+            continue
+        fi
+
+        # ffprobe için tam HTTP URL oluştur
+        local scheme=$(echo "$base_url" | grep -oE '^(https?://)')
+        local host_part=${base_url#$scheme}
+        local probe_url="${scheme}${REMOTE_USER}:${REMOTE_PASS}@${host_part}${raw_href}"
+
+        local new_name=$(compute_new_filename "$file_name" "$probe_url" "$current_idx" "$total_count")
+        local final_name="${new_name:-$file_name}"
+
+        # Dizi / Film hiyerarşisi ve kök klasör yönlendirme hesabı
+        local media_type=$(detect_media_type "$dir_path" "$file_name")
+        local target_dir_path="$dir_path"
+
+        if [ "$media_type" = "series" ]; then
+            local search_info=$(clean_search_title "$file_name")
+            local parsed_title=$(echo "$search_info" | cut -d'|' -f1)
+            local parsed_year=$(echo "$search_info" | cut -d'|' -f2)
+            local tmdb_res=$(query_tmdb "$parsed_title" "$parsed_year" "$media_type")
+            local tmdb_t=""
+            if [ -n "$tmdb_res" ]; then tmdb_t=$(echo "$tmdb_res" | cut -d'|' -f1); fi
+            local san_title=$(sanitize_title "${tmdb_t:-$parsed_title}")
+            local seas_folder=$(extract_season_folder "$file_name")
+
+            target_dir_path=$(compute_target_dir "$dir_path" "$san_title" "$seas_folder" "$media_type")
+        else
+            target_dir_path=$(compute_target_dir "$dir_path" "" "" "$media_type")
+        fi
+
+        local old_full_url="${base_url}${raw_href}"
+        local new_full_url="${base_url}${target_dir_path}/${final_name}"
+        new_full_url=$(echo "$new_full_url" | sed -E 's#//+#/#g' | sed -E 's#http:/#http://#g' | sed -E 's#https:/#https://#g')
+
+        if [ "$old_full_url" = "$new_full_url" ]; then
+            add_to_cache "$cache_key"
+            continue;
+        fi
+
+        if [ "$DRY_RUN" = true ]; then
+            echo -e "${CYAN}[SIMULATION WebDAV MOVE & RENAME]:${NC} $file_name -> ${target_dir_path}/${final_name}"
+            add_to_cache "$cache_key"
+        else
+            # WebDAV üzerinde klasör hiyerarşisini oluştur (MKCOL)
+            if [ "$dir_path" != "$target_dir_path" ]; then
+                local relative_target="${target_dir_path#/}"
+                IFS='/' read -ra PARTS <<< "$relative_target"
+                local curr_build=""
+                for part in "${PARTS[@]}"; do
+                    if [ -z "$part" ]; then continue; fi
+                    curr_build="${curr_build}/${part}"
+                    curl -s -k -o /dev/null -u "${REMOTE_USER}:${REMOTE_PASS}" -X MKCOL "${base_url}${curr_build}" || true
+                done
+            fi
+
+            echo -n "WebDAV MOVE yapılıyor... "
+            local http_code=$(curl -s -k -o /dev/null -w "%{http_code}" -u "${REMOTE_USER}:${REMOTE_PASS}" -X MOVE -H "Destination: ${new_full_url}" "${old_full_url}")
+            if [[ "$http_code" =~ ^(201|204|200)$ ]]; then
+                echo -e "${GREEN}✓ BAŞARILI${NC}"
+                add_to_cache "$cache_key"
+                add_to_cache "webdav_${REMOTE_URL}_${target_dir_path}/${final_name}"
+            else
+                echo -e "${RED}HATA (HTTP $http_code)${NC}"
+            fi
+        fi
+    done
+}
+
+# FTP İşlemleri
+process_ftp() {
+    echo -e "${BLUE}[+] FTP Sunucusuna bağlanılıyor (Özyinelemeli / Tüm Alt Klasörler): ${REMOTE_HOST}:${REMOTE_PORT}${REMOTE_DIR}${NC}"
+
+    local file_list=""
+    file_list=$(php -r '
+        $host = $argv[1];
+        $port = (int)$argv[2];
+        $user = $argv[3];
+        $pass = $argv[4];
+        $baseDir = $argv[5];
+
+        $files = array();
+        $queue = array(rtrim($baseDir, "/"));
+        if (empty($queue[0])) $queue[0] = "/";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_USERPWD, "{$user}:{$pass}");
+
+        while (!empty($queue)) {
+            $dir = array_shift($queue);
+            $url = "ftp://{$host}:{$port}" . rtrim($dir, "/") . "/";
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_FTPLISTONLY, false);
+            $output = curl_exec($ch);
+
+            if (empty($output)) {
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_FTPLISTONLY, true);
+                $output = curl_exec($ch);
+            }
+
+            if (empty($output)) continue;
+
+            $lines = explode("\n", str_replace("\r", "", $output));
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+
+                $isDir = false;
+                $name = "";
+
+                if (preg_match("/^d[rwx\-]{9}/i", $line)) {
+                    $isDir = true;
+                    $parts = preg_split("/\s+/", $line, 9);
+                    $name = $parts[8] ?? "";
+                } elseif (preg_match("/<DIR>/i", $line)) {
+                    $isDir = true;
+                    $parts = preg_split("/\s+/", $line, 4);
+                    $name = $parts[3] ?? "";
+                } elseif (preg_match("/^-[rwx\-]{9}/i", $line)) {
+                    $parts = preg_split("/\s+/", $line, 9);
+                    $name = $parts[8] ?? "";
+                } else {
+                    $name = $line;
+                }
+
+                if (empty($name) || $name === "." || $name === "..") continue;
+
+                $itemPath = rtrim($dir, "/") . "/" . ltrim($name, "/");
+
+                if ($isDir) {
+                    $queue[] = $itemPath;
+                } else {
+                    if (preg_match("/\.(mkv|mp4|avi|m4v|ts|m2ts|mov|webm|flv|wmv|iso)$/i", $name)) {
+                        $files[] = $itemPath;
+                    }
+                }
+            }
+        }
+        curl_close($ch);
+        foreach ($files as $f) {
+            echo $f . "\n";
+        }
+    ' "$REMOTE_HOST" "$REMOTE_PORT" "$REMOTE_USER" "$REMOTE_PASS" "$REMOTE_DIR" 2>/dev/null || echo "")
+
+    if [ -z "$file_list" ]; then
+        echo -e "${YELLOW}FTP dizininde işlenecek video dosyası bulunamadı veya FTP bağlantısı kurulamadı.${NC}"
+        return
+    fi
+
+    # Alfabetik Sıralama (A-Z)
+    file_list=$(echo "$file_list" | sort -f)
+
+    local total_count=$(echo "$file_list" | grep -c . || echo 0)
+    local current_idx=0
+    local cached_count=0
+
+    while read -r rel_path; do
+        if [ -z "$rel_path" ]; then continue; fi
+        local cache_key="ftp_${REMOTE_HOST}:${REMOTE_PORT}_${rel_path}"
+        if is_cached "$cache_key"; then
+            cached_count=$((cached_count + 1))
+        fi
+    done <<< "$file_list"
+
+    if [ "$cached_count" -gt 0 ]; then
+        echo -e "${YELLOW}Önbellekteki ${cached_count} içerik atlandı.${NC}"
+        echo ""
+    fi
+
+    if [ "$cached_count" -eq "$total_count" ] && [ "$total_count" -gt 0 ]; then
+        echo -e "${GREEN}Tüm dosyalar daha önce işlenmiş (Yeni dosya yok).${NC}"
+        return
+    fi
+
+    echo "$file_list" | while read -r rel_path; do
+        if [ -z "$rel_path" ]; then continue; fi
+        current_idx=$((current_idx + 1))
+
+        local file_name=$(basename "$rel_path")
+        local dir_path=$(dirname "$rel_path")
+
+        # Önbellek (Cache) Kontrolü
+        local cache_key="ftp_${REMOTE_HOST}:${REMOTE_PORT}_${rel_path}"
+        if is_cached "$cache_key"; then
+            continue
+        fi
+
+        local probe_url="ftp://${REMOTE_USER}:${REMOTE_PASS}@${REMOTE_HOST}:${REMOTE_PORT}${rel_path}"
+        local new_name=$(compute_new_filename "$file_name" "$probe_url" "$current_idx" "$total_count")
+        local final_name="${new_name:-$file_name}"
+
+        # Dizi / Film hiyerarşisi ve kök klasör yönlendirme hesabı
+        local media_type=$(detect_media_type "$dir_path" "$file_name")
+        local target_dir_path="$dir_path"
+
+        if [ "$media_type" = "series" ]; then
+            local search_info=$(clean_search_title "$file_name")
+            local parsed_title=$(echo "$search_info" | cut -d'|' -f1)
+            local parsed_year=$(echo "$search_info" | cut -d'|' -f2)
+            local tmdb_res=$(query_tmdb "$parsed_title" "$parsed_year" "$media_type")
+            local tmdb_t=""
+            if [ -n "$tmdb_res" ]; then tmdb_t=$(echo "$tmdb_res" | cut -d'|' -f1); fi
+            local san_title=$(sanitize_title "${tmdb_t:-$parsed_title}")
+            local seas_folder=$(extract_season_folder "$file_name")
+
+            target_dir_path=$(compute_target_dir "$dir_path" "$san_title" "$seas_folder" "$media_type")
+        else
+            target_dir_path=$(compute_target_dir "$dir_path" "" "" "$media_type")
+        fi
+
+        local old_path="${rel_path}"
+        old_path=$(echo "$old_path" | sed -E 's#//+#/#g')
+        local new_path="${target_dir_path}/${final_name}"
+        new_path=$(echo "$new_path" | sed -E 's#//+#/#g')
+
+        if [ "$old_path" = "$new_path" ]; then
+            add_to_cache "$cache_key"
+            continue;
+        fi
+
+        if [ "$DRY_RUN" = true ]; then
+            echo -e "${CYAN}[SIMULATION FTP MOVE & RENAME]:${NC} $file_name -> ${target_dir_path}/${final_name}"
+            add_to_cache "$cache_key"
+        else
+            # FTP üzerinde klasör hiyerarşisini oluştur (MKD)
+            if [ "$dir_path" != "$target_dir_path" ]; then
+                local relative_target="${target_dir_path#/}"
+                IFS='/' read -ra PARTS <<< "$relative_target"
+                local curr_build=""
+                for part in "${PARTS[@]}"; do
+                    if [ -z "$part" ]; then continue; fi
+                    curr_build="${curr_build}/${part}"
+                    curl -s --user "${REMOTE_USER}:${REMOTE_PASS}" "ftp://${REMOTE_HOST}:${REMOTE_PORT}/" -Q "MKD ${curr_build}" > /dev/null 2>&1 || true
+                done
+            fi
+
+            echo -n "FTP Taşıma & Yeniden Adlandırılıyor... "
+            curl -s --user "${REMOTE_USER}:${REMOTE_PASS}" "ftp://${REMOTE_HOST}:${REMOTE_PORT}/" \
+                -Q "RNFR ${old_path}" \
+                -Q "RNTO ${new_path}" > /dev/null
+            echo -e "${GREEN}✓ BAŞARILI${NC}"
+            add_to_cache "$cache_key"
+            add_to_cache "ftp_${REMOTE_HOST}:${REMOTE_PORT}_${target_dir_path}/${final_name}"
+        fi
+    done
+}
+
+# Yerel Dizin İşlemleri
+process_local() {
+    local target_dir="$REMOTE_DIR"
+
+    if [ ! -d "$target_dir" ]; then
+        echo -e "${RED}Hata: Belirtilen yerel dizin bulunamadı: $target_dir${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}[+] Yerel dizin işleniyor (Tüm Alt Klasörler Dahil): ${target_dir}${NC}"
+
+    local file_list=""
+    file_list=$(find "$target_dir" -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.m4v" -o -iname "*.ts" -o -iname "*.m2ts" -o -iname "*.mov" -o -iname "*.webm" -o -iname "*.flv" -o -iname "*.wmv" -o -iname "*.iso" \) || echo "")
+
+    if [ -z "$file_list" ]; then
+        echo -e "${YELLOW}Yerel dizinde işlenecek video dosyası bulunamadı.${NC}"
+        return
+    fi
+
+    # Alfabetik Sıralama (A-Z)
+    file_list=$(echo "$file_list" | sort -f)
+
+    local total_count=$(echo "$file_list" | grep -c . || echo 0)
+    local current_idx=0
+    local cached_count=0
+
+    while read -r file_path; do
+        if [ -z "$file_path" ]; then continue; fi
+        local cache_key="local_${file_path}"
+        if is_cached "$cache_key"; then
+            cached_count=$((cached_count + 1))
+        fi
+    done <<< "$file_list"
+
+    if [ "$cached_count" -gt 0 ]; then
+        echo -e "${YELLOW}Önbellekteki ${cached_count} içerik atlandı.${NC}"
+        echo ""
+    fi
+
+    if [ "$cached_count" -eq "$total_count" ] && [ "$total_count" -gt 0 ]; then
+        echo -e "${GREEN}Tüm dosyalar daha önce işlenmiş (Yeni dosya yok).${NC}"
+        return
+    fi
+
+    echo "$file_list" | while read -r file_path; do
+        if [ -z "$file_path" ]; then continue; fi
+        current_idx=$((current_idx + 1))
+
+        local file_name=$(basename "$file_path")
+        local dir_name=$(dirname "$file_path")
+
+        # Önbellek (Cache) Kontrolü
+        local cache_key="local_${file_path}"
+        if is_cached "$cache_key"; then
+            continue
+        fi
+
+        local new_name=$(compute_new_filename "$file_path" "$file_path" "$current_idx" "$total_count")
+        local final_name="${new_name:-$file_name}"
+
+        # Dizi / Film hiyerarşisi ve kök klasör yönlendirme hesabı
+        local media_type=$(detect_media_type "$dir_name" "$file_name")
+        local target_dir_path="$dir_name"
+
+        if [ "$media_type" = "series" ]; then
+            local search_info=$(clean_search_title "$file_name")
+            local parsed_title=$(echo "$search_info" | cut -d'|' -f1)
+            local parsed_year=$(echo "$search_info" | cut -d'|' -f2)
+            local tmdb_res=$(query_tmdb "$parsed_title" "$parsed_year" "$media_type")
+            local tmdb_t=""
+            if [ -n "$tmdb_res" ]; then tmdb_t=$(echo "$tmdb_res" | cut -d'|' -f1); fi
+            local san_title=$(sanitize_title "${tmdb_t:-$parsed_title}")
+            local seas_folder=$(extract_season_folder "$file_name")
+
+            target_dir_path=$(compute_target_dir "$dir_name" "$san_title" "$seas_folder" "$media_type")
+        else
+            target_dir_path=$(compute_target_dir "$dir_name" "" "" "$media_type")
+        fi
+
+        local target_filepath="${target_dir_path}/${final_name}"
+
+        if [ "$file_path" = "$target_filepath" ]; then
+            add_to_cache "$cache_key"
+            continue;
+        fi
+
+        if [ "$DRY_RUN" = true ]; then
+            echo -e "${CYAN}[SIMULATION Yerel MOVE & RENAME]:${NC} $file_name -> ${target_dir_path}/${final_name}"
+            add_to_cache "$cache_key"
+        else
+            mkdir -p "$target_dir_path"
+            if [ -f "$target_filepath" ] && [ "$file_path" != "$target_filepath" ]; then
+                echo -e "${RED}Hata: Hedef dosya zaten mevcut: $final_name${NC}"
+            else
+                mv "$file_path" "$target_filepath"
+                echo -e "${GREEN}✓ BAŞARIYLA TAŞINDI VE YENİDEN ADLANDIRILDI${NC}"
+                add_to_cache "$cache_key"
+                add_to_cache "local_${target_filepath}"
+            fi
+        fi
+    done
+}
+
+# ==============================================================================
+# Ana Çalıştırma Akışı
+# ==============================================================================
+
+setup_cache
+check_dependencies
+parse_args "$@"
+
+# Eğer parametreler girilmemişse interaktif menüyü çalıştır
+if [ -z "$PROTOCOL" ] || [ -z "$REMOTE_URL$REMOTE_HOST$REMOTE_DIR" ]; then
+    interactive_setup
+fi
+
+echo ""
+echo -e "${MAGENTA}================================================================${NC}"
+echo -e "${GREEN}İşlem Başlatılıyor...${NC}"
+echo -e "  - Protokol : ${YELLOW}${PROTOCOL}${NC}"
+echo -e "  - Önbellek : ${CYAN}${CACHE_FILE}${NC}"
+echo -e "  - Mod      : $( [ "$DRY_RUN" = true ] && echo -e "${CYAN}Simülasyon (Dry-Run)${NC}" || echo -e "${GREEN}Canlı (Dosyalar Yeniden Adlandırılacak)${NC}" )"
+echo -e "${MAGENTA}================================================================${NC}"
+echo ""
+
+case "$PROTOCOL" in
+    webdav) process_webdav ;;
+    ftp) process_ftp ;;
+    local) process_local ;;
+    *) echo -e "${RED}Geçersiz protokol seçimi!${NC}"; exit 1 ;;
+esac
+
+echo ""
+echo -e "${GREEN}================================================================${NC}"
+echo -e "${GREEN}✓ İşlem Tamamlandı.${NC}"
+echo -e "${GREEN}================================================================${NC}"
