@@ -112,12 +112,14 @@ Scripti menüsüz olarak doğrudan özel parametrelerle de çalıştırabilirsin
 
 | Komut | Açıklama |
 | :--- | :--- |
+| `sudo bash gateway_setup.sh update` | **⚡ Hızlı Güncelleme (1 Saniye):** Ağ, SSL ve disk ayarlarına dokunmadan sadece `server.js` ve daemon kodunu günceller. |
 | `sudo bash gateway_setup.sh status` | Servis, Nginx, SSL ve Disk genel durum özetini gösterir. |
+| `sudo bash gateway_command.sh install` | Sıfırdan veya tam yeniden kurulum sihirbazını başlatır. |
 | `sudo bash gateway_setup.sh list-disks` | Havuzdaki aktif disklerin boyut, kullanılan ve boş alan analizi. |
 | `sudo bash gateway_setup.sh add-disk` | Etkileşimli yeni disk arama ve havuza bağlama modunu açar. |
 | `sudo bash gateway_setup.sh remove-disk` | Havuzdan disk güvenli çıkarma ve umount işlemi. |
 | `sudo bash gateway_setup.sh logs` | Gateway Daemon canlı loglarını izler (`journalctl`). |
-| `sudo bash gateway_setup.sh restart` | Storage Gateway servisini yeniden başlatır. |
+| `sudo bash gateway_setup.sh restart` | Storage Gateway servisini yeniden başlatır (1 saniye). |
 | `sudo bash gateway_setup.sh token` | Test token üretme ve endpoint doğrulama aracı. |
 | `sudo bash gateway_setup.sh disk-graph` | ASCII formatında görsel disk doluluk grafiği çizer. |
 | `sudo bash gateway_setup.sh file-stats` | Disklerdeki toplam dosya/klasör sayısı ve uzantı dağılımı. |

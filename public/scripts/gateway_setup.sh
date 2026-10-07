@@ -1,17 +1,18 @@
 #!/bin/bash
 
 # ==============================================================================
-# ENTERPRISE STORAGE GATEWAY MANAGER v3.2
+# ENTERPRISE STORAGE GATEWAY MANAGER v3.3
 # Direct Mount Scanning & Deep Subdirectory Auto-Discovery
-
-# bash gateway_setup.sh install — Kurulum Sihirbazı
+#
+# bash gateway_setup.sh update — ⚡ Hızlı Kod Güncelleme (1 Saniyede Server.js Günceller)
+# bash gateway_setup.sh install — Sıfırdan Kurulum Sihirbazı
 # bash gateway_setup.sh status — Dashboard ve Disk Listesi
 # bash gateway_setup.sh token — Token Paneli
 # bash gateway_setup.sh disk-graph — Doluluk Grafiği
 # bash gateway_setup.sh file-stats — Dosya İstatistikleri
 # bash gateway_setup.sh connectivity — Bağlantı Testi
 # bash gateway_setup.sh add-disk — Yeni Disk Ekleme
-
+#
 # ==============================================================================
 
 set -e
@@ -55,23 +56,13 @@ get_env_val() {
     fi
 }
 
-# ==============================================================================
-# lsblk tabanlı evrensel disk tarayıcı
-# Hem mount'lu hem mount'suz tüm diskleri ve partition'ları döndürür
-# Çıktı formatı: DEV|SIZE|FSTYPE|MOUNTPOINT|MODEL
-# ==============================================================================
 scan_all_block_devices() {
     lsblk -J -b -o NAME,SIZE,FSTYPE,MOUNTPOINT,TYPE,MODEL 2>/dev/null | \
     python3 -c "
 import json, sys
 
-# Sistem/boot dosya sistemleri - depolama için kullanılmaz
 SKIP_FS = {'vfat', 'iso9660', 'squashfs', 'tmpfs', 'devtmpfs'}
-
-# Çok küçük partition'ları atla (100 MB altı)
 MIN_SIZE = 100 * 1024 * 1024
-
-# Sanal/sistem cihazları atla
 SKIP_DEV = ['sr', 'loop', 'ram', 'zram', 'dm-', 'md']
 
 def parse_size(s):
@@ -91,34 +82,26 @@ def walk(devices, parent_model=''):
         model   = ((d.get('model') or '').strip()) or parent_model
         children = d.get('children') or []
 
-        # Sanal cihazları atla
         if any(name.startswith(x) for x in SKIP_DEV):
             continue
 
         if dtype == 'disk':
             if children:
-                # Partition'ı olan disk: sadece partition'larını göster
                 walk(children, model)
             else:
-                # Ham disk (partition'sız): diski göster
                 if size_b >= MIN_SIZE and fs not in SKIP_FS:
                     result.append((dev, size_b, fs, mp, model))
         elif dtype == 'part':
-            # Çok küçük partition'ları atla (EFI, BIOS boot vs.)
             if size_b < MIN_SIZE:
                 continue
-            # Sistem FS'lerini atla
             if fs in SKIP_FS:
                 continue
             result.append((dev, size_b, fs, mp, model))
 
 walk(json.load(sys.stdin).get('blockdevices', []))
-
-# Boyuta göre büyükten küçüğe sırala
 result.sort(key=lambda x: x[1], reverse=True)
 
 for dev, size_b, fs, mp, model in result:
-    # Boyutu insan okunur yap
     if size_b >= 1024**4:
         size_str = f'{size_b/1024**4:.1f}T'
     elif size_b >= 1024**3:
@@ -131,7 +114,6 @@ for dev, size_b, fs, mp, model in result:
 " 2>/dev/null
 }
 
-# Verilen bir bloğu mount et (gerekirse ext4 ile formatla)
 auto_mount_disk() {
     local dev=$1
     local mp=$2
@@ -158,7 +140,6 @@ auto_mount_disk() {
         log_success "$dev -> $mp olarak mount edildi."
     fi
 
-    # fstab'a ekle (UUID ile kalıcı)
     local uuid
     uuid=$(blkid -s UUID -o value "$dev" 2>/dev/null)
     if [ -n "$uuid" ] && ! grep -q "$uuid" /etc/fstab; then
@@ -278,7 +259,7 @@ show_dashboard() {
     migrate_disks_to_depo_format
     clear
     echo -e "${CYAN}====================================================================${NC}"
-    echo -e "${BOLD}${BLUE}   DYNAMIC VIRTUAL STORAGE GATEWAY MANAGER v3.2                     ${NC}"
+    echo -e "${BOLD}${BLUE}   DYNAMIC VIRTUAL STORAGE GATEWAY MANAGER v3.3                     ${NC}"
     echo -e "${CYAN}====================================================================${NC}"
 
     local status_str="${RED}DURDURULDU / OFFLINE${NC}"
@@ -382,14 +363,12 @@ add_disk_interactive() {
     index=1
 
     while IFS='|' read -r dev size fs mp model; do
-        # /boot, /snap gibi sistem bölümlerini atla
         [[ "$mp" == "/boot"* || "$mp" == "/snap"* ]] && continue
 
         DETECTED_DEVS+=("$dev")
         DETECTED_FS+=("$fs")
         DETECTED_MPS+=("$mp")
 
-        # Bu cihaz zaten havuzdaki bir depo dizinine karşılık geliyor mu?
         already_in_pool=""
         if [ -n "$current_disks" ]; then
             IFS=',' read -ra C_DISKS <<< "$current_disks"
@@ -516,7 +495,6 @@ remove_disk_interactive() {
         new_disks_csv=$(IFS=,; echo "${NEW_ARRAY[*]}")
         set_env_val "STORAGE_DISKS" "$new_disks_csv"
 
-        # Disk /mnt/depoX olarak mount'luysa umount et ve fstab kaydını temizle
         if mountpoint -q "$target_rem"; then
             log_info "$target_rem umount ediliyor..."
             umount -l "$target_rem" 2>/dev/null || true
@@ -537,9 +515,6 @@ view_logs() {
     journalctl -u "$SERVICE_NAME" -f -n 50
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 1: Token Yönetimi Paneli
-# ==============================================================================
 token_management() {
     show_dashboard
     log_step "Token Yönetimi Paneli"
@@ -564,7 +539,7 @@ token_management() {
     read -p "Seçiminiz: " T_CHOICE
 
     generate_token() {
-        local expires=$1  # boşsa kalıcı
+        local expires=$1
         local payload_data='{"action":"admin"'
         if [ -n "$expires" ]; then
             payload_data="$payload_data,\"expires\":$expires"
@@ -641,9 +616,6 @@ print(f'Toplam: {total//1024**3}GB | Boş: {free//1024**3}GB | Doluluk: %{pct}')
     esac
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 2: ASCII Disk Doluluk Grafiği
-# ==============================================================================
 disk_usage_graph() {
     show_dashboard
     log_step "Depolama Havuzu Doluluk Grafiği"
@@ -665,7 +637,6 @@ disk_usage_graph() {
         [ -d "$disk_path" ] || continue
 
         local label=""
-        # Etiket ara
         if [ -n "$labels_csv" ]; then
             IFS=',' read -ra LBL_PAIRS <<< "$labels_csv"
             for pair in "${LBL_PAIRS[@]}"; do
@@ -686,7 +657,6 @@ disk_usage_graph() {
         total_pool_bytes=$(( total_pool_bytes + total_kb * 1024 ))
         free_pool_bytes=$(( free_pool_bytes + avail_kb * 1024 ))
 
-        # Quota kontrolü
         local quota_gb=0 quota_str=""
         if [ -n "$quota_csv" ]; then
             IFS=',' read -ra QT_PAIRS <<< "$quota_csv"
@@ -696,7 +666,6 @@ disk_usage_graph() {
                 p_gb=$(echo "$p" | cut -d: -f2)
                 if [ "$p_path" = "$disk_path" ]; then
                     quota_gb=$p_gb
-                    # Quota'ya göre kullanımı yeniden hesapla
                     local quota_kb=$(( quota_gb * 1024 * 1024 ))
                     if [ $used_kb -gt $quota_kb ]; then
                         pct=100
@@ -709,19 +678,16 @@ disk_usage_graph() {
             done
         fi
 
-        # Renk seç
         local bar_color=$GREEN
         [ "$pct" -ge 70 ] && bar_color=$YELLOW
         [ "$pct" -ge 85 ] && bar_color=$RED
 
-        # Bar çiz (40 karakter)
         local filled=$(( pct * 40 / 100 ))
         local empty=$(( 40 - filled ))
         local bar=""
         for ((i=0; i<filled; i++)); do bar+="█"; done
         for ((i=0; i<empty;  i++)); do bar+="░"; done
 
-        # Boyutları insan okunur yap
         human_size() { local kb=$1; echo "$(echo "scale=1; $kb/1024/1024" | bc)G" 2>/dev/null || echo "${kb}K"; }
         local sz_total sz_used sz_avail
         sz_total=$(human_size $total_kb)
@@ -733,7 +699,6 @@ disk_usage_graph() {
         echo ""
     done
 
-    # Havuz özeti
     local pool_used=$(( (total_pool_bytes - free_pool_bytes) / 1024 / 1024 ))
     local pool_total=$(( total_pool_bytes / 1024 / 1024 ))
     local pool_free=$(( free_pool_bytes / 1024 / 1024 ))
@@ -753,9 +718,6 @@ disk_usage_graph() {
     echo ""
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 3: Disk Dosya İstatistikleri
-# ==============================================================================
 disk_file_stats() {
     show_dashboard
     log_step "Depolama Havuzu Dosya İstatistikleri"
@@ -807,9 +769,6 @@ disk_file_stats() {
     echo ""
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 5: Bağlantı ve Erişilebilirlik Testi
-# ==============================================================================
 connectivity_test() {
     show_dashboard
     log_step "Bağlantı ve Erişilebilirlik Testi"
@@ -818,7 +777,6 @@ connectivity_test() {
     local port=$(get_env_val "PORT"); port=${port:-8080}
     local secret=$(get_env_val "STORAGE_SECRET_KEY")
 
-    # 1. Yerel servis
     echo -e "${YELLOW}[1] Yerel Gateway Servisi (127.0.0.1:$port)${NC}"
     if curl -sf --max-time 5 "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
         log_success "Yerel servis yanıt veriyor."
@@ -826,7 +784,6 @@ connectivity_test() {
         log_error "Yerel servis yanıt vermiyor! (systemctl restart $SERVICE_NAME)"
     fi
 
-    # 2. Nginx
     echo -e "${YELLOW}[2] Nginx Durumu${NC}"
     if systemctl is-active --quiet nginx; then
         log_success "Nginx çalışıyor."
@@ -834,7 +791,6 @@ connectivity_test() {
         log_error "Nginx çalışmıyor!"
     fi
 
-    # 3. HTTP erişim
     if [ -n "$domain" ]; then
         echo -e "${YELLOW}[3] HTTP Erişim (http://$domain/health)${NC}"
         http_code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 "http://$domain/health" 2>/dev/null || echo "000")
@@ -844,7 +800,6 @@ connectivity_test() {
             log_error "HTTP erişimi başarısız (HTTP $http_code)"
         fi
 
-        # 4. HTTPS erişim
         echo -e "${YELLOW}[4] HTTPS Erişim (https://$domain/health)${NC}"
         https_code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 "https://$domain/health" 2>/dev/null || echo "000")
         if [ "$https_code" = "200" ]; then
@@ -854,7 +809,6 @@ connectivity_test() {
         fi
     fi
 
-    # 5. Port kontrolü
     echo -e "${YELLOW}[5] Port $port Durumu${NC}"
     if ss -tlnp 2>/dev/null | grep -q ":$port " || netstat -tlnp 2>/dev/null | grep -q ":$port "; then
         log_success "Port $port dinlemede."
@@ -865,9 +819,6 @@ connectivity_test() {
     echo ""
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 6 & 9: Disk Kota ve Etiket Yönetimi
-# ==============================================================================
 quota_label_management() {
     show_dashboard
     log_step "Disk Kota ve Etiket Yönetimi"
@@ -912,7 +863,6 @@ quota_label_management() {
             local sel_dp=$(echo "${DISK_ARRAY[$((DISK_N-1))]}"|tr -d ' ')
             read -p "Yeni etiket (boş bırakmak için ENTER): " NEW_LBL
             [ -z "$NEW_LBL" ] && return
-            # Güncelle: aynı path varsa çıkar, yenisini ekle
             local new_labels=""
             if [ -n "$labels_csv" ]; then
                 IFS=',' read -ra LP <<< "$labels_csv"
@@ -971,9 +921,6 @@ quota_label_management() {
     esac
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 10: Webhook / Telegram Bildirim Ayarları
-# ==============================================================================
 notification_settings() {
     show_dashboard
     log_step "Bildirim Ayarları (Webhook / Telegram)"
@@ -1055,9 +1002,6 @@ notification_settings() {
     esac
 }
 
-# ==============================================================================
-# YENİ ÖZELLİK 12: Cron Sağlık Kontrolü Yönetimi
-# ==============================================================================
 cron_health_management() {
     show_dashboard
     log_step "Cron Sağlık Kontrolü Yönetimi"
@@ -1082,11 +1026,9 @@ cron_health_management() {
     echo ""
     read -p "Seçiminiz: " C_CHOICE
 
-    # healthcheck.sh içeriğini yaz
     write_healthcheck_script() {
         cat << 'HC_EOF' > "$cron_script"
 #!/bin/bash
-# Storage Gateway Healthcheck - Otomatik oluşturuldu
 INSTALL_DIR="/opt/storage-gateway"
 ENV_FILE="$INSTALL_DIR/.env"
 SERVICE_NAME="storage-gateway"
@@ -1109,7 +1051,6 @@ send_alert() {
 
 HOST=$(hostname)
 
-# 1. Servis kontrolü
 if ! systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "[$TS] HATA: Servis çalışmıyor, yeniden başlatılıyor..." >> "$LOG_FILE"
     systemctl restart "$SERVICE_NAME"
@@ -1123,7 +1064,6 @@ if ! systemctl is-active --quiet "$SERVICE_NAME"; then
     fi
 fi
 
-# 2. Disk doluluk kontrolü
 THR=$(get_val ALERT_DISK_PERCENT); THR=${THR:-85}
 DISKS=$(get_val STORAGE_DISKS)
 IFS=',' read -ra DARR <<< "$DISKS"
@@ -1137,7 +1077,6 @@ for dp in "${DARR[@]}"; do
     fi
 done
 
-# 3. SSL sertifika kontrolü (ayda bir)
 DOMAIN=$(get_val STORAGE_DOMAIN)
 CERT="/etc/letsencrypt/live/$DOMAIN/cert.pem"
 if [ -f "$CERT" ]; then
@@ -1152,7 +1091,6 @@ if [ -f "$CERT" ]; then
     fi
 fi
 
-# 4. Eski log satırlarını temizle (10000 satır üzeri)
 LINES=$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)
 if [ "$LINES" -gt 10000 ]; then
     tail -n 5000 "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
@@ -1164,7 +1102,6 @@ HC_EOF
     case $C_CHOICE in
         1)
             write_healthcheck_script
-            # Cron'dan eskiyi temizle, yeniyi ekle
             ( crontab -l 2>/dev/null | grep -v "$cron_tag" ; echo "*/5 * * * * bash $cron_script $cron_tag" ) | crontab -
             log_success "Cron sağlık kontrolü etkinleştirildi (her 5 dakikada çalışır)."
             log_info "Log dosyası: /var/log/storage-gateway-health.log"
@@ -1193,133 +1130,8 @@ HC_EOF
     esac
 }
 
-install_gateway() {
-    clear
-    echo -e "${CYAN}====================================================================${NC}"
-    echo -e "${BOLD}${BLUE}   STORAGE GATEWAY KURULUM & RE-INSTALL WIZARD                      ${NC}"
-    echo -e "${CYAN}====================================================================${NC}"
-
-    local exist_domain=$(get_env_val "STORAGE_DOMAIN")
-    local exist_secret=$(get_env_val "STORAGE_SECRET_KEY")
-    local exist_port=$(get_env_val "PORT")
-
-    read -p "1. Depolama Subdomain Adresi [Varsayılan: ${exist_domain:-storage.siteniz.com}]: " DOMAIN
-    DOMAIN=${DOMAIN:-$exist_domain}
-    while [ -z "$DOMAIN" ]; do
-        log_error "Domain adresi boş bırakılamaz!"
-        read -p "1. Depolama Subdomain Adresi: " DOMAIN
-    done
-
-    DEFAULT_SECRET=$(openssl rand -hex 24 2>/dev/null || echo "SecretKey_$(date +%s)_$RANDOM")
-    read -p "2. Laravel İletişim Secret Key [Varsayılan: ${exist_secret:-Rastgele}]: " SECRET_KEY
-    SECRET_KEY=${SECRET_KEY:-$exist_secret}
-    SECRET_KEY=${SECRET_KEY:-$DEFAULT_SECRET}
-
-    read -p "3. Gateway Portu [Varsayılan: ${exist_port:-8080}]: " PORT
-    PORT=${PORT:-$exist_port}
-    PORT=${PORT:-8080}
-
-    echo ""
-    log_info "Sunucudaki kullanılabilir fiziksel diskler taranıyor..."
-    echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
-
-    INST_DEVS=()
-    INST_TARGETS=()
-    INST_FS=()
-    INST_MPS=()
-    depo_counter=1
-    index=1
-
-    while IFS='|' read -r dev size fs mp model; do
-        [[ "$mp" == "/boot"* || "$mp" == "/snap"* ]] && continue
-
-        INST_DEVS+=("$dev")
-        INST_FS+=("$fs")
-        INST_MPS+=("$mp")
-
-        target_dir="/mnt/depo$depo_counter"
-        while [[ " ${INST_TARGETS[*]} " =~ " $target_dir " ]]; do
-            ((depo_counter++))
-            target_dir="/mnt/depo$depo_counter"
-        done
-        INST_TARGETS+=("$target_dir")
-        ((depo_counter++))
-
-        if [ -n "$mp" ]; then
-            avail=$(df -h "$mp" 2>/dev/null | tail -n1 | awk '{print $4}')
-            mp_info="Mevcut Mount: $mp | Boş: $avail"
-            fs_label="${fs:-?}"
-        else
-            if [ -z "$fs" ]; then
-                mp_info="${RED}Mount YOK / Dosya sistemi YOK → Formatlanacak${NC}"
-                fs_label="none"
-            else
-                mp_info="${YELLOW}Mount YOK → Otomatik mount edilecek${NC}"
-                fs_label="$fs"
-            fi
-        fi
-
-        model_str=""
-        [ -n "$model" ] && model_str=" ($model)"
-
-        echo -e "  [${CYAN}$index${NC}] ${BOLD}$dev${NC}$model_str | Boyut: $size | FS: $fs_label"
-        echo -e "       Hedef Depo Yolu: ${CYAN}$target_dir${NC} | $mp_info"
-        echo ""
-        ((index++))
-    done < <(scan_all_block_devices)
-
-    echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
-    echo ""
-
-    SELECTED_DISKS=()
-
-    if [ ${#INST_TARGETS[@]} -gt 0 ]; then
-        echo -e "${YELLOW}Havuza eklenecek disk numaralarını virgülle ayırarak girin (Örn: 1,2):${NC}"
-        read -p "Seçiminiz: " DISK_CHOICES
-
-        while [ -z "$DISK_CHOICES" ]; do
-            log_error "Lütfen en az bir disk numarası seçin!"
-            read -p "Seçiminiz: " DISK_CHOICES
-        done
-
-        IFS=',' read -ra ADDR <<< "$DISK_CHOICES"
-        for i in "${ADDR[@]}"; do
-            clean_i=$(echo "$i" | tr -d ' ')
-            if [[ "$clean_i" =~ ^[0-9]+$ ]] && [ "$clean_i" -ge 1 ] && [ "$clean_i" -le ${#INST_TARGETS[@]} ]; then
-                target_dir="${INST_TARGETS[$((clean_i-1))]}"
-                inst_dev="${INST_DEVS[$((clean_i-1))]}"
-                inst_fs="${INST_FS[$((clean_i-1))]}"
-                inst_mp="${INST_MPS[$((clean_i-1))]}"
-
-                ensure_depo_mount "$inst_dev" "$inst_mp" "$target_dir" "$inst_fs" || continue
-
-                SELECTED_DISKS+=("$target_dir")
-            fi
-        done
-    else
-        SELECTED_DISKS+=("/mnt/depo1")
-        mkdir -p "/mnt/depo1"
-    fi
-
-    DISKS_CSV=$(IFS=,; echo "${SELECTED_DISKS[*]}")
-
-    log_step "Paketler ve Bağımlılıklar Güncelleniyor..."
-    apt-get update -y >/dev/null 2>&1 || true
-    apt-get install -y ca-certificates curl gnupg lsb-release build-essential git nginx certbot python3-certbot-nginx >/dev/null 2>&1
-
-    if ! command -v node >/dev/null 2>&1; then
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
-        apt-get install -y nodejs >/dev/null 2>&1
-    fi
-
+write_gateway_files() {
     mkdir -p "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
-
-    for disk in "${SELECTED_DISKS[@]}"; do
-        mkdir -p "$disk"
-        chmod 755 "$disk"
-    done
-
     cat << 'PKG_EOF' > "$INSTALL_DIR/package.json"
 {
   "name": "storage-gateway",
@@ -1332,7 +1144,10 @@ install_gateway() {
 }
 PKG_EOF
 
-    npm install express dotenv busboy --silent >/dev/null 2>&1
+    if [ ! -d "$INSTALL_DIR/node_modules/express" ]; then
+        log_info "Node.js paketleri kuruluyor (express, dotenv, busboy)..."
+        (cd "$INSTALL_DIR" && npm install express dotenv busboy --silent >/dev/null 2>&1)
+    fi
 
     cat << 'JS_EOF' > "$INSTALL_DIR/server.js"
 const express = require('express');
@@ -1785,6 +1600,162 @@ app.listen(PORT, () => {
     console.log(`Storage Gateway Daemon aktif! Port: ${PORT}`);
 });
 JS_EOF
+}
+
+quick_update() {
+    clear
+    echo -e "${CYAN}====================================================================${NC}"
+    echo -e "${BOLD}${BLUE}   STORAGE GATEWAY HIZLI KOD GÜNCELLEME                             ${NC}"
+    echo -e "${CYAN}====================================================================${NC}"
+
+    if [ ! -d "$INSTALL_DIR" ]; then
+        log_error "Kurulu Gateway bulunamadı ($INSTALL_DIR). Önce tam kurulum yapın."
+        return 1
+    fi
+
+    log_step "Server.js ve Gateway Daemon Kodu Yenileniyor..."
+    write_gateway_files
+
+    log_info "Gateway servisi yeniden başlatılıyor..."
+    systemctl restart "$SERVICE_NAME"
+
+    log_success "Gateway Daemon kodu 1 SANİYEDE güncellendi ve servis yeniden başlatıldı!"
+    echo -e "   ${GREEN}✔ Ağ, SSL, Nginx ve Disk Yapılandırmanıza Dokunulmadı.${NC}"
+    sleep 2
+}
+
+install_gateway() {
+    clear
+    echo -e "${CYAN}====================================================================${NC}"
+    echo -e "${BOLD}${BLUE}   STORAGE GATEWAY KURULUM & RE-INSTALL WIZARD                      ${NC}"
+    echo -e "${CYAN}====================================================================${NC}"
+
+    local exist_domain=$(get_env_val "STORAGE_DOMAIN")
+    local exist_secret=$(get_env_val "STORAGE_SECRET_KEY")
+    local exist_port=$(get_env_val "PORT")
+
+    read -p "1. Depolama Subdomain Adresi [Varsayılan: ${exist_domain:-storage.siteniz.com}]: " DOMAIN
+    DOMAIN=${DOMAIN:-$exist_domain}
+    while [ -z "$DOMAIN" ]; do
+        log_error "Domain adresi boş bırakılamaz!"
+        read -p "1. Depolama Subdomain Adresi: " DOMAIN
+    done
+
+    DEFAULT_SECRET=$(openssl rand -hex 24 2>/dev/null || echo "SecretKey_$(date +%s)_$RANDOM")
+    read -p "2. Laravel İletişim Secret Key [Varsayılan: ${exist_secret:-Rastgele}]: " SECRET_KEY
+    SECRET_KEY=${SECRET_KEY:-$exist_secret}
+    SECRET_KEY=${SECRET_KEY:-$DEFAULT_SECRET}
+
+    read -p "3. Gateway Portu [Varsayılan: ${exist_port:-8080}]: " PORT
+    PORT=${PORT:-$exist_port}
+    PORT=${PORT:-8080}
+
+    echo ""
+    log_info "Sunucudaki kullanılabilir fiziksel diskler taranıyor..."
+    echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
+
+    INST_DEVS=()
+    INST_TARGETS=()
+    INST_FS=()
+    INST_MPS=()
+    depo_counter=1
+    index=1
+
+    while IFS='|' read -r dev size fs mp model; do
+        [[ "$mp" == "/boot"* || "$mp" == "/snap"* ]] && continue
+
+        INST_DEVS+=("$dev")
+        INST_FS+=("$fs")
+        INST_MPS+=("$mp")
+
+        target_dir="/mnt/depo$depo_counter"
+        while [[ " ${INST_TARGETS[*]} " =~ " $target_dir " ]]; do
+            ((depo_counter++))
+            target_dir="/mnt/depo$depo_counter"
+        done
+        INST_TARGETS+=("$target_dir")
+        ((depo_counter++))
+
+        if [ -n "$mp" ]; then
+            avail=$(df -h "$mp" 2>/dev/null | tail -n1 | awk '{print $4}')
+            mp_info="Mevcut Mount: $mp | Boş: $avail"
+            fs_label="${fs:-?}"
+        else
+            if [ -z "$fs" ]; then
+                mp_info="${RED}Mount YOK / Dosya sistemi YOK → Formatlanacak${NC}"
+                fs_label="none"
+            else
+                mp_info="${YELLOW}Mount YOK → Otomatik mount edilecek${NC}"
+                fs_label="$fs"
+            fi
+        fi
+
+        model_str=""
+        [ -n "$model" ] && model_str=" ($model)"
+
+        echo -e "  [${CYAN}$index${NC}] ${BOLD}$dev${NC}$model_str | Boyut: $size | FS: $fs_label"
+        echo -e "       Hedef Depo Yolu: ${CYAN}$target_dir${NC} | $mp_info"
+        echo ""
+        ((index++))
+    done < <(scan_all_block_devices)
+
+    echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
+    echo ""
+
+    SELECTED_DISKS=()
+
+    if [ ${#INST_TARGETS[@]} -gt 0 ]; then
+        echo -e "${YELLOW}Havuza eklenecek disk numaralarını virgülle ayırarak girin (Örn: 1,2):${NC}"
+        read -p "Seçiminiz: " DISK_CHOICES
+
+        while [ -z "$DISK_CHOICES" ]; do
+            log_error "Lütfen en az bir disk numarası seçin!"
+            read -p "Seçiminiz: " DISK_CHOICES
+        done
+
+        IFS=',' read -ra ADDR <<< "$DISK_CHOICES"
+        for i in "${ADDR[@]}"; do
+            clean_i=$(echo "$i" | tr -d ' ')
+            if [[ "$clean_i" =~ ^[0-9]+$ ]] && [ "$clean_i" -ge 1 ] && [ "$clean_i" -le ${#INST_TARGETS[@]} ]; then
+                target_dir="${INST_TARGETS[$((clean_i-1))]}"
+                inst_dev="${INST_DEVS[$((clean_i-1))]}"
+                inst_fs="${INST_FS[$((clean_i-1))]}"
+                inst_mp="${INST_MPS[$((clean_i-1))]}"
+
+                ensure_depo_mount "$inst_dev" "$inst_mp" "$target_dir" "$inst_fs" || continue
+
+                SELECTED_DISKS+=("$target_dir")
+            fi
+        done
+    else
+        SELECTED_DISKS+=("/mnt/depo1")
+        mkdir -p "/mnt/depo1"
+    fi
+
+    DISKS_CSV=$(IFS=,; echo "${SELECTED_DISKS[*]}")
+
+    log_step "Paketler ve Bağımlılıklar Güncelleniyor..."
+    if ! command -v nginx >/dev/null 2>&1 || ! command -v certbot >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
+        apt-get update -y >/dev/null 2>&1 || true
+        apt-get install -y ca-certificates curl gnupg lsb-release build-essential git nginx certbot python3-certbot-nginx >/dev/null 2>&1
+
+        if ! command -v node >/dev/null 2>&1; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
+            apt-get install -y nodejs >/dev/null 2>&1
+        fi
+    else
+        log_info "Temel bağımlılıklar (Nginx, Certbot, Node.js) zaten kurulu, paket güncellemesi atlandı."
+    fi
+
+    mkdir -p "$INSTALL_DIR"
+    cd "$INSTALL_DIR"
+
+    for disk in "${SELECTED_DISKS[@]}"; do
+        mkdir -p "$disk"
+        chmod 755 "$disk"
+    done
+
+    write_gateway_files
 
     cat << ENV_EOF > "$ENV_FILE"
 PORT=$PORT
@@ -1848,7 +1819,7 @@ NGINX_EOF
 
     certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email >/dev/null 2>&1 || true
 
-    log_success "Kurulum / Güncelleme başarıyla tamamlandı!"
+    log_success "Kurulum başarıyla tamamlandı!"
     sleep 2
 }
 
@@ -1861,15 +1832,16 @@ main_menu() {
         echo -e "  [${CYAN}3${NC}]  Havuzdan Disk Çıkar"
         echo -e "  [${CYAN}4${NC}]  Gateway Servis Loglarını Canlı İzle"
         echo -e "  [${CYAN}5${NC}]  Gateway Servisini Yeniden Başlat"
-        echo -e "  [${CYAN}6${NC}]  Gateway Konfigürasyonunu Yeniden Kur / Güncelle"
+        echo -e "  [${CYAN}6${NC}]  ⚡ Hızlı Kod Güncelle (Sadece Server.js - 1 Saniye)"
+        echo -e "  [${CYAN}7${NC}]  🔄 Sıfırdan / Tam Yeniden Kurulum Sihirbazı"
         echo -e "${YELLOW}────────────────────────────────────────────────────${NC}"
-        echo -e "  [${CYAN}7${NC}]  🔑 Token Yönetimi (Üret / Test / Decode)"
-        echo -e "  [${CYAN}8${NC}]  📊 Disk Doluluk Grafiği (ASCII)"
-        echo -e "  [${CYAN}9${NC}]  📁 Dosya İstatistikleri"
-        echo -e "  [${CYAN}10${NC}] 🌐 Bağlantı ve Erişilebilirlik Testi"
-        echo -e "  [${CYAN}11${NC}] 💾 Disk Kota ve Etiket Yönetimi"
-        echo -e "  [${CYAN}12${NC}] 📧 Bildirim Ayarları (Webhook / Telegram)"
-        echo -e "  [${CYAN}13${NC}] 🔁 Cron Sağlık Kontrolü Yönetimi"
+        echo -e "  [${CYAN}8${NC}]  🔑 Token Yönetimi (Üret / Test / Decode)"
+        echo -e "  [${CYAN}9${NC}]  📊 Disk Doluluk Grafiği (ASCII)"
+        echo -e "  [${CYAN}10${NC}] 📁 Dosya İstatistikleri"
+        echo -e "  [${CYAN}11${NC}] 🌐 Bağlantı ve Erişilebilirlik Testi"
+        echo -e "  [${CYAN}12${NC}] 💾 Disk Kota ve Etiket Yönetimi"
+        echo -e "  [${CYAN}13${NC}] 📧 Bildirim Ayarları (Webhook / Telegram)"
+        echo -e "  [${CYAN}14${NC}] 🔁 Cron Sağlık Kontrolü Yönetimi"
         echo -e "${CYAN}====================================================================${NC}"
         echo -e "  [${CYAN}0${NC}]  Çıkış"
         echo -e "${CYAN}====================================================================${NC}"
@@ -1881,14 +1853,15 @@ main_menu() {
             3)  remove_disk_interactive; read -p "Devam etmek için ENTER'a basın..." ;;
             4)  view_logs ;;
             5)  systemctl restart "$SERVICE_NAME"; log_success "Servis yeniden başlatıldı."; sleep 1 ;;
-            6)  install_gateway ;;
-            7)  token_management; read -p "Devam etmek için ENTER'a basın..." ;;
-            8)  disk_usage_graph; read -p "Devam etmek için ENTER'a basın..." ;;
-            9)  disk_file_stats; read -p "Devam etmek için ENTER'a basın..." ;;
-            10) connectivity_test; read -p "Devam etmek için ENTER'a basın..." ;;
-            11) quota_label_management; read -p "Devam etmek için ENTER'a basın..." ;;
-            12) notification_settings; read -p "Devam etmek için ENTER'a basın..." ;;
-            13) cron_health_management; read -p "Devam etmek için ENTER'a basın..." ;;
+            6)  quick_update ;;
+            7)  install_gateway ;;
+            8)  token_management; read -p "Devam etmek için ENTER'a basın..." ;;
+            9)  disk_usage_graph; read -p "Devam etmek için ENTER'a basın..." ;;
+            10) disk_file_stats; read -p "Devam etmek için ENTER'a basın..." ;;
+            11) connectivity_test; read -p "Devam etmek için ENTER'a basın..." ;;
+            12) quota_label_management; read -p "Devam etmek için ENTER'a basın..." ;;
+            13) notification_settings; read -p "Devam etmek için ENTER'a basın..." ;;
+            14) cron_health_management; read -p "Devam etmek için ENTER'a basın..." ;;
             0)  echo -e "${GREEN}Çıkış yapıldı.${NC}"; exit 0 ;;
             *)  log_error "Geçersiz seçim!"; sleep 1 ;;
         esac
@@ -1926,6 +1899,9 @@ case "$1" in
         systemctl restart "$SERVICE_NAME"
         log_success "Servis yeniden başlatıldı."
         ;;
+    update|quick-update|code-update)
+        quick_update
+        ;;
     token)
         token_management
         ;;
@@ -1939,7 +1915,6 @@ case "$1" in
         connectivity_test
         ;;
     healthcheck)
-        # Doğrudan cron script'i çalıştır (cron tarafından çağrılır)
         bash /opt/storage-gateway/healthcheck.sh
         ;;
     install|reinstall)
