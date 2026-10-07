@@ -171,12 +171,13 @@ class DownloadController extends Controller
     {
         $token = $request->input('token');
         $bytesSent = (int) $request->input('bytes_sent', 0);
+        $isClosed = (bool) ($request->input('closed') || $request->input('is_closed') || $request->input('finished'));
 
-        if (! $token || $bytesSent <= 0) {
+        if (! $token) {
             return response()->json(['status' => 'ignored'], 200);
         }
 
-        $this->subscriptionService->recordBytes($token, $bytesSent);
+        $this->subscriptionService->recordBytes($token, $bytesSent, $isClosed);
 
         return response()->json(['status' => 'ok']);
     }

@@ -189,12 +189,8 @@ class SubscriptionService
     /**
      * Record downloaded bytes against a ticket and its associated subscription period.
      */
-    public function recordBytes(string $token, int $bytes): bool
+    public function recordBytes(string $token, int $bytes, bool $isClosed = false): bool
     {
-        if ($bytes <= 0) {
-            return false;
-        }
-
         /** @var DownloadTicket|null $ticket */
         $ticket = DownloadTicket::where('token', $token)
             ->with(['mediaFile'])
@@ -217,17 +213,14 @@ class SubscriptionService
             $actualIncrement = $bytes;
         }
 
-        if ($actualIncrement <= 0) {
-            return true;
-        }
-
-        DB::transaction(function () use ($ticket, $actualIncrement, $fileSizeBytes) {
-            // Update ticket
+        DB::transaction(function () use ($ticket, $actualIncrement, $fileSizeBytes, $isClosed) {
             $newTotal = $ticket->bytes_downloaded + $actualIncrement;
             $ticket->bytes_downloaded = $newTotal;
 
             if ($fileSizeBytes > 0 && $newTotal >= (int) ($fileSizeBytes * 0.98)) {
                 $ticket->status = 'completed';
+            } elseif ($isClosed) {
+                $ticket->status = 'stopped';
             } else {
                 $ticket->status = 'active';
             }
@@ -236,7 +229,7 @@ class SubscriptionService
             $ticket->save();
 
             // Update user subscription period used_bytes
-            if ($ticket->subscription_period_id) {
+            if ($actualIncrement > 0 && $ticket->subscription_period_id) {
                 DB::table('subscription_periods')
                     ->where('id', $ticket->subscription_period_id)
                     ->increment('used_bytes', $actualIncrement);
@@ -280,10 +273,28 @@ class SubscriptionService
      */
     public function getActiveParallelDownloadsCount(User $user, ?int $excludeMediaFileId = null): int
     {
+        // 1. Auto-clean stale or idle tickets for this user
+        DownloadTicket::where('user_id', $user->id)
+            ->whereIn('status', ['active', 'pending'])
+            ->where('updated_at', '<', now()->subSeconds(90))
+            ->update(['status' => 'stopped']);
+
+        DownloadTicket::where('user_id', $user->id)
+            ->where('status', 'pending')
+            ->where('created_at', '<', now()->subSeconds(60))
+            ->update(['status' => 'stopped']);
+
+        DownloadTicket::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('bytes_downloaded', 0)
+            ->where('updated_at', '<', now()->subSeconds(60))
+            ->update(['status' => 'stopped']);
+
+        // 2. Count distinct media files in active tickets
         $query = DownloadTicket::where('user_id', $user->id)
             ->whereIn('status', ['active', 'pending'])
             ->where('expires_at', '>', now())
-            ->where('updated_at', '>=', now()->subMinutes(15));
+            ->where('updated_at', '>=', now()->subSeconds(90));
 
         if ($excludeMediaFileId !== null) {
             $query->where('media_file_id', '!=', $excludeMediaFileId);
