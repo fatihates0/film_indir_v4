@@ -511,8 +511,47 @@ remove_disk_interactive() {
 }
 
 view_logs() {
-    log_info "Gateway Servis Logları (Çıkmak için CTRL+C basınız)..."
-    journalctl -u "$SERVICE_NAME" -f -n 50
+    show_dashboard
+    log_step "Gateway Servis Logları İzleme"
+
+    echo -e "  [${CYAN}1${NC}] 📡 Canlı Log Akışı (Son 30 Satır - Canlı Takip)"
+    echo -e "  [${CYAN}2${NC}] 📜 Tüm Log Geçmişini Görüntüle (Hepsini Gör - Pager)"
+    echo -e "  [${CYAN}3${NC}] 🔢 Özel Satır Sayısı İle Göster (Örn: Son 100, 500 satır)"
+    echo -e "  [${CYAN}0${NC}] ↩ Geri"
+    echo ""
+    read -p "Seçiminiz [Varsayılan: 1]: " LOG_CHOICE
+    LOG_CHOICE=${LOG_CHOICE:-1}
+
+    case "$LOG_CHOICE" in
+        1)
+            echo ""
+            log_info "Son 30 log canlı izleniyor (Çıkmak için CTRL+C basınız)..."
+            echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
+            journalctl -u "$SERVICE_NAME" -n 30 -f
+            ;;
+        2)
+            echo ""
+            log_info "Tüm servis logları gösteriliyor (Çıkmak için 'q' tuşuna basınız)..."
+            sleep 1
+            journalctl -u "$SERVICE_NAME" -n 2000 --no-pager | less +G 2>/dev/null || journalctl -u "$SERVICE_NAME" -n 1000
+            ;;
+        3)
+            echo ""
+            read -p "Kaç satır log gösterilsin? [Varsayılan: 100]: " N_NUM
+            N_NUM=${N_NUM:-100}
+            log_info "Son $N_NUM log gösteriliyor..."
+            echo -e "${YELLOW}--------------------------------------------------------------------${NC}"
+            journalctl -u "$SERVICE_NAME" -n "$N_NUM" --no-pager
+            read -p "Devam etmek için ENTER'a basın..."
+            ;;
+        0)
+            return
+            ;;
+        *)
+            log_error "Geçersiz seçim!"
+            sleep 1
+            ;;
+    esac
 }
 
 test_quota_webhook() {
