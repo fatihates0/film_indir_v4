@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PaymentMethod;
+use App\Models\PaymentNotification;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -50,9 +52,73 @@ class PlanController extends Controller
                 ];
             });
 
+        $subscriptionsHistory = Subscription::with(['user', 'plan'])
+            ->latest('id')
+            ->get()
+            ->map(function (Subscription $sub) {
+                return [
+                    'id' => $sub->id,
+                    'user_id' => $sub->user_id,
+                    'user_name' => $sub->user ? $sub->user->name : 'Silinmiş Kullanıcı',
+                    'user_email' => $sub->user ? $sub->user->email : '-',
+                    'plan_name' => $sub->plan?->name ?? ($sub->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası'),
+                    'duration_months' => $sub->duration_months,
+                    'is_perpetual' => (bool) $sub->is_perpetual,
+                    'price_paid' => (float) $sub->price_paid,
+                    'formatted_price' => '₺'.number_format((float) $sub->price_paid, 2, ',', '.'),
+                    'status' => $sub->status,
+                    'status_label' => match ($sub->status) {
+                        'active' => 'Aktif',
+                        'cancelled' => 'İptal Edildi',
+                        'expired' => 'Süresi Doldu',
+                        default => ucfirst($sub->status),
+                    },
+                    'starts_at' => $sub->starts_at ? $sub->starts_at->format('d.m.Y H:i') : null,
+                    'expires_at' => $sub->is_perpetual ? 'Süresiz' : ($sub->expires_at ? $sub->expires_at->format('d.m.Y H:i') : null),
+                    'notes' => $sub->notes,
+                    'created_at' => $sub->created_at ? $sub->created_at->format('d.m.Y H:i') : null,
+                ];
+            });
+
+        $paymentMethods = PaymentMethod::orderBy('sort_order')->get();
+
+        $paymentNotifications = PaymentNotification::with(['user', 'plan', 'paymentMethod'])
+            ->latest('id')
+            ->get()
+            ->map(function (PaymentNotification $pn) {
+                return [
+                    'id' => $pn->id,
+                    'user_name' => $pn->user ? $pn->user->name : 'Silinmiş Kullanıcı',
+                    'user_email' => $pn->user ? $pn->user->email : '-',
+                    'plan_name' => $pn->plan?->name ?? 'Özel Paket',
+                    'method_name' => $pn->paymentMethod?->name ?? $pn->payment_method_id,
+                    'method_driver' => $pn->paymentMethod?->driver ?? 'manual',
+                    'duration_months' => $pn->duration_months,
+                    'amount' => (float) $pn->amount,
+                    'formatted_amount' => '₺'.number_format((float) $pn->amount, 2, ',', '.'),
+                    'reference_code' => $pn->reference_code,
+                    'sender_name' => $pn->sender_name,
+                    'tx_hash' => $pn->tx_hash,
+                    'user_notes' => $pn->user_notes,
+                    'admin_notes' => $pn->admin_notes,
+                    'status' => $pn->status,
+                    'status_label' => match ($pn->status) {
+                        'pending' => 'Bekliyor',
+                        'approved' => 'Onaylandı',
+                        'rejected' => 'Reddedildi',
+                        default => ucfirst($pn->status),
+                    },
+                    'created_at' => $pn->created_at ? $pn->created_at->format('d.m.Y H:i') : null,
+                    'processed_at' => $pn->processed_at ? $pn->processed_at->format('d.m.Y H:i') : null,
+                ];
+            });
+
         return Inertia::render('Admin/Plans/Index', [
             'plans' => $plans,
             'users' => $users,
+            'subscriptionsHistory' => $subscriptionsHistory,
+            'paymentMethods' => $paymentMethods,
+            'paymentNotifications' => $paymentNotifications,
         ]);
     }
 

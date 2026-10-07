@@ -8,6 +8,7 @@ use App\Helpers\QualityHelper;
 use App\Http\Resources\MovieDetailResource;
 use App\Http\Resources\SeriesDetailResource;
 use App\Http\Resources\TmdbTitleListResource;
+use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\TmdbCast;
@@ -1454,9 +1455,11 @@ class FrontController extends Controller
     public function pricing()
     {
         $plans = Plan::active()->get();
+        $paymentMethods = PaymentMethod::active()->get();
 
         return Inertia::render('Pricing', array_merge($this->getCommonData(), [
             'plans' => $plans,
+            'paymentMethods' => $paymentMethods,
         ]));
     }
 

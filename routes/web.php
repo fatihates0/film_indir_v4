@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Controllers\Admin\MediaController;
+use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\StorageBoxController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\FrontController;
+use App\Http\Controllers\PaymentNotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [FrontController::class, 'home'])->name('home');
@@ -21,6 +23,7 @@ Route::get('/about', [FrontController::class, 'about'])->name('about');
 Route::get('/settings', [FrontController::class, 'settings'])->name('settings');
 Route::get('/pricing', [FrontController::class, 'pricing'])->name('pricing');
 Route::post('/subscribe/{plan}', [FrontController::class, 'subscribePlan'])->name('subscribe.plan');
+Route::post('/payment-notifications', [PaymentNotificationController::class, 'store'])->name('payment-notifications.store');
 
 Route::get('/movie/{id?}', [FrontController::class, 'movieDetail'])->name('movie.detail');
 Route::get('/series/{id}', [FrontController::class, 'seriesDetail'])->name('series.detail');
@@ -83,4 +86,10 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
     Route::post('/plans/users/assign', [PlanController::class, 'assignUserPlan'])->name('plans.users.assign');
     Route::post('/plans/users/{user}/remove', [PlanController::class, 'removeUserPlan'])->name('plans.users.remove');
+
+    // Payment Method & Notification Management Routes
+    Route::post('/payment-methods/{paymentMethod}/toggle', [PaymentMethodController::class, 'toggle'])->name('payment-methods.toggle');
+    Route::put('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
+    Route::post('/payment-notifications/{notification}/approve', [PaymentNotificationController::class, 'approve'])->name('payment-notifications.approve');
+    Route::post('/payment-notifications/{notification}/reject', [PaymentNotificationController::class, 'reject'])->name('payment-notifications.reject');
 });
