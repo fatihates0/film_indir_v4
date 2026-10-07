@@ -54,7 +54,7 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::post('/sync-trailers', [AdminController::class, 'syncTrailers'])->name('sync-trailers');
     Route::get('/lookup-imdb', [AdminController::class, 'lookupImdb'])->name('lookup-imdb');
 
-    // Hetzner Storage Box Routes
+    // Gateway Storage Node Routes
     Route::get('/storage-boxes', [StorageBoxController::class, 'index'])->name('storage-boxes.index');
     Route::post('/storage-boxes', [StorageBoxController::class, 'store'])->name('storage-boxes.store');
     Route::put('/storage-boxes/{storageBox}', [StorageBoxController::class, 'update'])->name('storage-boxes.update');

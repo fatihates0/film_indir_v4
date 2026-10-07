@@ -33,7 +33,7 @@ class MediaScannerService
     protected int $timeout = 25;
 
     public function __construct(
-        protected HetznerStorageBoxService $storageBoxService
+        protected StorageGatewayService $storageGatewayService
     ) {}
 
     /**

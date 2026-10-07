@@ -7,15 +7,7 @@ enum StorageBoxProtocol: string
     case CustomGateway = 'custom_gateway';
 
     /**
-     * Check if protocol belongs to S3 family (false for Gateway).
-     */
-    public function isS3(): bool
-    {
-        return false;
-    }
-
-    /**
-     * Check if protocol is Custom Storage Gateway.
+     * Check if protocol is Storage Gateway.
      */
     public function isGateway(): bool
     {
@@ -27,7 +19,7 @@ enum StorageBoxProtocol: string
      */
     public function label(): string
     {
-        return 'Nginx Storage Node (Gateway Daemon)';
+        return 'Storage Gateway Node (Nginx Proxy)';
     }
 
     /**

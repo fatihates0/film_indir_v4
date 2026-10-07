@@ -29,8 +29,6 @@ class StorageBoxFactory extends Factory
             'port' => 80,
             'username' => 'gateway',
             'password' => 'test-gateway-secret-key-12345',
-            'bucket' => null,
-            'region' => null,
             'use_ssl' => false,
             'total_capacity_gb' => fake()->randomElement([1000, 2000, 5000, 10000]),
             'status' => StorageBoxStatus::Active,

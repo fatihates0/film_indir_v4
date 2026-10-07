@@ -1,12 +1,16 @@
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
-$app = require_once __DIR__ . '/../bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+use App\Models\StorageBox;
+use App\Services\MediaScannerService;
+use Illuminate\Contracts\Console\Kernel;
+
+require __DIR__.'/../vendor/autoload.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
+$kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
-$scanner = app(\App\Services\MediaScannerService::class);
-$boxes = \App\Models\StorageBox::active()->get();
+$scanner = app(MediaScannerService::class);
+$boxes = StorageBox::active()->get();
 
 foreach ($boxes as $box) {
     echo "Scanning box ID {$box->id}: {$box->name} ({$box->host})...\n";

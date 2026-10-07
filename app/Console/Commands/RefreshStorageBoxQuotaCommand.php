@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\StorageBox;
-use App\Services\HetznerStorageBoxService;
+use App\Services\StorageGatewayService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -21,22 +21,22 @@ class RefreshStorageBoxQuotaCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Query and refresh quota, connection status, and disk usage for active Hetzner Storage Boxes';
+    protected $description = 'Query and refresh quota, connection status, and disk usage for active Storage Gateway Nodes';
 
     /**
      * Execute the console command.
      */
-    public function handle(HetznerStorageBoxService $storageService): int
+    public function handle(StorageGatewayService $storageService): int
     {
         $boxes = StorageBox::active()->get();
 
         if ($boxes->isEmpty()) {
-            $this->info('Aktif durumda herhangi bir Hetzner Storage Box bulunamadı.');
+            $this->info('Aktif durumda herhangi bir Depolama Sunucusu bulunamadı.');
 
             return self::SUCCESS;
         }
 
-        $this->info("Toplam {$boxes->count()} adet aktif Storage Box için kota yenileme başlatılıyor...");
+        $this->info("Toplam {$boxes->count()} adet aktif Depolama Sunucusu için kota yenileme başlatılıyor...");
         $rows = [];
 
         foreach ($boxes as $box) {
@@ -83,7 +83,7 @@ class RefreshStorageBoxQuotaCommand extends Command
             $rows
         );
 
-        $this->info('Tüm aktif storage box ünitelerinin kotaları başarıyla yenilendi.');
+        $this->info('Tüm aktif depolama sunucularının kotaları başarıyla yenilendi.');
 
         return self::SUCCESS;
     }

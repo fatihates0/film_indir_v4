@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DownloadTicket;
 use App\Models\MediaFile;
-use App\Services\HetznerStorageBoxService;
+use App\Services\StorageGatewayService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +15,7 @@ class DownloadController extends Controller
 {
     public function __construct(
         protected SubscriptionService $subscriptionService,
-        protected HetznerStorageBoxService $storageBoxService
+        protected StorageGatewayService $gatewayService
     ) {}
 
     /**
@@ -95,9 +95,9 @@ class DownloadController extends Controller
         $filename = $mediaFile->name;
 
         $ticket->update(['status' => 'active']);
-        $gatewayUrl = $this->storageBoxService->generateCustomGatewayUrl($box, $mediaFile->path, $user->id);
+        $gatewayUrl = $this->gatewayService->generateGatewayUrl($box, $mediaFile->path, $user->id);
 
-        Log::info("İndirme Başlatıldı: Kullanıcı '{$user->name}' ({$user->email}), '{$filename}' dosyasını 'Custom Storage Gateway' yöntemiyle indirmeyi başlattı.", [
+        Log::info("İndirme Başlatıldı: Kullanıcı '{$user->name}' ({$user->email}), '{$filename}' dosyasını 'Storage Gateway' yöntemiyle indirmeyi başlattı.", [
             'user_id' => $user->id,
             'user_email' => $user->email,
             'media_file_id' => $mediaFile->id,

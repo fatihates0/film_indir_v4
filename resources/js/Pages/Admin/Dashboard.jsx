@@ -448,13 +448,13 @@ export default function AdminDashboard({
                                         </div>
                                     </div>
 
-                                    {/* HETZNER STORAGE BOX TELEMETRY */}
+                                    {/* GATEWAY STORAGE NODE TELEMETRY */}
                                     <div className="bg-[#0D111A] border border-white/[0.06] rounded-xl p-5 space-y-4">
                                         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
                                             <div>
                                                 <h3 className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5">
                                                     <Database className="w-3.5 h-3.5 text-[#00B074]" />
-                                                    <span>Hetzner Storage Box Deposu</span>
+                                                    <span>Gateway Depolama Sunucuları</span>
                                                 </h3>
                                                 <p className="text-[11px] text-gray-400">Film & video medya depolama üniteleri</p>
                                             </div>

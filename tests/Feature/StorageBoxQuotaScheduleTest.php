@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\StorageBoxStatus;
 use App\Models\StorageBox;
-use App\Services\HetznerStorageBoxService;
+use App\Services\StorageGatewayService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -23,13 +23,13 @@ class StorageBoxQuotaScheduleTest extends TestCase
             'free_capacity_gb' => 800,
         ]);
 
-        $mockService = Mockery::mock(HetznerStorageBoxService::class);
+        $mockService = Mockery::mock(StorageGatewayService::class);
         $mockService->shouldReceive('checkAndUpdate')
             ->once()
             ->with(Mockery::on(fn ($b) => $b->id === $box->id))
             ->andReturn($box);
 
-        $this->app->instance(HetznerStorageBoxService::class, $mockService);
+        $this->app->instance(StorageGatewayService::class, $mockService);
 
         $this->artisan('storage-box:refresh-quota')
             ->assertSuccessful();

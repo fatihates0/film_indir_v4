@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreStorageBoxRequest;
 use App\Http\Requests\Admin\UpdateStorageBoxRequest;
 use App\Models\StorageBox;
-use App\Services\HetznerStorageBoxService;
+use App\Services\StorageGatewayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,11 +19,11 @@ use Inertia\Response;
 class StorageBoxController extends Controller
 {
     public function __construct(
-        protected HetznerStorageBoxService $storageService
+        protected StorageGatewayService $storageService
     ) {}
 
     /**
-     * Display a listing of Hetzner Storage Boxes with real-time statistics.
+     * Display a listing of Gateway Storage Nodes with real-time statistics.
      */
     public function index(): Response
     {
@@ -39,8 +39,6 @@ class StorageBoxController extends Controller
                 'protocol_badge' => $box->protocol->badgeClasses(),
                 'port' => $box->port,
                 'username' => $box->username,
-                'bucket' => $box->bucket,
-                'region' => $box->region,
                 'use_ssl' => (bool) $box->use_ssl,
                 'total_capacity_gb' => $box->total_capacity_gb,
                 'formatted_total' => $box->formatted_total,
@@ -89,7 +87,6 @@ class StorageBoxController extends Controller
             'value' => $p->value,
             'label' => $p->label(),
             'default_port' => $p->defaultPort(),
-            'is_s3' => $p->isS3(),
         ]);
 
         return Inertia::render('Admin/StorageBoxes/Index', [

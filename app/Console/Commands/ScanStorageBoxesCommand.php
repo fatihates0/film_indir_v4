@@ -24,7 +24,7 @@ class ScanStorageBoxesCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Scan Hetzner Storage Boxes recursively for video files and update media_files table';
+    protected $description = 'Scan Gateway Storage Nodes recursively for video files and update media_files table';
 
     /**
      * Execute the console command.

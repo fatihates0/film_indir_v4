@@ -687,8 +687,8 @@ export default function MediasIndex({
 
     return (
         <AdminLayout
-            title="Storage Box Medya Kataloğu & TMDB"
-            subtitle="Hetzner Storage Box ünitelerindeki video dosyaları, otomatik TMDB giydirme ve yapım yılı kontrolü"
+            title="Medya Kataloğu & TMDB"
+            subtitle="Depolama sunucularındaki video dosyaları, otomatik TMDB giydirme ve yapım yılı kontrolü"
             activeTab="medias"
             statsSummary={{ total_medias: stats?.total_count || 0 }}
         >
@@ -2287,7 +2287,7 @@ export default function MediasIndex({
                                 <strong className="text-white">"{deletingMedia.clean_title}"</strong> adlı video veritabanı indeksinden kaldırılacak.
                             </p>
                             <p className="text-[11px] text-gray-500">
-                                * Not: Bu işlem Hetzner Storage Box'ınızdaki gerçek dosyayı silmez; sadece admin panelindeki kayıt listesinden çıkartır.
+                                * Not: Bu işlem depolama sunucunuzdaki gerçek dosyayı silmez; sadece admin panelindeki kayıt listesinden çıkartır.
                             </p>
 
                             <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -2344,7 +2344,7 @@ export default function MediasIndex({
                                     <span>Bu işlem veritabanı indeksini sıfırlar!</span>
                                 </p>
                                 <p className="text-[11px] text-gray-400 leading-normal">
-                                    Seçilen filtrelere göre veritabanındaki tüm video indeksleri silinecektir. Hetzner Storage Box disklerinizdeki fiziksel medya dosyalarına zarar gelmez. İstediğiniz an <strong className="text-gray-200">"Storage Box Tara"</strong> butonu ile arşivi saniyeler içinde tekrar taratabilirsiniz.
+                                    Seçilen filtrelere göre veritabanındaki tüm video indeksleri silinecektir. Depolama sunucusu disklerinizdeki fiziksel medya dosyalarına zarar gelmez. İstediğiniz an <strong className="text-gray-200">"Depolama Tara"</strong> butonu ile arşivi saniyeler içinde tekrar taratabilirsiniz.
                                 </p>
                             </div>
 

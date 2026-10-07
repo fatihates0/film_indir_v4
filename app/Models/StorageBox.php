@@ -27,8 +27,6 @@ class StorageBox extends Model
         'port',
         'username',
         'password',
-        'bucket',
-        'region',
         'use_ssl',
         'total_capacity_gb',
         'free_capacity_gb',

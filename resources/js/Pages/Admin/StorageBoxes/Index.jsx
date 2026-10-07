@@ -470,7 +470,7 @@ export default function StorageBoxesIndex({ boxes = [], stats }) {
                                     <label className="block text-gray-300 font-semibold mb-1">Sunucu Adı *</label>
                                     <input
                                         type="text"
-                                        placeholder="Örn: Storage Node #1 (Hetzner FSN)"
+                                        placeholder="Örn: Storage Gateway Node #1"
                                         value={formData.name}
                                         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                                         className="w-full bg-[#07090E] border border-white/[0.08] focus:border-[#00B074] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none transition-colors"

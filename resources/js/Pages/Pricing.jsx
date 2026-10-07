@@ -210,7 +210,7 @@ export default function Pricing({ plans = [] }) {
                                             </li>
                                             <li className="flex items-center gap-2.5">
                                                 <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span>1 Gbps Hetzner omurga yüksek hız</span>
+                                                <span>1 Gbps yüksek hızlı omurga bağlantısı</span>
                                             </li>
                                         </ul>
                                     </div>
