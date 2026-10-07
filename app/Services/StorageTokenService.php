@@ -80,9 +80,18 @@ class StorageTokenService
      */
     public function generateDownloadUrl(string $filePath, $userId, ?StorageBox $storageBox = null, int $ttlMinutes = 180, ?string $ticketToken = null): string
     {
+        $appUrl = config('services.storage.app_url', config('app.url', url('/')));
+
+        if ((str_contains($appUrl, '127.0.0.1') || str_contains($appUrl, 'localhost')) && request()->hasHeader('host')) {
+            $requestUrl = request()->schemeAndHttpHost();
+            if (! str_contains($requestUrl, '127.0.0.1') && ! str_contains($requestUrl, 'localhost')) {
+                $appUrl = $requestUrl;
+            }
+        }
+
         $extraPayload = [
             'file_path' => '/'.ltrim($filePath, '/'),
-            'app_url' => config('app.url', url('/')),
+            'app_url' => $appUrl,
         ];
 
         if ($ticketToken) {

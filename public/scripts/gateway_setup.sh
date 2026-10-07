@@ -524,9 +524,9 @@ test_quota_webhook() {
     echo ""
 
     local cur_laravel_url=$(get_env_val "LARAVEL_WEBHOOK_URL")
-    read -p "1. Laravel Site Base URL [Varsayılan: ${cur_laravel_url:-https://filmindir.com}]: " TARGET_URL
+    read -p "1. Laravel Site Base URL [Varsayılan: ${cur_laravel_url:-https://sinekutu.com}]: " TARGET_URL
     TARGET_URL=${TARGET_URL:-$cur_laravel_url}
-    TARGET_URL=${TARGET_URL:-https://filmindir.com}
+    TARGET_URL=${TARGET_URL:-https://sinekutu.com}
 
     TARGET_URL=$(echo "$TARGET_URL" | sed 's|/*$||')
 
@@ -985,20 +985,23 @@ notification_settings() {
     log_step "Bildirim Ayarları (Webhook / Telegram)"
 
     local cur_webhook=$(get_env_val "WEBHOOK_URL")
+    local cur_laravel_url=$(get_env_val "LARAVEL_WEBHOOK_URL")
     local cur_tg_token=$(get_env_val "TELEGRAM_BOT_TOKEN")
     local cur_tg_chat=$(get_env_val "TELEGRAM_CHAT_ID")
     local cur_disk_thr=$(get_env_val "ALERT_DISK_PERCENT"); cur_disk_thr=${cur_disk_thr:-85}
 
-    echo -e " Mevcut Webhook URL    : ${CYAN}${cur_webhook:-(tanımlanmamış)}${NC}"
-    echo -e " Telegram Bot Token    : ${CYAN}${cur_tg_token:-(tanımlanmamış)}${NC}"
-    echo -e " Telegram Chat ID      : ${CYAN}${cur_tg_chat:-(tanımlanmamış)}${NC}"
-    echo -e " Disk Doluluk Eşiği    : ${CYAN}%${cur_disk_thr}${NC}"
+    echo -e " Mevcut Sistem Webhook URL : ${CYAN}${cur_webhook:-(tanımlanmamış)}${NC}"
+    echo -e " Mevcut Laravel Webhook URL: ${CYAN}${cur_laravel_url:-(token'dan otomatik alınır)}${NC}"
+    echo -e " Telegram Bot Token        : ${CYAN}${cur_tg_token:-(tanımlanmamış)}${NC}"
+    echo -e " Telegram Chat ID          : ${CYAN}${cur_tg_chat:-(tanımlanmamış)}${NC}"
+    echo -e " Disk Doluluk Eşiği        : ${CYAN}%${cur_disk_thr}${NC}"
     echo ""
-    echo -e "  [${CYAN}1${NC}] Webhook URL ayarla (Discord / Slack / özel)"
+    echo -e "  [${CYAN}1${NC}] Sistem Webhook URL ayarla (Discord / Slack / özel)"
     echo -e "  [${CYAN}2${NC}] Telegram ayarla (Bot Token + Chat ID)"
     echo -e "  [${CYAN}3${NC}] Disk doluluk uyarı eşiğini değiştir (şu an: %${cur_disk_thr})"
     echo -e "  [${CYAN}4${NC}] Test bildirimi gönder"
-    echo -e "  [${CYAN}5${NC}] Tüm bildirimleri devre dışı bırak"
+    echo -e "  [${CYAN}5${NC}] 🎯 Laravel Kota Webhook URL Manuel Ayarla (LARAVEL_WEBHOOK_URL)"
+    echo -e "  [${CYAN}6${NC}] Tüm bildirimleri devre dışı bırak"
     echo -e "  [${CYAN}0${NC}] Geri"
     echo ""
     read -p "Seçiminiz: " N_CHOICE
@@ -1022,10 +1025,10 @@ notification_settings() {
 
     case $N_CHOICE in
         1)
-            read -p "Webhook URL girin: " W_URL
+            read -p "System Webhook URL girin: " W_URL
             [ -z "$W_URL" ] && return
             set_env_val "WEBHOOK_URL" "$W_URL"
-            log_success "Webhook URL kaydedildi."
+            log_success "Sistem Webhook URL kaydedildi."
             ;;
         2)
             read -p "Telegram Bot Token: " TG_TOK
@@ -1051,11 +1054,23 @@ notification_settings() {
             fi
             ;;
         5)
+            read -p "Laravel Base URL girin (Örn: https://movie.fatihates.com.tr): " L_URL
+            [ -z "$L_URL" ] && return
+            L_URL=$(echo "$L_URL" | sed 's|/*$||')
+            set_env_val "LARAVEL_WEBHOOK_URL" "$L_URL"
+            systemctl restart "$SERVICE_NAME" 2>/dev/null || true
+            log_success "LARAVEL_WEBHOOK_URL kaydedildi ve servis yenilendi: $L_URL"
+            ;;
+        6)
             set_env_val "WEBHOOK_URL" ""
             set_env_val "TELEGRAM_BOT_TOKEN" ""
             set_env_val "TELEGRAM_CHAT_ID" ""
-            log_success "Tüm bildirimler devre dışı bırakıldı."
+            set_env_val "LARAVEL_WEBHOOK_URL" ""
+            log_success "Tüm bildirimler ve özel Laravel Webhook URL sıfırlandı."
             ;;
+        0) return ;;
+        *) log_error "Geçersiz seçim!" ;;
+    esac
         0) return ;;
         *) log_error "Geçersiz seçim!" ;;
     esac
@@ -1243,8 +1258,15 @@ function reportBytesToLaravel(downloadInfo, bytesSent) {
         return;
     }
 
-    const appUrl = downloadInfo.app_url || getEnvConfig().LARAVEL_WEBHOOK_URL;
+    let appUrl = getEnvConfig().LARAVEL_WEBHOOK_URL;
+    if (!appUrl && downloadInfo.app_url) {
+        if (!downloadInfo.app_url.includes('127.0.0.1') && !downloadInfo.app_url.includes('localhost')) {
+            appUrl = downloadInfo.app_url;
+        }
+    }
+
     if (!appUrl) {
+        console.error('Laravel log-bytes webhook hatasi: Gecerli Laravel site URL bulunamadi. (Token app_url 127.0.0.1/localhost iceriyor, lutfen Gateway .env dosyasina LARAVEL_WEBHOOK_URL ekleyin).');
         return;
     }
 
