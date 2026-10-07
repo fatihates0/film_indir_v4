@@ -397,11 +397,11 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
             {/* Mobile Menu Popup Modal */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-20 px-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+                    className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-16 pb-8 px-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
                     onClick={() => setIsMobileMenuOpen(false)}
                 >
                     <div
-                        className="w-full max-w-sm sm:max-w-md bg-white dark:bg-[#161822] border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl text-slate-900 dark:text-white transform transition-all animate-in zoom-in-95 duration-200"
+                        className="w-full max-w-sm sm:max-w-md bg-white dark:bg-[#161822] border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl text-slate-900 dark:text-white transform transition-all animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header: Dynamic Active Title / Logo + Close Button */}
