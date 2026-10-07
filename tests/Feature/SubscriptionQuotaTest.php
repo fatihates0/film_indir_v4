@@ -259,4 +259,61 @@ class SubscriptionQuotaTest extends TestCase
         $period->refresh();
         $this->assertEquals($transferredBytes, $period->used_bytes);
     }
+
+    public function test_multiple_range_requests_are_capped_at_media_file_size_bytes(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+        $period = $service->getCurrentPeriod($user);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $fileSizeBytes = 2520295065; // ~2.35 GB
+        $file = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'StarWars.mkv',
+            'path' => '/movies/StarWars.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => $fileSizeBytes,
+        ]);
+
+        $ticket = DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file->id,
+            'subscription_period_id' => $period->id,
+            'bytes_downloaded' => 0,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        // Request 1: 168 MB initial Range request
+        $chunk1 = 168524098;
+        $service->recordBytes($ticket->token, $chunk1);
+
+        // Request 2: Full file transfer 2.35 GB
+        $service->recordBytes($ticket->token, $fileSizeBytes);
+
+        $period->refresh();
+        $ticket->refresh();
+
+        // Total recorded bytes for this ticket must equal fileSizeBytes exactly, not exceeding it!
+        $this->assertEquals($fileSizeBytes, $ticket->bytes_downloaded);
+        $this->assertEquals($fileSizeBytes, $period->used_bytes);
+    }
 }

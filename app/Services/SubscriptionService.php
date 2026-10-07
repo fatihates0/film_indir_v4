@@ -193,7 +193,9 @@ class SubscriptionService
         }
 
         /** @var DownloadTicket|null $ticket */
-        $ticket = DownloadTicket::where('token', $token)->first();
+        $ticket = DownloadTicket::where('token', $token)
+            ->with(['mediaFile'])
+            ->first();
 
         if (! $ticket) {
             Log::warning("DownloadTicket not found for token: {$token}");
@@ -201,9 +203,24 @@ class SubscriptionService
             return false;
         }
 
-        DB::transaction(function () use ($ticket, $bytes) {
+        $fileSizeBytes = $ticket->mediaFile?->size_bytes ?? 0;
+        $alreadyDownloaded = $ticket->bytes_downloaded ?? 0;
+
+        // Calculate max additional bytes that can be charged for this ticket (cap at file size)
+        if ($fileSizeBytes > 0) {
+            $remainingTicketBytes = max(0, $fileSizeBytes - $alreadyDownloaded);
+            $actualIncrement = min($bytes, $remainingTicketBytes);
+        } else {
+            $actualIncrement = $bytes;
+        }
+
+        if ($actualIncrement <= 0) {
+            return true;
+        }
+
+        DB::transaction(function () use ($ticket, $actualIncrement) {
             // Update ticket
-            $ticket->increment('bytes_downloaded', $bytes);
+            $ticket->increment('bytes_downloaded', $actualIncrement);
             if ($ticket->status === 'pending') {
                 $ticket->status = 'completed';
                 $ticket->save();
@@ -213,7 +230,7 @@ class SubscriptionService
             if ($ticket->subscription_period_id) {
                 DB::table('subscription_periods')
                     ->where('id', $ticket->subscription_period_id)
-                    ->increment('used_bytes', $bytes);
+                    ->increment('used_bytes', $actualIncrement);
             }
         });
 
