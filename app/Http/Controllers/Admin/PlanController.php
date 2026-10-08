@@ -8,7 +8,9 @@ use App\Models\PaymentMethod;
 use App\Models\PaymentNotification;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\SubscriptionPeriod;
 use App\Models\User;
+use App\Models\UserExtraQuota;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -34,6 +36,16 @@ class PlanController extends Controller
             ->map(function (User $u) {
                 $period = app(SubscriptionService::class)->getCurrentPeriod($u);
                 $activeSub = $u->subscriptions()->where('status', 'active')->latest()->first();
+                $activeExtras = app(SubscriptionService::class)->getActiveExtraQuotas($u);
+
+                $mainAllocated = $period ? $period->allocated_bytes : 0;
+                $mainUsed = $period ? $period->used_bytes : 0;
+                $extraAllocated = (int) $activeExtras->sum('allocated_bytes');
+                $extraUsed = (int) $activeExtras->sum('used_bytes');
+
+                $totalAllocated = $mainAllocated + $extraAllocated;
+                $totalUsed = $mainUsed + $extraUsed;
+                $totalPercentage = $totalAllocated > 0 ? round(min(100.0, max(0.0, ($totalUsed / $totalAllocated) * 100)), 1) : 0;
 
                 return [
                     'id' => $u->id,
@@ -44,13 +56,16 @@ class PlanController extends Controller
                     'plan_key' => $u->plan->value,
                     'plan_name' => $period ? ($period->subscription->plan?->name ?? ($period->subscription->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası')) : $u->plan->label(),
                     'plan_id' => $period?->subscription?->plan_id,
+                    'plan_type' => $period?->subscription?->plan?->type ?? 'individual',
                     'has_active_sub' => $activeSub !== null,
                     'is_perpetual' => (bool) ($activeSub?->is_perpetual),
-                    'quota_used' => $period ? $period->formatted_used : '0 GB',
-                    'quota_total' => $period ? $period->formatted_allocated : '0 GB',
-                    'quota_used_bytes' => $period?->used_bytes ?? 0,
-                    'quota_allocated_bytes' => $period?->allocated_bytes ?? 0,
-                    'quota_percentage' => $period ? $period->usage_percentage : 0,
+                    'quota_used' => SubscriptionPeriod::formatBytes($totalUsed),
+                    'quota_total' => SubscriptionPeriod::formatBytes($totalAllocated),
+                    'quota_used_bytes' => $totalUsed,
+                    'quota_allocated_bytes' => $totalAllocated,
+                    'quota_percentage' => $totalPercentage,
+                    'active_extras_count' => $activeExtras->count(),
+                    'extra_quota_formatted' => SubscriptionPeriod::formatBytes($activeExtras->sum(fn ($e) => $e->remaining_bytes)),
                     'custom_speed_limit_mbps' => $u->custom_speed_limit_mbps,
                     'expires_at' => $activeSub ? ($activeSub->is_perpetual ? 'Süresiz' : $activeSub->expires_at->format('d.m.Y H:i')) : null,
                     'created_at' => $u->created_at->format('d.m.Y H:i'),
@@ -70,6 +85,7 @@ class PlanController extends Controller
                     'user_name' => $sub->user ? $sub->user->name : 'Silinmiş Kullanıcı',
                     'user_email' => $sub->user ? $sub->user->email : '-',
                     'plan_name' => $sub->plan?->name ?? ($sub->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası'),
+                    'plan_type' => $sub->plan?->type ?? 'individual',
                     'duration_months' => $sub->duration_months,
                     'is_perpetual' => (bool) $sub->is_perpetual,
                     'price_paid' => (float) $sub->price_paid,
@@ -102,6 +118,7 @@ class PlanController extends Controller
                     'user_name' => $pn->user ? $pn->user->name : 'Silinmiş Kullanıcı',
                     'user_email' => $pn->user ? $pn->user->email : '-',
                     'plan_name' => $pn->plan?->name ?? 'Özel Paket',
+                    'plan_type' => $pn->plan?->type ?? 'individual',
                     'method_name' => $pn->paymentMethod?->name ?? $pn->payment_method_id,
                     'method_driver' => $pn->paymentMethod?->driver ?? 'manual',
                     'duration_months' => $pn->duration_months,
@@ -141,6 +158,7 @@ class PlanController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:100',
             'slug' => 'nullable|string|max:100|unique:plans,slug',
+            'type' => 'required|string|in:individual,business,extra',
             'description' => 'nullable|string|max:1000',
             'monthly_quota_gb' => 'required|integer|min:1|max:100000',
             'price_1m' => 'required|numeric|min:0',
@@ -149,7 +167,7 @@ class PlanController extends Controller
             'price_12m' => 'required|numeric|min:0',
             'allowed_durations' => 'nullable|array',
             'allowed_durations.*' => 'integer|in:1,3,6,12',
-            'max_parallel_downloads' => 'required|integer|min:1|max:20',
+            'max_parallel_downloads' => 'required|integer|min:0|max:100',
             'speed_limit_mbps' => 'nullable|integer|min:1',
             'allow_vps_access' => 'nullable|boolean',
             'is_active' => 'required|boolean',
@@ -161,23 +179,28 @@ class PlanController extends Controller
             $slug = $slug.'-'.time();
         }
 
+        $type = $validated['type'];
         $monthlyQuotaBytes = (int) $validated['monthly_quota_gb'] * 1024 * 1024 * 1024;
-        $allowedDurations = ! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12];
+        $allowedDurations = $type === Plan::TYPE_EXTRA ? [1] : (! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12]);
+
+        $allowVps = $type === Plan::TYPE_BUSINESS ? true : (bool) ($validated['allow_vps_access'] ?? false);
+        $maxParallel = $type === Plan::TYPE_BUSINESS ? 0 : (int) $validated['max_parallel_downloads'];
 
         Plan::create([
             'name' => $validated['name'],
             'slug' => $slug,
+            'type' => $type,
             'description' => $validated['description'] ?? null,
             'monthly_quota_gb' => $validated['monthly_quota_gb'],
             'monthly_quota_bytes' => $monthlyQuotaBytes,
             'price_1m' => $validated['price_1m'],
-            'price_3m' => $validated['price_3m'],
-            'price_6m' => $validated['price_6m'],
-            'price_12m' => $validated['price_12m'],
+            'price_3m' => $type === Plan::TYPE_EXTRA ? $validated['price_1m'] : $validated['price_3m'],
+            'price_6m' => $type === Plan::TYPE_EXTRA ? $validated['price_1m'] : $validated['price_6m'],
+            'price_12m' => $type === Plan::TYPE_EXTRA ? $validated['price_1m'] : $validated['price_12m'],
             'allowed_durations' => $allowedDurations,
-            'max_parallel_downloads' => $validated['max_parallel_downloads'],
+            'max_parallel_downloads' => $maxParallel,
             'speed_limit_mbps' => $validated['speed_limit_mbps'] ?? null,
-            'allow_vps_access' => (bool) ($validated['allow_vps_access'] ?? false),
+            'allow_vps_access' => $allowVps,
             'is_active' => $validated['is_active'],
             'sort_order' => $validated['sort_order'],
         ]);
@@ -193,6 +216,7 @@ class PlanController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:100',
             'slug' => 'required|string|max:100|unique:plans,slug,'.$plan->id,
+            'type' => 'required|string|in:individual,business,extra',
             'description' => 'nullable|string|max:1000',
             'monthly_quota_gb' => 'required|integer|min:1|max:100000',
             'price_1m' => 'required|numeric|min:0',
@@ -201,30 +225,35 @@ class PlanController extends Controller
             'price_12m' => 'required|numeric|min:0',
             'allowed_durations' => 'nullable|array',
             'allowed_durations.*' => 'integer|in:1,3,6,12',
-            'max_parallel_downloads' => 'required|integer|min:1|max:20',
+            'max_parallel_downloads' => 'required|integer|min:0|max:100',
             'speed_limit_mbps' => 'nullable|integer|min:1',
             'allow_vps_access' => 'nullable|boolean',
             'is_active' => 'required|boolean',
             'sort_order' => 'required|integer|min:0',
         ]);
 
+        $type = $validated['type'];
         $monthlyQuotaBytes = (int) $validated['monthly_quota_gb'] * 1024 * 1024 * 1024;
-        $allowedDurations = ! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12];
+        $allowedDurations = $type === Plan::TYPE_EXTRA ? [1] : (! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12]);
+
+        $allowVps = $type === Plan::TYPE_BUSINESS ? true : (bool) ($validated['allow_vps_access'] ?? false);
+        $maxParallel = $type === Plan::TYPE_BUSINESS ? 0 : (int) $validated['max_parallel_downloads'];
 
         $plan->update([
             'name' => $validated['name'],
             'slug' => Str::slug($validated['slug']),
+            'type' => $type,
             'description' => $validated['description'] ?? null,
             'monthly_quota_gb' => $validated['monthly_quota_gb'],
             'monthly_quota_bytes' => $monthlyQuotaBytes,
             'price_1m' => $validated['price_1m'],
-            'price_3m' => $validated['price_3m'],
-            'price_6m' => $validated['price_6m'],
-            'price_12m' => $validated['price_12m'],
+            'price_3m' => $type === Plan::TYPE_EXTRA ? $validated['price_1m'] : $validated['price_3m'],
+            'price_6m' => $type === Plan::TYPE_EXTRA ? $validated['price_1m'] : $validated['price_6m'],
+            'price_12m' => $type === Plan::TYPE_EXTRA ? $validated['price_1m'] : $validated['price_12m'],
             'allowed_durations' => $allowedDurations,
-            'max_parallel_downloads' => $validated['max_parallel_downloads'],
+            'max_parallel_downloads' => $maxParallel,
             'speed_limit_mbps' => $validated['speed_limit_mbps'] ?? null,
-            'allow_vps_access' => (bool) ($validated['allow_vps_access'] ?? false),
+            'allow_vps_access' => $allowVps,
             'is_active' => $validated['is_active'],
             'sort_order' => $validated['sort_order'],
         ]);
@@ -289,7 +318,7 @@ class PlanController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'plan_id' => 'nullable|string', // plan ID or 'custom' or 'none'
+            'plan_id' => 'nullable|string', // plan ID or 'custom' or 'none' or 'extra_custom'
             'custom_quota_gb' => 'nullable|integer|min:1|max:100000',
             'custom_speed_limit_mbps' => 'nullable|integer|min:0|max:100000',
             'duration_type' => 'required|string|in:1,3,6,12,custom,perpetual',
@@ -316,6 +345,26 @@ class PlanController extends Controller
             return redirect()->back()->with('success', "{$user->name} kullanıcısının paketi kaldırıldı.");
         }
 
+        $plan = Plan::find($validated['plan_id']);
+
+        // Check if assigning an Extra Quota package directly
+        if ($plan && $plan->isExtra()) {
+            UserExtraQuota::create([
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'name' => $plan->name,
+                'allocated_bytes' => $plan->monthly_quota_bytes,
+                'used_bytes' => 0,
+                'starts_at' => now(),
+                'expires_at' => now()->addDays(30),
+                'status' => 'active',
+                'price_paid' => $validated['price_paid'] ?? (float) $plan->price_1m,
+                'notes' => $validated['notes'] ?? 'Yönetici tarafından ek kota tanımlandı',
+            ]);
+
+            return redirect()->back()->with('success', "{$user->name} kullanıcısına {$plan->name} ({$plan->monthly_quota_gb} GB - 30 Gün) ek kotası başarıyla eklendi.");
+        }
+
         $isPerpetual = $validated['duration_type'] === 'perpetual';
         $durationMonths = 1;
 
@@ -327,13 +376,11 @@ class PlanController extends Controller
             }
         }
 
-        $plan = null;
         $customQuotaGb = null;
 
         if ($validated['plan_id'] === 'custom' || empty($validated['plan_id'])) {
             $customQuotaGb = (int) ($validated['custom_quota_gb'] ?? 100);
         } else {
-            $plan = Plan::find($validated['plan_id']);
             if ($validated['custom_quota_gb']) {
                 $customQuotaGb = (int) $validated['custom_quota_gb'];
             }
@@ -368,11 +415,13 @@ class PlanController extends Controller
     {
         $user->subscriptions()->where('status', 'active')->update(['status' => 'cancelled']);
         $user->subscriptionPeriods()->where('is_active', true)->update(['is_active' => false]);
+        $user->extraQuotas()->where('status', 'active')->update(['status' => 'expired']);
+
         $user->update([
             'plan' => 'free',
             'custom_speed_limit_mbps' => null,
         ]);
 
-        return redirect()->back()->with('success', "{$user->name} kullanıcısının tüm paket ve kotası temizlendi.");
+        return redirect()->back()->with('success', "{$user->name} kullanıcısının tüm paket ve ek kota hakları temizlendi.");
     }
 }

@@ -119,6 +119,14 @@ class User extends Authenticatable
     }
 
     /**
+     * User's purchased extra quotas.
+     */
+    public function extraQuotas(): HasMany
+    {
+        return $this->hasMany(UserExtraQuota::class);
+    }
+
+    /**
      * Download tickets created by the user.
      */
     public function downloadTickets(): HasMany
@@ -135,9 +143,9 @@ class User extends Authenticatable
             return true;
         }
 
-        $period = app(SubscriptionService::class)->getCurrentPeriod($this);
+        $totalRemaining = app(SubscriptionService::class)->getTotalRemainingBytes($this);
 
-        return $period !== null && $period->hasAvailableQuota();
+        return $totalRemaining > 0;
     }
 
     /**
@@ -149,8 +157,8 @@ class User extends Authenticatable
             return true;
         }
 
-        $period = app(SubscriptionService::class)->getCurrentPeriod($this);
+        $totalRemaining = app(SubscriptionService::class)->getTotalRemainingBytes($this);
 
-        return $period !== null && $period->remaining_bytes >= $fileSizeBytes;
+        return $totalRemaining >= $fileSizeBytes;
     }
 }

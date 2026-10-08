@@ -77,6 +77,7 @@ export default function PlansIndex({
     const initialPlanForm = {
         name: '',
         slug: '',
+        type: 'individual', // 'individual', 'business', 'extra'
         description: '',
         monthly_quota_gb: 500,
         price_1m: 99.00,
@@ -206,6 +207,7 @@ export default function PlansIndex({
         setPlanForm({
             name: plan.name || '',
             slug: plan.slug || '',
+            type: plan.type || 'individual',
             description: plan.description || '',
             monthly_quota_gb: plan.monthly_quota_gb || 100,
             price_1m: plan.price_1m || 0,
@@ -213,7 +215,7 @@ export default function PlansIndex({
             price_6m: plan.price_6m || 0,
             price_12m: plan.price_12m || 0,
             allowed_durations: plan.allowed_durations || [1, 3, 6, 12],
-            max_parallel_downloads: plan.max_parallel_downloads || 4,
+            max_parallel_downloads: plan.max_parallel_downloads ?? 4,
             speed_limit_mbps: plan.speed_limit_mbps || '',
             allow_vps_access: Boolean(plan.allow_vps_access),
             is_active: Boolean(plan.is_active),
@@ -1260,13 +1262,36 @@ export default function PlansIndex({
                             </div>
 
                             <form onSubmit={handleSavePlan} className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Paket Türü *</label>
+                                        <select
+                                            value={planForm.type || 'individual'}
+                                            onChange={(e) => {
+                                                const t = e.target.value;
+                                                let updates = { type: t };
+                                                if (t === 'business') {
+                                                    updates.allow_vps_access = true;
+                                                    updates.max_parallel_downloads = 0;
+                                                } else if (t === 'extra') {
+                                                    updates.allowed_durations = [1];
+                                                }
+                                                setPlanForm({ ...planForm, ...updates });
+                                            }}
+                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white font-bold focus:outline-none focus:border-[#00B074]"
+                                        >
+                                            <option value="individual">Bireysel Paket (Standart)</option>
+                                            <option value="business">Business Paket (VPS IP + Sınırsız İndirme)</option>
+                                            <option value="extra">Ek Kota Paketi (30 Gün Geçerli)</option>
+                                        </select>
+                                    </div>
+
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-300 mb-1">Paket Adı *</label>
                                         <input
                                             type="text"
                                             required
-                                            placeholder="Örn: VIP Paket, Temel Paket"
+                                            placeholder="Örn: VIP Paket, Business Pro"
                                             value={planForm.name}
                                             onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
                                             className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
@@ -1277,7 +1302,7 @@ export default function PlansIndex({
                                         <label className="block text-xs font-semibold text-gray-300 mb-1">Slug (Benzersiz Kod)</label>
                                         <input
                                             type="text"
-                                            placeholder="Örn: vip, basic, premium (Boş bırakılırsa otomatik)"
+                                            placeholder="Örn: vip, business-pro (Boşsa otomatik)"
                                             value={planForm.slug}
                                             onChange={(e) => setPlanForm({ ...planForm, slug: e.target.value })}
                                             className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"

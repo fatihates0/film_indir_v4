@@ -14,7 +14,7 @@ class PaymentNotificationController extends Controller
     /**
      * Submit a new payment notification (User side).
      */
-    public function store(Request $request)
+    public function store(Request $request, SubscriptionService $subscriptionService)
     {
         $user = $request->user();
         if (! $user) {
@@ -39,10 +39,18 @@ class PaymentNotificationController extends Controller
         }
 
         $plan = Plan::findOrFail($validated['plan_id']);
-        $durationMonths = (int) $validated['duration_months'];
 
-        if (! $plan->isDurationAllowed($durationMonths)) {
-            return redirect()->back()->with('error', "{$plan->name} paketi için seçilen {$durationMonths} aylık abonelik döngüsü geçerli değildir.");
+        // Extra Quota validation: User MUST have an active main subscription to buy extra quota!
+        if ($plan->isExtra()) {
+            if (! $subscriptionService->canBuyExtraQuota($user)) {
+                return redirect()->back()->with('error', 'Ek kota satın alabilmek için aktif bir bireysel veya business paketinizin bulunması gerekmektedir.');
+            }
+            $durationMonths = 1;
+        } else {
+            $durationMonths = (int) $validated['duration_months'];
+            if (! $plan->isDurationAllowed($durationMonths)) {
+                return redirect()->back()->with('error', "{$plan->name} paketi için seçilen {$durationMonths} aylık abonelik döngüsü geçerli değildir.");
+            }
         }
 
         $amount = $plan->getPriceForDuration($durationMonths);
@@ -82,14 +90,26 @@ class PaymentNotificationController extends Controller
             return redirect()->back()->with('error', 'Kullanıcı bulunamadı.');
         }
 
-        // Activate user subscription
-        $subscriptionService->subscribe(
-            $user,
-            $plan,
-            $notification->duration_months,
-            (float) $notification->amount,
-            "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
-        );
+        if ($plan && $plan->isExtra()) {
+            try {
+                $subscriptionService->purchaseExtraQuota(
+                    $user,
+                    $plan,
+                    (float) $notification->amount,
+                    "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
+                );
+            } catch (\Exception $e) {
+                return redirect()->back()->with('error', $e->getMessage());
+            }
+        } else {
+            $subscriptionService->subscribe(
+                $user,
+                $plan,
+                $notification->duration_months,
+                (float) $notification->amount,
+                "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
+            );
+        }
 
         $notification->update([
             'status' => 'approved',

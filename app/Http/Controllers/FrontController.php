@@ -1464,13 +1464,27 @@ class FrontController extends Controller
     }
 
     /**
-     * Subscribe user to a chosen plan with selected duration.
+     * Subscribe user to a chosen plan with selected duration or purchase Extra Quota.
      */
     public function subscribePlan(Request $request, Plan $plan, SubscriptionService $subscriptionService)
     {
         $user = $request->user();
         if (! $user) {
             return redirect()->route('home')->with('error', 'Lütfen önce giriş yapınız.');
+        }
+
+        if ($plan->isExtra()) {
+            if (! $subscriptionService->canBuyExtraQuota($user)) {
+                return redirect()->back()->with('error', 'Ek kota satın alabilmek için aktif bir bireysel veya business paketinizin bulunması gerekmektedir.');
+            }
+
+            try {
+                $subscriptionService->purchaseExtraQuota($user, $plan);
+
+                return redirect()->back()->with('success', "Tebrikler! {$plan->name} ({$plan->monthly_quota_gb} GB - 30 Gün) ek kotanız aktif edildi.");
+            } catch (\Exception $e) {
+                return redirect()->back()->with('error', $e->getMessage());
+            }
         }
 
         $validated = $request->validate([

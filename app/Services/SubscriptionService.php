@@ -7,7 +7,9 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\SubscriptionPeriod;
 use App\Models\User;
+use App\Models\UserExtraQuota;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -88,11 +90,15 @@ class SubscriptionService
 
             // Sync user's plan attribute on User model
             if ($plan) {
-                $slugLower = strtolower($plan->slug);
-                if (in_array($slugLower, ['free', 'basic', 'premium', 'vip'])) {
-                    $user->update(['plan' => $slugLower]);
+                if ($plan->isBusiness()) {
+                    $user->update(['plan' => 'vip']);
                 } else {
-                    $user->update(['plan' => 'premium']);
+                    $slugLower = strtolower($plan->slug);
+                    if (in_array($slugLower, ['free', 'basic', 'premium', 'vip'])) {
+                        $user->update(['plan' => $slugLower]);
+                    } else {
+                        $user->update(['plan' => 'premium']);
+                    }
                 }
             } else {
                 $user->update(['plan' => 'premium']);
@@ -103,7 +109,133 @@ class SubscriptionService
     }
 
     /**
-     * Get the active subscription period for the user, advancing monthly cycle if needed.
+     * Check if user has an active main (individual or business) subscription.
+     */
+    public function hasActiveMainSubscription(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->subscriptions()
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where('expires_at', '>', now())
+            ->where(function ($query) {
+                $query->whereHas('plan', function ($pq) {
+                    $pq->whereIn('type', [Plan::TYPE_INDIVIDUAL, Plan::TYPE_BUSINESS]);
+                })->orWhereNull('plan_id');
+            })
+            ->exists();
+    }
+
+    /**
+     * Check if user is eligible to purchase or be assigned an Extra Quota package.
+     */
+    public function canBuyExtraQuota(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $this->hasActiveMainSubscription($user);
+    }
+
+    /**
+     * Purchase or assign an Extra Quota package to a user (valid for 30 days).
+     */
+    public function purchaseExtraQuota(
+        User $user,
+        Plan $extraPlan,
+        ?float $pricePaid = null,
+        ?string $notes = null
+    ): UserExtraQuota {
+        if (! $this->canBuyExtraQuota($user)) {
+            throw new \RuntimeException('Ek kota satın alabilmek için aktif bir bireysel veya business paketinizin bulunması gerekmektedir.');
+        }
+
+        $now = Carbon::now();
+        $expiresAt = $now->copy()->addDays(30);
+        $pricePaid = $pricePaid ?? (float) $extraPlan->price_1m;
+
+        return UserExtraQuota::create([
+            'user_id' => $user->id,
+            'plan_id' => $extraPlan->id,
+            'name' => $extraPlan->name,
+            'allocated_bytes' => $extraPlan->monthly_quota_bytes,
+            'used_bytes' => 0,
+            'starts_at' => $now,
+            'expires_at' => $expiresAt,
+            'status' => 'active',
+            'price_paid' => $pricePaid,
+            'notes' => $notes ?? '30 gün süreli ek kota tanımlandı',
+        ]);
+    }
+
+    /**
+     * Get all active and non-expired extra quotas for a user (auto-expires past ones).
+     *
+     * @return Collection<int, UserExtraQuota>
+     */
+    public function getActiveExtraQuotas(User $user): Collection
+    {
+        $now = Carbon::now();
+
+        // Auto-mark expired
+        UserExtraQuota::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('expires_at', '<=', $now)
+            ->update(['status' => 'expired']);
+
+        // Auto-mark exhausted
+        UserExtraQuota::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->whereColumn('used_bytes', '>=', 'allocated_bytes')
+            ->update(['status' => 'exhausted']);
+
+        return UserExtraQuota::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('starts_at', '<=', $now)
+            ->where('expires_at', '>', $now)
+            ->whereColumn('used_bytes', '<', 'allocated_bytes')
+            ->orderBy('expires_at', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get total remaining bytes from active Extra Quotas.
+     */
+    public function getExtraQuotaRemainingBytes(User $user): int
+    {
+        $activeExtras = $this->getActiveExtraQuotas($user);
+
+        return (int) $activeExtras->sum(fn (UserExtraQuota $eq) => $eq->remaining_bytes);
+    }
+
+    /**
+     * Get main subscription period remaining bytes.
+     */
+    public function getMainPeriodRemainingBytes(User $user): int
+    {
+        $period = $this->getCurrentPeriod($user);
+
+        return $period ? $period->remaining_bytes : 0;
+    }
+
+    /**
+     * Get combined total remaining bytes (Main Period Quota + Active Extra Quotas).
+     */
+    public function getTotalRemainingBytes(User $user): int
+    {
+        if ($user->isAdmin()) {
+            return 999999999999999;
+        }
+
+        return $this->getMainPeriodRemainingBytes($user) + $this->getExtraQuotaRemainingBytes($user);
+    }
+
+    /**
+     * Get the active main subscription period for the user, advancing monthly cycle if needed.
      */
     public function getCurrentPeriod(User $user): ?SubscriptionPeriod
     {
@@ -111,6 +243,11 @@ class SubscriptionService
         $subscription = $user->subscriptions()
             ->where('status', 'active')
             ->where('starts_at', '<=', now())
+            ->where(function ($query) {
+                $query->whereHas('plan', function ($pq) {
+                    $pq->whereIn('type', [Plan::TYPE_INDIVIDUAL, Plan::TYPE_BUSINESS]);
+                })->orWhereNull('plan_id');
+            })
             ->with(['plan'])
             ->latest('id')
             ->first();
@@ -138,7 +275,6 @@ class SubscriptionService
         // If period doesn't exist or period has expired (monthly cycle renewal!)
         if (! $currentPeriod || (! $subscription->is_perpetual && $now->greaterThanOrEqualTo($currentPeriod->period_end))) {
             return DB::transaction(function () use ($subscription, $user, $currentPeriod) {
-                // Deactivate old period if exists
                 if ($currentPeriod) {
                     $currentPeriod->update(['is_active' => false]);
                     $nextPeriodNum = $currentPeriod->period_number + 1;
@@ -146,19 +282,16 @@ class SubscriptionService
                     $nextPeriodNum = 1;
                 }
 
-                // Calculate period start based on anchor date and period number
                 $periodStart = $subscription->is_perpetual
                     ? $subscription->starts_at->copy()
                     : $subscription->starts_at->copy()->addMonthsNoOverflow($nextPeriodNum - 1);
 
-                // If next period start is already beyond subscription expiration, subscription is done
                 if (! $subscription->is_perpetual && $periodStart->greaterThanOrEqualTo($subscription->expires_at)) {
                     $subscription->update(['status' => 'expired']);
 
                     return null;
                 }
 
-                // Calculate period end based on anchor date
                 $periodEnd = $subscription->is_perpetual
                     ? $subscription->expires_at->copy()
                     : $subscription->starts_at->copy()->addMonthsNoOverflow($nextPeriodNum);
@@ -169,7 +302,6 @@ class SubscriptionService
 
                 $allocatedBytes = $subscription->plan ? $subscription->plan->monthly_quota_bytes : ($currentPeriod?->allocated_bytes ?? 0);
 
-                // Create the fresh monthly quota period (resets used_bytes to 0!)
                 return SubscriptionPeriod::create([
                     'subscription_id' => $subscription->id,
                     'user_id' => $user->id,
@@ -187,13 +319,13 @@ class SubscriptionService
     }
 
     /**
-     * Record downloaded bytes against a ticket and its associated subscription period.
+     * Record downloaded bytes against ticket, prioritizing Extra Quota FIRST before main subscription period.
      */
     public function recordBytes(string $token, int $bytes, bool $isClosed = false): bool
     {
         /** @var DownloadTicket|null $ticket */
         $ticket = DownloadTicket::where('token', $token)
-            ->with(['mediaFile'])
+            ->with(['mediaFile', 'user'])
             ->first();
 
         if (! $ticket) {
@@ -205,7 +337,6 @@ class SubscriptionService
         $fileSizeBytes = $ticket->mediaFile?->size_bytes ?? 0;
         $alreadyDownloaded = $ticket->bytes_downloaded ?? 0;
 
-        // Calculate max additional bytes that can be charged for this ticket (cap at file size)
         if ($fileSizeBytes > 0) {
             $remainingTicketBytes = max(0, $fileSizeBytes - $alreadyDownloaded);
             $actualIncrement = min($bytes, $remainingTicketBytes);
@@ -228,11 +359,37 @@ class SubscriptionService
             $ticket->touch();
             $ticket->save();
 
-            // Update user subscription period used_bytes
-            if ($actualIncrement > 0 && $ticket->subscription_period_id) {
-                DB::table('subscription_periods')
-                    ->where('id', $ticket->subscription_period_id)
-                    ->increment('used_bytes', $actualIncrement);
+            // Deduct bytes: PRIORITY TO EXTRA QUOTA!
+            if ($actualIncrement > 0 && $ticket->user) {
+                $bytesLeftToDeduct = $actualIncrement;
+
+                // 1. Check and deduct from active Extra Quotas first
+                $activeExtras = $this->getActiveExtraQuotas($ticket->user);
+                foreach ($activeExtras as $extra) {
+                    $rem = $extra->remaining_bytes;
+                    if ($rem <= 0) {
+                        continue;
+                    }
+
+                    $deduct = min($bytesLeftToDeduct, $rem);
+                    $extra->increment('used_bytes', $deduct);
+                    $bytesLeftToDeduct -= $deduct;
+
+                    if ($extra->fresh()->used_bytes >= $extra->allocated_bytes) {
+                        $extra->update(['status' => 'exhausted']);
+                    }
+
+                    if ($bytesLeftToDeduct <= 0) {
+                        break;
+                    }
+                }
+
+                // 2. If remaining bytes left to deduct, charge main subscription period
+                if ($bytesLeftToDeduct > 0 && $ticket->subscription_period_id) {
+                    DB::table('subscription_periods')
+                        ->where('id', $ticket->subscription_period_id)
+                        ->increment('used_bytes', $bytesLeftToDeduct);
+                }
             }
         });
 
@@ -250,9 +407,15 @@ class SubscriptionService
 
         $period = $this->getCurrentPeriod($user);
         if ($period && $period->subscription && $period->subscription->plan) {
-            $maxPlan = $period->subscription->plan->max_parallel_downloads;
-            if ($maxPlan > 0) {
-                return $maxPlan;
+            $plan = $period->subscription->plan;
+
+            // Business plans or plans with max_parallel_downloads == 0 mean UNLIMITED parallel downloads
+            if ($plan->isBusiness() || $plan->max_parallel_downloads === 0) {
+                return 999999;
+            }
+
+            if ($plan->max_parallel_downloads > 0) {
+                return $plan->max_parallel_downloads;
             }
         }
 
@@ -260,7 +423,7 @@ class SubscriptionService
             return match ($user->plan->value) {
                 'free' => 1,
                 'basic' => 2,
-                'vip' => 5,
+                'vip' => 999999,
                 default => 3, // premium
             };
         }
@@ -300,7 +463,12 @@ class SubscriptionService
 
         $period = $this->getCurrentPeriod($user);
         if ($period && $period->subscription && $period->subscription->plan) {
-            return (bool) $period->subscription->plan->allow_vps_access;
+            $plan = $period->subscription->plan;
+
+            // Business plans automatically allow VPS / Server access
+            if ($plan->isBusiness() || (bool) $plan->allow_vps_access) {
+                return true;
+            }
         }
 
         return false;
@@ -351,6 +519,10 @@ class SubscriptionService
         }
 
         $maxAllowed = $this->getMaxParallelDownloads($user);
+        if ($maxAllowed >= 999999) {
+            return true;
+        }
+
         $activeCount = $this->getActiveParallelDownloadsCount($user, $mediaFileId);
 
         return $activeCount < $maxAllowed;
@@ -367,7 +539,10 @@ class SubscriptionService
             return [
                 'has_subscription' => true,
                 'is_admin' => true,
+                'has_active_main_sub' => true,
+                'can_buy_extra_quota' => true,
                 'plan_name' => 'Yönetici (Sınırsız)',
+                'plan_type' => 'business',
                 'monthly_quota_gb' => 99999,
                 'allocated_bytes' => 999999999999999,
                 'used_bytes' => 0,
@@ -376,23 +551,44 @@ class SubscriptionService
                 'formatted_allocated' => 'Sınırsız',
                 'formatted_used' => '0 GB',
                 'formatted_remaining' => 'Sınırsız',
+                'main_remaining_bytes' => 999999999999999,
+                'extra_remaining_bytes' => 0,
+                'active_extra_quotas' => [],
                 'period_end' => null,
                 'period_end_formatted' => 'Süresiz',
                 'subscription_expires_at' => null,
                 'can_download' => true,
-                'max_parallel_downloads' => 99,
+                'max_parallel_downloads' => 999999,
                 'active_parallel_downloads' => 0,
                 'speed_limit_mbps' => null,
+                'allows_vps_access' => true,
             ];
         }
 
+        $hasMainSub = $this->hasActiveMainSubscription($user);
         $period = $this->getCurrentPeriod($user);
+        $activeExtras = $this->getActiveExtraQuotas($user);
 
-        if (! $period) {
+        $mainAllocated = $period ? $period->allocated_bytes : 0;
+        $mainUsed = $period ? $period->used_bytes : 0;
+        $mainRemaining = $period ? $period->remaining_bytes : 0;
+
+        $extraAllocated = (int) $activeExtras->sum('allocated_bytes');
+        $extraUsed = (int) $activeExtras->sum('used_bytes');
+        $extraRemaining = (int) $activeExtras->sum(fn ($e) => $e->remaining_bytes);
+
+        $totalAllocated = $mainAllocated + $extraAllocated;
+        $totalUsed = $mainUsed + $extraUsed;
+        $totalRemaining = $mainRemaining + $extraRemaining;
+
+        if (! $period && $activeExtras->isEmpty()) {
             return [
                 'has_subscription' => false,
                 'is_admin' => false,
+                'has_active_main_sub' => false,
+                'can_buy_extra_quota' => false,
                 'plan_name' => 'Paket Yok',
+                'plan_type' => 'none',
                 'monthly_quota_gb' => 0,
                 'allocated_bytes' => 0,
                 'used_bytes' => 0,
@@ -401,6 +597,9 @@ class SubscriptionService
                 'formatted_allocated' => '0 GB',
                 'formatted_used' => '0 GB',
                 'formatted_remaining' => '0 GB',
+                'main_remaining_bytes' => 0,
+                'extra_remaining_bytes' => 0,
+                'active_extra_quotas' => [],
                 'period_end' => null,
                 'period_end_formatted' => null,
                 'subscription_expires_at' => null,
@@ -408,39 +607,64 @@ class SubscriptionService
                 'max_parallel_downloads' => $this->getMaxParallelDownloads($user),
                 'active_parallel_downloads' => $this->getActiveParallelDownloadsCount($user),
                 'speed_limit_mbps' => null,
+                'allows_vps_access' => false,
             ];
         }
 
-        $subscription = $period->subscription;
-        $plan = $subscription->plan;
+        $subscription = $period?->subscription;
+        $plan = $subscription?->plan;
 
-        $planName = $plan ? $plan->name : ($subscription->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası');
-        $monthlyQuotaGb = $plan ? $plan->monthly_quota_gb : (int) round($period->allocated_bytes / (1024 * 1024 * 1024));
-        $periodEndFormatted = $subscription->is_perpetual ? 'Süresiz (Sınırsız Süre)' : $period->period_end->format('d.m.Y H:i');
+        $planName = $plan ? $plan->name : ($subscription?->is_perpetual ? 'Süresiz Özel Kota' : 'Aktif Abonelik');
+        $monthlyQuotaGb = $plan ? $plan->monthly_quota_gb : (int) round($mainAllocated / (1024 * 1024 * 1024));
+        $periodEndFormatted = $subscription?->is_perpetual ? 'Süresiz (Sınırsız Süre)' : $period?->period_end->format('d.m.Y H:i');
         $maxParallel = $this->getMaxParallelDownloads($user);
         $activeParallel = $this->getActiveParallelDownloadsCount($user);
         $speedLimit = $this->getSpeedLimitMbps($user);
+        $allowsVps = $this->allowsVpsAccess($user);
+
+        $usagePct = $totalAllocated > 0 ? round(min(100.0, max(0.0, ($totalUsed / $totalAllocated) * 100)), 1) : 100.0;
+
+        $formattedExtras = $activeExtras->map(fn (UserExtraQuota $eq) => [
+            'id' => $eq->id,
+            'name' => $eq->name,
+            'allocated_bytes' => $eq->allocated_bytes,
+            'used_bytes' => $eq->used_bytes,
+            'remaining_bytes' => $eq->remaining_bytes,
+            'formatted_remaining' => $eq->formatted_remaining,
+            'formatted_allocated' => $eq->formatted_allocated,
+            'expires_at' => $eq->expires_at->toIso8601String(),
+            'expires_at_formatted' => $eq->expires_at->format('d.m.Y H:i'),
+        ])->toArray();
 
         return [
             'has_subscription' => true,
             'is_admin' => false,
+            'has_active_main_sub' => $hasMainSub,
+            'can_buy_extra_quota' => $hasMainSub,
             'plan_name' => $planName,
+            'plan_type' => $plan?->type ?? 'individual',
             'monthly_quota_gb' => $monthlyQuotaGb,
-            'allocated_bytes' => $period->allocated_bytes,
-            'used_bytes' => $period->used_bytes,
-            'remaining_bytes' => $period->remaining_bytes,
-            'usage_percentage' => $period->usage_percentage,
-            'formatted_allocated' => $period->formatted_allocated,
-            'formatted_used' => $period->formatted_used,
-            'formatted_remaining' => $period->formatted_remaining,
-            'period_end' => $subscription->is_perpetual ? null : $period->period_end->toIso8601String(),
+            'allocated_bytes' => $totalAllocated,
+            'used_bytes' => $totalUsed,
+            'remaining_bytes' => $totalRemaining,
+            'usage_percentage' => $usagePct,
+            'formatted_allocated' => SubscriptionPeriod::formatBytes($totalAllocated),
+            'formatted_used' => SubscriptionPeriod::formatBytes($totalUsed),
+            'formatted_remaining' => SubscriptionPeriod::formatBytes($totalRemaining),
+            'main_remaining_bytes' => $mainRemaining,
+            'extra_remaining_bytes' => $extraRemaining,
+            'formatted_main_remaining' => SubscriptionPeriod::formatBytes($mainRemaining),
+            'formatted_extra_remaining' => SubscriptionPeriod::formatBytes($extraRemaining),
+            'active_extra_quotas' => $formattedExtras,
+            'period_end' => $subscription?->is_perpetual ? null : $period?->period_end->toIso8601String(),
             'period_end_formatted' => $periodEndFormatted,
-            'subscription_expires_at' => $subscription->is_perpetual ? null : $subscription->expires_at->toIso8601String(),
-            'is_perpetual' => $subscription->is_perpetual,
-            'can_download' => $period->hasAvailableQuota(),
+            'subscription_expires_at' => $subscription?->is_perpetual ? null : $subscription?->expires_at->toIso8601String(),
+            'is_perpetual' => (bool) ($subscription?->is_perpetual),
+            'can_download' => $totalRemaining > 0,
             'max_parallel_downloads' => $maxParallel,
             'active_parallel_downloads' => $activeParallel,
             'speed_limit_mbps' => $speedLimit,
+            'allows_vps_access' => $allowsVps,
         ];
     }
 }

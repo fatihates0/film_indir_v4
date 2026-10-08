@@ -633,4 +633,110 @@ class SubscriptionQuotaTest extends TestCase
 
         $this->assertEquals(10, $payload['speed_limit_mbps']);
     }
+
+    public function test_business_plan_allows_vps_access_and_unlimited_parallel_downloads(): void
+    {
+        $user = User::factory()->create();
+        $businessPlan = Plan::where('type', Plan::TYPE_BUSINESS)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $businessPlan, 1);
+
+        $this->assertTrue($service->allowsVpsAccess($user));
+        $this->assertEquals(999999, $service->getMaxParallelDownloads($user));
+        $this->assertTrue($service->canStartParallelDownload($user, 99));
+    }
+
+    public function test_extra_quota_requires_active_main_subscription(): void
+    {
+        $user = User::factory()->create();
+        $extraPlan = Plan::where('type', Plan::TYPE_EXTRA)->firstOrFail();
+        $service = app(SubscriptionService::class);
+
+        $this->assertFalse($service->canBuyExtraQuota($user));
+
+        $this->expectException(\RuntimeException::class);
+        $service->purchaseExtraQuota($user, $extraPlan);
+    }
+
+    public function test_extra_quota_priority_over_main_subscription_period(): void
+    {
+        $user = User::factory()->create();
+        $individualPlan = Plan::where('type', Plan::TYPE_INDIVIDUAL)->firstOrFail();
+        $extraPlan = Plan::where('type', Plan::TYPE_EXTRA)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $individualPlan, 1);
+
+        $extraQuota = $service->purchaseExtraQuota($user, $extraPlan);
+        $this->assertEquals(0, $extraQuota->used_bytes);
+
+        $box = StorageBox::create([
+            'name' => 'Box Extra Test',
+            'host' => 'extra.storagebox.de',
+            'protocol' => StorageBoxProtocol::CustomGateway,
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $file = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'TestMovie.mkv',
+            'path' => '/movies/TestMovie.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 10 * 1024 * 1024 * 1024, // 10 GB
+        ]);
+
+        $ticket = DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file->id,
+            'subscription_period_id' => $service->getCurrentPeriod($user)->id,
+            'bytes_downloaded' => 0,
+            'status' => 'active',
+            'expires_at' => now()->addHours(3),
+        ]);
+
+        // Download 5 GB
+        $downloadBytes = 5 * 1024 * 1024 * 1024;
+        $service->recordBytes($ticket->token, $downloadBytes, false);
+
+        // Verify Extra Quota used_bytes increased by 5 GB, while main period used_bytes remains 0!
+        $extraQuota->refresh();
+        $this->assertEquals($downloadBytes, $extraQuota->used_bytes);
+
+        $mainPeriod = $service->getCurrentPeriod($user);
+        $this->assertEquals(0, $mainPeriod->used_bytes);
+    }
+
+    public function test_extra_quota_expires_after_30_days(): void
+    {
+        $user = User::factory()->create();
+        $individualPlan = Plan::where('type', Plan::TYPE_INDIVIDUAL)->firstOrFail();
+        $extraPlan = Plan::where('type', Plan::TYPE_EXTRA)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $individualPlan, 1);
+
+        $extraQuota = $service->purchaseExtraQuota($user, $extraPlan);
+        $this->assertEquals('active', $extraQuota->status);
+
+        // Travel 31 days into future
+        Carbon::setTestNow(now()->addDays(31));
+
+        $activeExtras = $service->getActiveExtraQuotas($user);
+        $this->assertCount(0, $activeExtras);
+
+        $extraQuota->refresh();
+        $this->assertEquals('expired', $extraQuota->status);
+
+        Carbon::setTestNow();
+    }
 }

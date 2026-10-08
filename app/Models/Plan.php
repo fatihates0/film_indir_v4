@@ -12,6 +12,12 @@ class Plan extends Model
 {
     use HasFactory;
 
+    public const TYPE_INDIVIDUAL = 'individual';
+
+    public const TYPE_BUSINESS = 'business';
+
+    public const TYPE_EXTRA = 'extra';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -20,6 +26,7 @@ class Plan extends Model
     protected $fillable = [
         'name',
         'slug',
+        'type',
         'description',
         'monthly_quota_bytes',
         'monthly_quota_gb',
@@ -42,6 +49,7 @@ class Plan extends Model
      */
     protected $appends = [
         'formatted_quota',
+        'type_label',
     ];
 
     /**
@@ -52,6 +60,7 @@ class Plan extends Model
     protected function casts(): array
     {
         return [
+            'type' => 'string',
             'monthly_quota_bytes' => 'integer',
             'monthly_quota_gb' => 'integer',
             'price_1m' => 'decimal:2',
@@ -84,6 +93,54 @@ class Plan extends Model
     }
 
     /**
+     * Scope to individual plans.
+     */
+    public function scopeIndividual(Builder $query): Builder
+    {
+        return $query->where('type', self::TYPE_INDIVIDUAL);
+    }
+
+    /**
+     * Scope to business plans.
+     */
+    public function scopeBusiness(Builder $query): Builder
+    {
+        return $query->where('type', self::TYPE_BUSINESS);
+    }
+
+    /**
+     * Scope to extra quota plans.
+     */
+    public function scopeExtra(Builder $query): Builder
+    {
+        return $query->where('type', self::TYPE_EXTRA);
+    }
+
+    /**
+     * Check if plan is individual type.
+     */
+    public function isIndividual(): bool
+    {
+        return $this->type === self::TYPE_INDIVIDUAL || empty($this->type);
+    }
+
+    /**
+     * Check if plan is business type.
+     */
+    public function isBusiness(): bool
+    {
+        return $this->type === self::TYPE_BUSINESS;
+    }
+
+    /**
+     * Check if plan is extra quota type.
+     */
+    public function isExtra(): bool
+    {
+        return $this->type === self::TYPE_EXTRA;
+    }
+
+    /**
      * Formatted quota string (e.g. "1.500 GB").
      */
     protected function formattedQuota(): Attribute
@@ -94,12 +151,30 @@ class Plan extends Model
     }
 
     /**
+     * Human-readable type label.
+     */
+    protected function typeLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => match ($this->type) {
+                self::TYPE_BUSINESS => 'Business Paket',
+                self::TYPE_EXTRA => 'Ek Kota Paketi',
+                default => 'Bireysel Paket',
+            }
+        );
+    }
+
+    /**
      * Allowed durations array fallback.
      */
     protected function allowedDurations(): Attribute
     {
         return Attribute::make(
             get: function ($value): array {
+                if ($this->isExtra()) {
+                    return [1];
+                }
+
                 if (empty($value)) {
                     return [1, 3, 6, 12];
                 }
@@ -118,6 +193,10 @@ class Plan extends Model
      */
     public function isDurationAllowed(int $months): bool
     {
+        if ($this->isExtra()) {
+            return $months === 1;
+        }
+
         return in_array($months, $this->allowed_durations, true);
     }
 
@@ -126,6 +205,10 @@ class Plan extends Model
      */
     public function getPriceForDuration(int $months): float
     {
+        if ($this->isExtra()) {
+            return (float) $this->price_1m;
+        }
+
         return match ($months) {
             3 => (float) $this->price_3m,
             6 => (float) $this->price_6m,

@@ -5,13 +5,12 @@ import AuthModal from '../Components/AuthModal';
 import { 
     Check, Zap, Shield, HardDrive, Download, ArrowRight, 
     Sparkles, RefreshCw, Clock, AlertCircle, Building2, Coins, 
-    Copy, CheckCircle2, X, Info 
+    Copy, CheckCircle2, X, Info, Server, PlusCircle, UserCheck, Lock
 } from 'lucide-react';
 
 export default function Pricing({ plans = [], paymentMethods = [] }) {
     const { auth, flash } = usePage().props;
     const [selectedDuration, setSelectedDuration] = useState(1); // 1, 3, 6, 12
-    const [submittingPlanId, setSubmittingPlanId] = useState(null);
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authModalMode, setAuthModalMode] = useState('login');
 
@@ -34,8 +33,14 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
         { months: 12, label: '12 Aylık', badge: '%30 İndirim' },
     ];
 
+    // Filter plans by type
+    const individualPlans = plans.filter(p => !p.type || p.type === 'individual');
+    const businessPlans = plans.filter(p => p.type === 'business');
+    const extraPlans = plans.filter(p => p.type === 'extra');
+
     const getPrice = (plan, months) => {
         if (!plan) return 0;
+        if (plan.type === 'extra') return parseFloat(plan.price_1m || 0);
         switch (months) {
             case 3:
                 return parseFloat(plan.price_3m || 0);
@@ -50,29 +55,36 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
     const isDurationAllowedForPlan = (plan, months) => {
         if (!plan) return true;
+        if (plan.type === 'extra') return months === 1;
         const allowed = plan.allowed_durations || [1, 3, 6, 12];
         return allowed.includes(months);
     };
 
     const getAllowedDurationLabels = (plan) => {
+        if (plan.type === 'extra') return '30 Günlük Kullanım';
         const allowed = plan?.allowed_durations || [1, 3, 6, 12];
         return allowed.map(m => m === 12 ? '12 Aylık' : `${m} Aylık`).join(', ');
     };
 
     const handleOpenCheckout = (plan) => {
-        const allowed = plan.allowed_durations || [1, 3, 6, 12];
-        const isAllowed = allowed.includes(selectedDuration);
-
-        if (!isAllowed) {
-            // Just switch the page duration tab to the first allowed duration so the user can inspect details first
-            const firstAllowed = allowed[0] || 1;
-            setSelectedDuration(firstAllowed);
-            return;
-        }
-
         if (!user) {
             setAuthModalMode('login');
             setAuthModalOpen(true);
+            return;
+        }
+
+        // Check Extra Quota eligibility
+        if (plan.type === 'extra' && (!quota || !quota.can_buy_extra_quota)) {
+            alert('Ek kota alabilmek için aktif bir bireysel veya business paketinizin bulunması gerekmektedir.');
+            return;
+        }
+
+        const allowed = plan.allowed_durations || [1, 3, 6, 12];
+        const isAllowed = plan.type === 'extra' ? true : allowed.includes(selectedDuration);
+
+        if (!isAllowed) {
+            const firstAllowed = allowed[0] || 1;
+            setSelectedDuration(firstAllowed);
             return;
         }
 
@@ -100,7 +112,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
         router.post('/payment-notifications', {
             plan_id: checkoutPlan.id,
             payment_method_id: selectedMethodId,
-            duration_months: selectedDuration,
+            duration_months: checkoutPlan.type === 'extra' ? 1 : selectedDuration,
             sender_name: senderName,
             tx_hash: txHash,
             user_notes: userNotes,
@@ -113,32 +125,218 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
         });
     };
 
+    const renderPlanCard = (plan, index) => {
+        const isAllowed = isDurationAllowedForPlan(plan, selectedDuration);
+        const price = getPrice(plan, selectedDuration);
+        const monthlyEquivalent = selectedDuration > 1 ? (price / selectedDuration).toFixed(0) : price;
+        const isFeatured = index === 1 || plan.type === 'business';
+
+        const isExtraPlan = plan.type === 'extra';
+        const isBusinessPlan = plan.type === 'business';
+
+        return (
+            <div
+                key={plan.id}
+                className={`relative rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 ${
+                    isBusinessPlan
+                        ? 'bg-gradient-to-b from-[#1E1912] to-[#12100C] border-2 border-amber-500/80 shadow-2xl shadow-amber-500/10'
+                        : isExtraPlan
+                            ? 'bg-gradient-to-b from-[#101B2B] to-[#0D1420] border border-sky-500/50 hover:border-sky-400 shadow-xl'
+                            : isFeatured
+                                ? 'bg-gradient-to-b from-[#161D2B] to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
+                                : 'bg-[#121620] border border-white/10 hover:border-white/20'
+                }`}
+            >
+                {/* Badges */}
+                {isBusinessPlan && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500 text-black shadow-lg shadow-amber-500/30 flex items-center gap-1.5 whitespace-nowrap">
+                        <Server className="w-3.5 h-3.5" /> Sunucu IP Destekli Business
+                    </div>
+                )}
+                {isExtraPlan && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-sky-500 text-white shadow-lg shadow-sky-500/30 flex items-center gap-1.5 whitespace-nowrap">
+                        <PlusCircle className="w-3.5 h-3.5" /> 30 Gün Geçerli Ek Kota
+                    </div>
+                )}
+                {!isBusinessPlan && !isExtraPlan && isFeatured && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00B074] text-white shadow-lg shadow-[#00B074]/30 whitespace-nowrap">
+                        En Çok Tercih Edilen
+                    </div>
+                )}
+
+                <div className="space-y-6 pt-2">
+                    {/* Plan Header */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                isBusinessPlan
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                    : isExtraPlan
+                                        ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                                        : 'bg-[#00B074]/10 text-[#00B074] border-[#00B074]/20'
+                            }`}>
+                                {plan.type_label}
+                            </span>
+                        </div>
+                        <p className="text-xs text-gray-400 line-clamp-2">{plan.description}</p>
+                    </div>
+
+                    {/* Quota Badge */}
+                    <div className="py-3 px-4 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <HardDrive className={`w-5 h-5 ${isBusinessPlan ? 'text-amber-400' : isExtraPlan ? 'text-sky-400' : 'text-[#00B074]'}`} />
+                            <span className="text-xs text-gray-300">
+                                {isExtraPlan ? 'Ek Transfer Kotası' : 'Aylık İndirme Kotası'}
+                            </span>
+                        </div>
+                        <span className="text-lg font-black text-white">{plan.formatted_quota}</span>
+                    </div>
+
+                    {/* Price */}
+                    <div className="space-y-1">
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-3xl sm:text-4xl font-black text-white">₺{price}</span>
+                            <span className="text-xs text-gray-400 font-medium">
+                                / {isExtraPlan ? '30 Gün' : `${selectedDuration} Ay`}
+                            </span>
+                        </div>
+                        {!isExtraPlan && selectedDuration > 1 && (
+                            <p className="text-[11px] text-[#00B074]">
+                                Aylık ~₺{monthlyEquivalent} denk gelir
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Features List */}
+                    <ul className="space-y-3 pt-2 text-xs text-gray-300">
+                        {isBusinessPlan ? (
+                            <>
+                                <li className="flex items-center gap-2.5 font-bold text-amber-300">
+                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span>Sunucu / VPS IP adreslerinden indirme izni</span>
+                                </li>
+                                <li className="flex items-center gap-2.5 font-bold text-amber-300">
+                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span>Sınırsız Eşzamanlı Paralel Bağlantı</span>
+                                </li>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span><strong>{plan.formatted_quota}</strong> dev aylık transfer kotası</span>
+                                </li>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span>1 Gbps yüksek hızlı kurumsal omurga</span>
+                                </li>
+                            </>
+                        ) : isExtraPlan ? (
+                            <>
+                                <li className="flex items-center gap-2.5 font-bold text-sky-300">
+                                    <Check className="w-4 h-4 text-sky-400 shrink-0" />
+                                    <span><strong>{plan.formatted_quota}</strong> anında tanımlanan ek kota</span>
+                                </li>
+                                <li className="flex items-center gap-2.5 font-bold text-sky-300">
+                                    <Check className="w-4 h-4 text-sky-400 shrink-0" />
+                                    <span>İlk Önce Bu Kota Harcanır (Öncelikli)</span>
+                                </li>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-sky-400 shrink-0" />
+                                    <span>Satın alma tarihinden itibaren 30 gün geçerli</span>
+                                </li>
+                                <li className="flex items-center gap-2.5 text-gray-400">
+                                    <UserCheck className="w-4 h-4 text-sky-400 shrink-0" />
+                                    <span>Aktif ana paket aboneleri yararlanabilir</span>
+                                </li>
+                            </>
+                        ) : (
+                            <>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-[#00B074] shrink-0" />
+                                    <span><strong>{plan.formatted_quota}</strong> aylık transfer hakkı</span>
+                                </li>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-[#00B074] shrink-0" />
+                                    <span>Aydan aya otomatik sıfırlanan kota</span>
+                                </li>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-[#00B074] shrink-0" />
+                                    <span><strong>{plan.max_parallel_downloads}</strong> adet eşzamanlı paralel bağlantı</span>
+                                </li>
+                                <li className="flex items-center gap-2.5">
+                                    <Check className="w-4 h-4 text-[#00B074] shrink-0" />
+                                    <span>IDM, JDownloader ve tarayıcı desteği</span>
+                                </li>
+                            </>
+                        )}
+                    </ul>
+                </div>
+
+                {/* Action Button */}
+                <div className="pt-8">
+                    {isExtraPlan && user && quota && !quota.can_buy_extra_quota ? (
+                        <button
+                            type="button"
+                            disabled
+                            className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold bg-gray-800 text-gray-400 border border-white/5 flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                            title="Ek kota satın alabilmek için aktif bir ana paketinizin bulunması gerekmektedir."
+                        >
+                            <Lock className="w-4 h-4 text-gray-500" />
+                            <span>Aktif Paket Gerekli</span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => handleOpenCheckout(plan)}
+                            className={`w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                isBusinessPlan
+                                    ? 'bg-amber-500 hover:bg-amber-600 text-black shadow-xl shadow-amber-500/20'
+                                    : isExtraPlan
+                                        ? 'bg-sky-500 hover:bg-sky-600 text-white shadow-xl shadow-sky-500/20'
+                                        : isFeatured
+                                            ? 'bg-[#00B074] hover:bg-[#009663] text-white shadow-xl shadow-[#00B074]/30'
+                                            : 'bg-white/10 hover:bg-white/20 text-white'
+                            }`}
+                        >
+                            <span>{isExtraPlan ? 'Ek Kota Satın Al' : 'Paket Seç & Öde'}</span>
+                            <ArrowRight className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <Layout>
             <Head title="İndirme Paketleri & Üyelikler - SineKutu" />
 
             <div className="min-h-screen bg-[#0A0D14] text-gray-200 py-12 px-4 sm:px-6 lg:px-8">
-                <div className="max-w-7xl mx-auto space-y-12">
+                <div className="max-w-7xl mx-auto space-y-16">
                     
                     {/* CURRENT USER QUOTA BANNER */}
                     {user && quota && quota.has_subscription && (
-                        <div className="bg-gradient-to-r from-[#00B074]/15 via-emerald-950/20 to-[#00B074]/5 border border-[#00B074]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                        <div className="bg-gradient-to-r from-[#00B074]/15 via-emerald-950/20 to-[#00B074]/5 border border-[#00B074]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden space-y-4">
                             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
-                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#00B074] text-white">
-                                            Aktif Paketiniz
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#00B074] text-white flex items-center gap-1">
+                                            <Sparkles className="w-3 h-3" /> Aktif Paketiniz
                                         </span>
                                         <h3 className="text-xl font-bold text-white">{quota.plan_name}</h3>
+                                        {quota.allows_vps_access && (
+                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                Sunucu/VPS Erişimi Aktif
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs text-gray-400">
                                         Kota yenilenme tarihi: <strong className="text-gray-200">{quota.period_end_formatted || 'Süresiz'}</strong>
                                     </p>
                                 </div>
 
-                                <div className="w-full md:w-72 space-y-2">
+                                <div className="w-full md:w-80 space-y-2">
                                     <div className="flex justify-between text-xs font-semibold">
-                                        <span className="text-gray-400">Kalan Kota</span>
+                                        <span className="text-gray-400">Toplam Kalan Kota</span>
                                         <span className="text-[#00B074] font-bold">{quota.formatted_remaining} / {quota.formatted_allocated}</span>
                                     </div>
                                     <div className="w-full bg-black/40 h-2.5 rounded-full overflow-hidden border border-white/5">
@@ -153,22 +351,47 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Active Extra Quotas Breakdown */}
+                            {quota.active_extra_quotas && quota.active_extra_quotas.length > 0 && (
+                                <div className="pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    {quota.active_extra_quotas.map((eq) => (
+                                        <div key={eq.id} className="p-3 rounded-xl bg-black/40 border border-[#00B074]/30 flex items-center justify-between gap-3 text-xs">
+                                            <div>
+                                                <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                                                    <PlusCircle className="w-3.5 h-3.5" />
+                                                    <span>{eq.name}</span>
+                                                </div>
+                                                <span className="text-[10px] text-gray-400 block mt-0.5">
+                                                    Son Kullanma: <strong className="text-gray-200">{eq.expires_at_formatted}</strong>
+                                                </span>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <span className="text-xs font-black text-[#00B074] block">
+                                                    {eq.formatted_remaining}
+                                                </span>
+                                                <span className="text-[9px] text-gray-400 block">Öncelikli Kota</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {/* HEADER */}
+                    {/* MAIN HEADER */}
                     <div className="text-center max-w-3xl mx-auto space-y-4">
                         <span className="px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#00B074]/10 border border-[#00B074]/30 text-[#00B074] inline-flex items-center gap-2">
                             <Sparkles className="w-3.5 h-3.5" /> Yüksek Hızlı İndirme Paketleri
                         </span>
                         <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-                            İhtiyacınıza Uygun <span className="text-[#00B074]">Aylık Kota</span> Seçin
+                            İhtiyacınıza Uygun <span className="text-[#00B074]">İndirme Paketleri</span>
                         </h1>
                         <p className="text-sm sm:text-base text-gray-400">
-                            Yalnızca indirdiğiniz tam bayt kotanızdan düşer. 10 GB dosyanın 3 GB'sini indirirseniz sadece 3 GB sayılır. Kotanız her ay abone olduğunuz gün sıfırlanır.
+                            Bireysel, Business veya Ek Kota seçeneklerimizden dilediğinizi tercih edebilirsiniz. Yalnızca indirdiğiniz tam bayt kotanızdan düşer.
                         </p>
 
-                        {/* DURATION TOGGLE */}
+                        {/* GLOBAL DURATION TOGGLE (FOR INDIVIDUAL & BUSINESS) */}
                         <div className="pt-6 flex justify-center">
                             <div className="bg-[#121620] p-1.5 rounded-2xl border border-white/10 flex items-center gap-1 max-w-md w-full">
                                 {durationOptions.map((opt) => (
@@ -194,139 +417,105 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                         </div>
                     </div>
 
-                    {/* PRICING CARDS */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-4">
-                        {plans.map((plan, index) => {
-                            const isAllowed = isDurationAllowedForPlan(plan, selectedDuration);
-                            const price = getPrice(plan, selectedDuration);
-                            const monthlyEquivalent = (price / selectedDuration).toFixed(0);
-                            const isFeatured = index === 1; // 2nd plan is popular
-                            const allowedLabel = getAllowedDurationLabels(plan);
-                            const hasRestrictedDurations = (plan.allowed_durations || [1, 3, 6, 12]).length < 4;
+                    {/* SECTION 1: BİREYSEL PAKETLER */}
+                    <div className="space-y-6 pt-4">
+                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
+                            <div className="w-10 h-10 rounded-2xl bg-[#00B074]/15 text-[#00B074] border border-[#00B074]/30 flex items-center justify-center">
+                                <HardDrive className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                                    <span>Bireysel Paketler</span>
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00B074]/20 text-[#00B074] border border-[#00B074]/30">
+                                        Standart Ev & Mobil Kullanım
+                                    </span>
+                                </h2>
+                                <p className="text-xs text-gray-400">
+                                    Kişisel indirmeleriniz için yüksek hızlı ve uygun fiyatlı aylık transfer paketleri.
+                                </p>
+                            </div>
+                        </div>
 
-                            return (
-                                <div
-                                    key={plan.id}
-                                    className={`relative rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 ${
-                                        isFeatured
-                                            ? 'bg-gradient-to-b from-[#161D2B] to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
-                                            : 'bg-[#121620] border border-white/10 hover:border-white/20'
-                                    } ${!isAllowed ? 'opacity-80' : ''}`}
-                                >
-                                    {isFeatured && (
-                                        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00B074] text-white shadow-lg shadow-[#00B074]/30">
-                                            En Çok Tercih Edilen
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-6">
-                                        {/* Plan Header */}
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                                                {hasRestrictedDurations && (
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                                        Sadece: {allowedLabel}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 line-clamp-2">{plan.description}</p>
-                                        </div>
-
-                                        {/* Quota Badge */}
-                                        <div className="py-3 px-4 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
-                                            <div className="flex items-center gap-2.5">
-                                                <HardDrive className="w-5 h-5 text-[#00B074]" />
-                                                <span className="text-xs text-gray-300">Aylık İndirme Kotası</span>
-                                            </div>
-                                            <span className="text-lg font-black text-white">{plan.formatted_quota}</span>
-                                        </div>
-
-                                        {/* Price */}
-                                        <div className="space-y-1">
-                                            {isAllowed ? (
-                                                <>
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-3xl sm:text-4xl font-black text-white">₺{price}</span>
-                                                        <span className="text-xs text-gray-400 font-medium">/ {selectedDuration} Ay</span>
-                                                    </div>
-                                                    {selectedDuration > 1 && (
-                                                        <p className="text-[11px] text-[#00B074]">
-                                                            Aylık ~₺{monthlyEquivalent} denk gelir
-                                                        </p>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 space-y-1">
-                                                    <div className="flex items-center gap-1.5 text-xs font-bold">
-                                                        <AlertCircle className="w-4 h-4 shrink-0" />
-                                                        <span>{selectedDuration} Aylık Seçenekte Geçersiz</span>
-                                                    </div>
-                                                    <p className="text-[11px] text-gray-300">
-                                                        Bu paket sadece <strong className="text-amber-400">{allowedLabel}</strong> alımda geçerlidir.
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Features List */}
-                                        <ul className="space-y-3 pt-2 text-xs text-gray-300">
-                                            <li className="flex items-center gap-2.5">
-                                                <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span><strong>{plan.formatted_quota}</strong> aylık transfer hakkı</span>
-                                            </li>
-                                            <li className="flex items-center gap-2.5">
-                                                <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span>Aydan aya otomatik sıfırlanan kota</span>
-                                            </li>
-                                            <li className="flex items-center gap-2.5">
-                                                <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span><strong>{plan.max_parallel_downloads}</strong> adet eşzamanlı paralel bağlantı</span>
-                                            </li>
-                                            <li className="flex items-center gap-2.5">
-                                                <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span>IDM, JDownloader ve tarayıcı desteği</span>
-                                            </li>
-                                            <li className="flex items-center gap-2.5">
-                                                <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span>Kaldığı yerden devam etme (Resume)</span>
-                                            </li>
-                                            <li className="flex items-center gap-2.5">
-                                                <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                                <span>1 Gbps yüksek hızlı omurga bağlantısı</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    {/* Action Button */}
-                                    <div className="pt-8">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleOpenCheckout(plan)}
-                                            className={`w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                                isAllowed
-                                                    ? isFeatured
-                                                        ? 'bg-[#00B074] hover:bg-[#009663] text-white shadow-xl shadow-[#00B074]/30'
-                                                        : 'bg-white/10 hover:bg-white/20 text-white'
-                                                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-lg'
-                                            }`}
-                                        >
-                                            {isAllowed ? (
-                                                <>
-                                                    <span>Paket Seç & Öde</span>
-                                                    <ArrowRight className="w-4 h-4" />
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span>Süreyi Değiştir & İncele ({allowedLabel})</span>
-                                                    <ArrowRight className="w-4 h-4" />
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-2">
+                            {individualPlans.length === 0 ? (
+                                <div className="col-span-full py-8 text-center text-gray-400 bg-[#121620] rounded-3xl border border-white/5 text-xs">
+                                    Bireysel paket bulunmamaktadır.
                                 </div>
-                            );
-                        })}
+                            ) : (
+                                individualPlans.map((plan, idx) => renderPlanCard(plan, idx))
+                            )}
+                        </div>
+                    </div>
+
+                    {/* SECTION 2: BUSINESS PAKETLER */}
+                    <div className="space-y-6 pt-6">
+                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                                <Server className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                                    <span>Business Paketler</span>
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                        Sunucu & VPS Destekli
+                                    </span>
+                                </h2>
+                                <p className="text-xs text-gray-400">
+                                    Sunucu / VPS IP adreslerine izin veren, yüksek kotalı ve eşzamanlı indirme sınırı olmayan profesyonel paketler.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-2">
+                            {businessPlans.length === 0 ? (
+                                <div className="col-span-full py-8 text-center text-gray-400 bg-[#121620] rounded-3xl border border-white/5 text-xs">
+                                    Business paket bulunmamaktadır.
+                                </div>
+                            ) : (
+                                businessPlans.map((plan, idx) => renderPlanCard(plan, idx))
+                            )}
+                        </div>
+                    </div>
+
+                    {/* SECTION 3: EK KOTA PAKETLERİ */}
+                    <div className="space-y-6 pt-6">
+                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
+                            <div className="w-10 h-10 rounded-2xl bg-sky-500/15 text-sky-400 border border-sky-500/30 flex items-center justify-center">
+                                <PlusCircle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                                    <span>Ek Kota Paketleri</span>
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                                        30 Gün Kullanım Süreli
+                                    </span>
+                                </h2>
+                                <p className="text-xs text-gray-400">
+                                    Ay içerisinde kotası biten aktif paketi olan kullanıcılarımız için öncelikli harcanan ek kota paketleri.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* NOTICE BOX */}
+                        <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-start gap-3 text-xs text-sky-200">
+                            <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <strong className="block text-white font-bold">Ek Kota Bilgilendirmesi:</strong>
+                                <p className="leading-relaxed">
+                                    Ek kota paketleri <strong>30 gün geçerlidir</strong> ve indirmelerinizde <strong>ilk olarak ek kotanız harcanır</strong>. Ek kota satın alabilmek için hesabınızda aktif bir Bireysel veya Business paketinin bulunması gerekmektedir.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-2">
+                            {extraPlans.length === 0 ? (
+                                <div className="col-span-full py-8 text-center text-gray-400 bg-[#121620] rounded-3xl border border-white/5 text-xs">
+                                    Ek kota paketi bulunmamaktadır.
+                                </div>
+                            ) : (
+                                extraPlans.map((plan, idx) => renderPlanCard(plan, idx))
+                            )}
+                        </div>
                     </div>
 
                     {/* FAQ / SYSTEM INFO */}
@@ -348,22 +537,22 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                             </div>
 
                             <div className="space-y-2">
-                                <div className="w-8 h-8 rounded-xl bg-[#00B074]/10 text-[#00B074] flex items-center justify-center font-bold text-xs">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-xs">
                                     2
                                 </div>
-                                <h4 className="text-sm font-bold text-white">Aydan Aya Yenilenme</h4>
+                                <h4 className="text-sm font-bold text-white">Business & Sunucu IP</h4>
                                 <p className="text-xs text-gray-400 leading-relaxed">
-                                    Abone olduğunuz gün sayaç başlar. Örneğin ayın 17'sinde abone olduysanız, her ayın 17'sinde kotanız sıfırlanıp taze paketiniz başlar.
+                                    Business paketlerde Sunucu/VPS IP adreslerinden indirme engeline takılmadan yüksek omurga hızıyla sınırsız paralel indirme yapabilirsiniz.
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <div className="w-8 h-8 rounded-xl bg-[#00B074]/10 text-[#00B074] flex items-center justify-center font-bold text-xs">
+                                <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold text-xs">
                                     3
                                 </div>
-                                <h4 className="text-sm font-bold text-white">Kota Güvenliği</h4>
+                                <h4 className="text-sm font-bold text-white">Ek Kota Önceliği</h4>
                                 <p className="text-xs text-gray-400 leading-relaxed">
-                                    Aylık kotanız bittiğinde içerik indirme hakkınız duraklatılır. Süreniz geldiğinde ya da yeni paket aldığınızda anında tekrar aktif olur.
+                                    Kotanız bittiğinde veya azaldığında ek kota alabilirsiniz. İndirme yaparken sistem ilk olarak 30 gün geçerli ek kotanızı tüketir.
                                 </p>
                             </div>
                         </div>
@@ -380,11 +569,13 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                         {/* Modal Header */}
                         <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
                             <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#00B074]">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                    checkoutPlan.type === 'business' ? 'text-amber-400' : checkoutPlan.type === 'extra' ? 'text-sky-400' : 'text-[#00B074]'
+                                }`}>
                                     Sipariş ve Ödeme Bildirimi
                                 </span>
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2 mt-0.5">
-                                    <span>{checkoutPlan.name} Paketi ({selectedDuration} Ay)</span>
+                                    <span>{checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : `(${selectedDuration} Ay)`}</span>
                                 </h3>
                             </div>
                             <button
@@ -404,9 +595,11 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                 </span>
                             </div>
                             <div className="text-right">
-                                <span className="text-xs text-gray-400 block">Aylık İndirme Kotası</span>
+                                <span className="text-xs text-gray-400 block">
+                                    {checkoutPlan.type === 'extra' ? 'Ek İndirme Kotası' : 'Aylık İndirme Kotası'}
+                                </span>
                                 <span className="text-sm font-bold text-emerald-400 font-mono">
-                                    {checkoutPlan.monthly_quota_gb} GB / Ay
+                                    {checkoutPlan.monthly_quota_gb} GB {checkoutPlan.type === 'extra' ? '(30 Gün)' : '/ Ay'}
                                 </span>
                             </div>
                         </div>
@@ -616,4 +809,3 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
         </Layout>
     );
 }
-

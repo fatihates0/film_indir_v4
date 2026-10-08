@@ -264,7 +264,14 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                                         {props.auth?.quota && (
                                             <div className="mx-2 my-2 p-2.5 bg-slate-50 dark:bg-black/30 rounded-xl border border-slate-200 dark:border-white/5 space-y-1.5">
                                                 <div className="flex items-center justify-between text-[11px]">
-                                                    <span className="font-semibold text-slate-700 dark:text-gray-300">{props.auth.quota.plan_name}</span>
+                                                    <span className="font-semibold text-slate-700 dark:text-gray-300 flex items-center gap-1">
+                                                        {props.auth.quota.plan_name}
+                                                        {props.auth.quota.active_extra_quotas?.length > 0 && (
+                                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                                                                + Ek Kota
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                     <span className="text-[#00B074] font-bold">{props.auth.quota.formatted_remaining}</span>
                                                 </div>
                                                 <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
