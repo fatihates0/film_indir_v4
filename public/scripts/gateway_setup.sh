@@ -1740,6 +1740,24 @@ function isCloudflareIp(ip) {
     if (parts[0] === 173 && parts[1] === 245 && parts[2] >= 48 && parts[2] <= 63) return true;
     // 198.41.128.0 - 198.41.255.255
     if (parts[0] === 198 && parts[1] === 41 && parts[2] >= 128) return true;
+    // 108.162.192.0 - 108.162.255.255
+    if (parts[0] === 108 && parts[1] === 162 && parts[2] >= 192) return true;
+    // 141.101.64.0 - 141.101.127.255
+    if (parts[0] === 141 && parts[1] === 101 && parts[2] >= 64 && parts[2] <= 127) return true;
+    // 188.114.96.0 - 188.114.111.255
+    if (parts[0] === 188 && parts[1] === 114 && parts[2] >= 96 && parts[2] <= 111) return true;
+    // 190.93.240.0 - 190.93.255.255
+    if (parts[0] === 190 && parts[1] === 93 && parts[2] >= 240) return true;
+    // 197.234.240.0 - 197.234.243.255
+    if (parts[0] === 197 && parts[1] === 234 && parts[2] >= 240 && parts[2] <= 243) return true;
+    // 103.21.244.0 - 103.21.247.255
+    if (parts[0] === 103 && parts[1] === 21 && parts[2] >= 244 && parts[2] <= 247) return true;
+    // 103.22.200.0 - 103.22.203.255
+    if (parts[0] === 103 && parts[1] === 22 && parts[2] >= 200 && parts[2] <= 203) return true;
+    // 103.31.4.0 - 103.31.7.255
+    if (parts[0] === 103 && parts[1] === 31 && parts[2] >= 4 && parts[2] <= 7) return true;
+    // 131.0.72.0 - 131.0.75.255
+    if (parts[0] === 131 && parts[1] === 0 && parts[2] >= 72 && parts[2] <= 75) return true;
 
     return false;
 }

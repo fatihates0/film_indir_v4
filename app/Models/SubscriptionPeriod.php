@@ -176,7 +176,7 @@ class SubscriptionPeriod extends Model
     }
 
     /**
-     * Format raw bytes into human readable format (GB / MB / TB).
+     * Format raw bytes into human readable format, capping maximum unit at GB.
      */
     public static function formatBytes(int $bytes, int $precision = 2): string
     {
@@ -184,12 +184,16 @@ class SubscriptionPeriod extends Model
             return '0 GB';
         }
 
-        $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-        $power = $bytes > 0 ? floor(log($bytes, 1024)) : 0;
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $power = $bytes > 0 ? (int) floor(log($bytes, 1024)) : 0;
         $power = min($power, count($units) - 1);
 
         $value = $bytes / pow(1024, $power);
+        $formatted = number_format($value, $precision, ',', '.');
+        if (str_ends_with($formatted, ',00')) {
+            $formatted = substr($formatted, 0, -3);
+        }
 
-        return number_format($value, $precision, ',', '.').' '.$units[$power];
+        return $formatted.' '.$units[$power];
     }
 }
