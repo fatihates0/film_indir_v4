@@ -1694,6 +1694,9 @@ function checkActiveWithLaravel(downloadInfo, callback) {
                     if (data && data.allowed === false) {
                         return callback(null, false, data);
                     }
+                    if (data && data.speed_limit_mbps !== undefined) {
+                        downloadInfo.speed_limit_mbps = data.speed_limit_mbps;
+                    }
                     callback(null, true);
                 } catch (e) {
                     callback(null, true);

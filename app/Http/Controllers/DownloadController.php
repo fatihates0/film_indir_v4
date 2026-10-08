@@ -230,6 +230,11 @@ class DownloadController extends Controller
             $ticket->update(['status' => 'active']);
         }
 
-        return response()->json(['allowed' => true]);
+        $speedLimitMbps = $this->subscriptionService->getSpeedLimitMbps($user);
+
+        return response()->json([
+            'allowed' => true,
+            'speed_limit_mbps' => $speedLimitMbps,
+        ]);
     }
 }
