@@ -1374,6 +1374,8 @@ export default function PlansIndex({
                                             />
                                         </div>
                                     </div>
+                                </div>
+
                                 {/* Allowed Durations Toggle */}
                                 <div className="space-y-2 pt-2 border-t border-white/[0.06]">
                                     <label className="block text-xs font-semibold text-gray-300">
