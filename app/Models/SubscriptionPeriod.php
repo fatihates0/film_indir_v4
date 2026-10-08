@@ -189,11 +189,7 @@ class SubscriptionPeriod extends Model
         $power = min($power, count($units) - 1);
 
         $value = $bytes / pow(1024, $power);
-        $formatted = number_format($value, $precision, ',', '.');
-        if (str_ends_with($formatted, ',00')) {
-            $formatted = substr($formatted, 0, -3);
-        }
 
-        return $formatted.' '.$units[$power];
+        return number_format($value, $precision, ',', '.').' '.$units[$power];
     }
 }
