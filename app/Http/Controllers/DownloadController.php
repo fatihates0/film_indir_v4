@@ -147,6 +147,7 @@ class DownloadController extends Controller
         $filename = $mediaFile->name;
 
         $maxParallel = $this->subscriptionService->getMaxParallelDownloads($user);
+        $speedLimitMbps = $this->subscriptionService->getSpeedLimitMbps($user);
         $ticket->update(['status' => 'active']);
         $gatewayUrl = $this->gatewayService->generateGatewayUrl(
             $box,
@@ -155,7 +156,8 @@ class DownloadController extends Controller
             180,
             $ticket->token,
             $mediaFile->id,
-            $maxParallel
+            $maxParallel,
+            $speedLimitMbps
         );
 
         Log::info("İndirme Başlatıldı: Kullanıcı '{$user->name}' ({$user->email}), '{$filename}' dosyasını 'Storage Gateway' yöntemiyle indirmeyi başlattı.", [

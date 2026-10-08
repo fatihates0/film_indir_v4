@@ -189,9 +189,10 @@ class StorageGatewayService
         int $ttlMinutes = 180,
         ?string $ticketToken = null,
         ?int $mediaFileId = null,
-        ?int $maxParallelDownloads = null
+        ?int $maxParallelDownloads = null,
+        ?int $speedLimitMbps = null
     ): string {
-        return $this->tokenService->generateDownloadUrl($filePath, $userId, $box, $ttlMinutes, $ticketToken, $mediaFileId, $maxParallelDownloads);
+        return $this->tokenService->generateDownloadUrl($filePath, $userId, $box, $ttlMinutes, $ticketToken, $mediaFileId, $maxParallelDownloads, $speedLimitMbps);
     }
 
     /**
@@ -204,9 +205,10 @@ class StorageGatewayService
         int $ttlMinutes = 180,
         ?string $ticketToken = null,
         ?int $mediaFileId = null,
-        ?int $maxParallelDownloads = null
+        ?int $maxParallelDownloads = null,
+        ?int $speedLimitMbps = null
     ): string {
-        return $this->generateGatewayUrl($box, $filePath, $userId, $ttlMinutes, $ticketToken, $mediaFileId, $maxParallelDownloads);
+        return $this->generateGatewayUrl($box, $filePath, $userId, $ttlMinutes, $ticketToken, $mediaFileId, $maxParallelDownloads, $speedLimitMbps);
     }
 
     /**

@@ -269,6 +269,23 @@ class SubscriptionService
     }
 
     /**
+     * Get maximum allowed download speed limit in Mbps for a user (null means unlimited).
+     */
+    public function getSpeedLimitMbps(User $user): ?int
+    {
+        if ($user->isAdmin()) {
+            return null;
+        }
+
+        $period = $this->getCurrentPeriod($user);
+        if ($period && $period->subscription && $period->subscription->plan) {
+            return $period->subscription->plan->speed_limit_mbps;
+        }
+
+        return null;
+    }
+
+    /**
      * Get the count of distinct active media files currently being downloaded by a user.
      */
     public function getActiveParallelDownloadsCount(User $user, ?int $excludeMediaFileId = null): int
@@ -344,6 +361,7 @@ class SubscriptionService
                 'can_download' => true,
                 'max_parallel_downloads' => 99,
                 'active_parallel_downloads' => 0,
+                'speed_limit_mbps' => null,
             ];
         }
 
@@ -368,6 +386,7 @@ class SubscriptionService
                 'can_download' => false,
                 'max_parallel_downloads' => $this->getMaxParallelDownloads($user),
                 'active_parallel_downloads' => $this->getActiveParallelDownloadsCount($user),
+                'speed_limit_mbps' => null,
             ];
         }
 
@@ -379,6 +398,7 @@ class SubscriptionService
         $periodEndFormatted = $subscription->is_perpetual ? 'Süresiz (Sınırsız Süre)' : $period->period_end->format('d.m.Y H:i');
         $maxParallel = $this->getMaxParallelDownloads($user);
         $activeParallel = $this->getActiveParallelDownloadsCount($user);
+        $speedLimit = $this->getSpeedLimitMbps($user);
 
         return [
             'has_subscription' => true,
@@ -399,6 +419,7 @@ class SubscriptionService
             'can_download' => $period->hasAvailableQuota(),
             'max_parallel_downloads' => $maxParallel,
             'active_parallel_downloads' => $activeParallel,
+            'speed_limit_mbps' => $speedLimit,
         ];
     }
 }

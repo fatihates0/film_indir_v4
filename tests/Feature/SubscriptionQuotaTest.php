@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\StorageBoxProtocol;
 use App\Enums\UserRole;
 use App\Models\DownloadTicket;
 use App\Models\MediaFile;
@@ -576,5 +577,60 @@ class SubscriptionQuotaTest extends TestCase
             'allowed' => false,
             'code' => 'PARALLEL_LIMIT_EXCEEDED',
         ]);
+    }
+
+    public function test_download_token_includes_speed_limit_mbps_from_user_plan(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+        $plan->update(['speed_limit_mbps' => 10]);
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+
+        $this->assertEquals(10, $service->getSpeedLimitMbps($user));
+
+        $box = StorageBox::create([
+            'name' => 'Gateway Box 1',
+            'protocol' => StorageBoxProtocol::CustomGateway,
+            'host' => '1.2.3.4',
+            'port' => 8080,
+            'username' => 'root',
+            'password' => 'secret123',
+            'is_active' => true,
+        ]);
+
+        $file = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'LimitedSpeedMovie.mkv',
+            'path' => '/movies/LimitedSpeedMovie.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 1000000,
+        ]);
+
+        $ticket = DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file->id,
+            'bytes_downloaded' => 0,
+            'status' => 'pending',
+            'expires_at' => now()->addHours(3),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('downloads.stream', ['token' => $ticket->token]));
+
+        $response->assertStatus(302);
+        $redirectUrl = $response->getTargetUrl();
+
+        // Extract token parameter from redirect URL
+        $parsed = parse_url($redirectUrl);
+        parse_str($parsed['query'], $queryParams);
+        $rawToken = $queryParams['token'];
+
+        $parts = explode('.', $rawToken);
+        $payload = json_decode(base64_decode($parts[0]), true);
+
+        $this->assertEquals(10, $payload['speed_limit_mbps']);
     }
 }

@@ -1741,6 +1741,9 @@ app.get('/download', verifyToken, (req, res) => {
     res.on('close', triggerReport);
     res.on('finish', triggerReport);
 
+    const speedLimitMbps = parseInt(req.downloadInfo.speed_limit_mbps || 0, 10);
+    const speedLimitBytesPerSec = speedLimitMbps > 0 ? (speedLimitMbps * 125000) : 0;
+
     if (range) {
         const parts = range.replace(/bytes=/, "").split("-");
         const start = parseInt(parts[0], 10);
@@ -1760,6 +1763,9 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Type': 'application/octet-stream',
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
+        if (speedLimitBytesPerSec > 0) {
+            head['X-Accel-Limit-Rate'] = speedLimitBytesPerSec.toString();
+        }
 
         res.writeHead(206, head);
         file.on('data', (chunk) => {
@@ -1772,6 +1778,9 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Type': 'application/octet-stream',
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
+        if (speedLimitBytesPerSec > 0) {
+            head['X-Accel-Limit-Rate'] = speedLimitBytesPerSec.toString();
+        }
         res.writeHead(200, head);
         const stream = fs.createReadStream(fullPath, { highWaterMark: 256 * 1024 });
         stream.on('data', (chunk) => {

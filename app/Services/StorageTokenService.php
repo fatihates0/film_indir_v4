@@ -85,7 +85,8 @@ class StorageTokenService
         int $ttlMinutes = 180,
         ?string $ticketToken = null,
         ?int $mediaFileId = null,
-        ?int $maxParallelDownloads = null
+        ?int $maxParallelDownloads = null,
+        ?int $speedLimitMbps = null
     ): string {
         $appUrl = config('services.storage.app_url', config('app.url', url('/')));
 
@@ -111,6 +112,10 @@ class StorageTokenService
 
         if ($maxParallelDownloads !== null) {
             $extraPayload['max_parallel_downloads'] = $maxParallelDownloads;
+        }
+
+        if ($speedLimitMbps !== null && $speedLimitMbps > 0) {
+            $extraPayload['speed_limit_mbps'] = $speedLimitMbps;
         }
 
         return $this->generateApiUrl('/download', $userId, $storageBox, $ttlMinutes, $extraPayload);
