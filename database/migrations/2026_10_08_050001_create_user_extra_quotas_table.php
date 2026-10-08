@@ -18,8 +18,8 @@ return new class extends Migration
             $table->string('name');
             $table->unsignedBigInteger('allocated_bytes');
             $table->unsignedBigInteger('used_bytes')->default(0);
-            $table->timestamp('starts_at');
-            $table->timestamp('expires_at');
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
             $table->string('status')->default('active'); // active, exhausted, expired
             $table->decimal('price_paid', 10, 2)->default(0);
             $table->text('notes')->nullable();

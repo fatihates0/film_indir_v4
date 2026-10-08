@@ -139,12 +139,12 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                 key={plan.id}
                 className={`relative rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 ${
                     isBusinessPlan
-                        ? 'bg-gradient-to-b from-[#1E1912] to-[#12100C] border-2 border-amber-500/80 shadow-2xl shadow-amber-500/10'
+                        ? 'bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-amber-500/10 dark:from-[#1E1912] dark:to-[#12100C] border-2 border-amber-500/80 shadow-2xl shadow-amber-500/10'
                         : isExtraPlan
-                            ? 'bg-gradient-to-b from-[#101B2B] to-[#0D1420] border border-sky-500/50 hover:border-sky-400 shadow-xl'
+                            ? 'bg-gradient-to-b from-sky-50 to-white dark:from-[#101B2B] dark:to-[#0D1420] border border-sky-500/50 hover:border-sky-400 shadow-xl'
                             : isFeatured
-                                ? 'bg-gradient-to-b from-[#161D2B] to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
-                                : 'bg-[#121620] border border-white/10 hover:border-white/20'
+                                ? 'bg-gradient-to-b from-emerald-50 to-white dark:from-[#161D2B] dark:to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
+                                : 'bg-white dark:bg-[#121620] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 shadow-md dark:shadow-none'
                 }`}
             >
                 {/* Badges */}
@@ -168,83 +168,83 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                     {/* Plan Header */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{plan.name}</h3>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                                 isBusinessPlan
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
                                     : isExtraPlan
-                                        ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
-                                        : 'bg-[#00B074]/10 text-[#00B074] border-[#00B074]/20'
+                                        ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30'
+                                        : 'bg-[#00B074]/10 text-[#00B074] border-[#00B074]/30'
                             }`}>
                                 {plan.type_label}
                             </span>
                         </div>
-                        <p className="text-xs text-gray-400 line-clamp-2">{plan.description}</p>
+                        <p className="text-xs text-slate-600 dark:text-gray-400 line-clamp-2">{plan.description}</p>
                     </div>
 
                     {/* Quota Badge */}
-                    <div className="py-3 px-4 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                    <div className="py-3 px-4 rounded-2xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/5 flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                            <HardDrive className={`w-5 h-5 ${isBusinessPlan ? 'text-amber-400' : isExtraPlan ? 'text-sky-400' : 'text-[#00B074]'}`} />
-                            <span className="text-xs text-gray-300">
+                            <HardDrive className={`w-5 h-5 ${isBusinessPlan ? 'text-amber-500 dark:text-amber-400' : isExtraPlan ? 'text-sky-500 dark:text-sky-400' : 'text-[#00B074]'}`} />
+                            <span className="text-xs text-slate-700 dark:text-gray-300">
                                 {isExtraPlan ? 'Ek Transfer Kotası' : 'Aylık İndirme Kotası'}
                             </span>
                         </div>
-                        <span className="text-lg font-black text-white">{plan.formatted_quota}</span>
+                        <span className="text-lg font-black text-slate-900 dark:text-white">{plan.formatted_quota}</span>
                     </div>
 
                     {/* Price */}
                     <div className="space-y-1">
                         <div className="flex items-baseline gap-1">
-                            <span className="text-3xl sm:text-4xl font-black text-white">₺{price}</span>
-                            <span className="text-xs text-gray-400 font-medium">
+                            <span className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">₺{price}</span>
+                            <span className="text-xs text-slate-500 dark:text-gray-400 font-medium">
                                 / {isExtraPlan ? '30 Gün' : `${selectedDuration} Ay`}
                             </span>
                         </div>
                         {!isExtraPlan && selectedDuration > 1 && (
-                            <p className="text-[11px] text-[#00B074]">
+                            <p className="text-[11px] text-[#00B074] font-medium">
                                 Aylık ~₺{monthlyEquivalent} denk gelir
                             </p>
                         )}
                     </div>
 
                     {/* Features List */}
-                    <ul className="space-y-3 pt-2 text-xs text-gray-300">
+                    <ul className="space-y-3 pt-2 text-xs text-slate-700 dark:text-gray-300">
                         {isBusinessPlan ? (
                             <>
-                                <li className="flex items-center gap-2.5 font-bold text-amber-300">
-                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                <li className="flex items-center gap-2.5 font-bold text-amber-700 dark:text-amber-300">
+                                    <Check className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
                                     <span>Sunucu / VPS IP adreslerinden indirme izni</span>
                                 </li>
-                                <li className="flex items-center gap-2.5 font-bold text-amber-300">
-                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                <li className="flex items-center gap-2.5 font-bold text-amber-700 dark:text-amber-300">
+                                    <Check className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
                                     <span>Sınırsız Eşzamanlı Paralel Bağlantı</span>
                                 </li>
                                 <li className="flex items-center gap-2.5">
-                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                                    <span><strong>{plan.formatted_quota}</strong> dev aylık transfer kotası</span>
+                                    <Check className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+                                    <span><strong className="text-slate-900 dark:text-white">{plan.formatted_quota}</strong> dev aylık transfer kotası</span>
                                 </li>
                                 <li className="flex items-center gap-2.5">
-                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <Check className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
                                     <span>1 Gbps yüksek hızlı kurumsal omurga</span>
                                 </li>
                             </>
                         ) : isExtraPlan ? (
                             <>
-                                <li className="flex items-center gap-2.5 font-bold text-sky-300">
-                                    <Check className="w-4 h-4 text-sky-400 shrink-0" />
-                                    <span><strong>{plan.formatted_quota}</strong> anında tanımlanan ek kota</span>
+                                <li className="flex items-center gap-2.5 font-bold text-sky-700 dark:text-sky-300">
+                                    <Check className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
+                                    <span><strong className="text-slate-900 dark:text-white">{plan.formatted_quota}</strong> anında tanımlanan ek kota</span>
                                 </li>
-                                <li className="flex items-center gap-2.5 font-bold text-sky-300">
-                                    <Check className="w-4 h-4 text-sky-400 shrink-0" />
+                                <li className="flex items-center gap-2.5 font-bold text-sky-700 dark:text-sky-300">
+                                    <Check className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
                                     <span>İlk Önce Bu Kota Harcanır (Öncelikli)</span>
                                 </li>
                                 <li className="flex items-center gap-2.5">
-                                    <Check className="w-4 h-4 text-sky-400 shrink-0" />
+                                    <Check className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
                                     <span>Satın alma tarihinden itibaren 30 gün geçerli</span>
                                 </li>
-                                <li className="flex items-center gap-2.5 text-gray-400">
-                                    <UserCheck className="w-4 h-4 text-sky-400 shrink-0" />
+                                <li className="flex items-center gap-2.5 text-slate-500 dark:text-gray-400">
+                                    <UserCheck className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
                                     <span>Aktif ana paket aboneleri yararlanabilir</span>
                                 </li>
                             </>
@@ -252,7 +252,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                             <>
                                 <li className="flex items-center gap-2.5">
                                     <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                    <span><strong>{plan.formatted_quota}</strong> aylık transfer hakkı</span>
+                                    <span><strong className="text-slate-900 dark:text-white">{plan.formatted_quota}</strong> aylık transfer hakkı</span>
                                 </li>
                                 <li className="flex items-center gap-2.5">
                                     <Check className="w-4 h-4 text-[#00B074] shrink-0" />
@@ -260,7 +260,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                 </li>
                                 <li className="flex items-center gap-2.5">
                                     <Check className="w-4 h-4 text-[#00B074] shrink-0" />
-                                    <span><strong>{plan.max_parallel_downloads}</strong> adet eşzamanlı paralel bağlantı</span>
+                                    <span><strong className="text-slate-900 dark:text-white">{plan.max_parallel_downloads}</strong> adet eşzamanlı paralel bağlantı</span>
                                 </li>
                                 <li className="flex items-center gap-2.5">
                                     <Check className="w-4 h-4 text-[#00B074] shrink-0" />
@@ -277,10 +277,10 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                         <button
                             type="button"
                             disabled
-                            className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold bg-gray-800 text-gray-400 border border-white/5 flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                            className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold bg-slate-200 dark:bg-gray-800 text-slate-500 dark:text-gray-400 border border-slate-300 dark:border-white/5 flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
                             title="Ek kota satın alabilmek için aktif bir ana paketinizin bulunması gerekmektedir."
                         >
-                            <Lock className="w-4 h-4 text-gray-500" />
+                            <Lock className="w-4 h-4 text-slate-400 dark:text-gray-500" />
                             <span>Aktif Paket Gerekli</span>
                         </button>
                     ) : (
@@ -294,7 +294,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                         ? 'bg-sky-500 hover:bg-sky-600 text-white shadow-xl shadow-sky-500/20'
                                         : isFeatured
                                             ? 'bg-[#00B074] hover:bg-[#009663] text-white shadow-xl shadow-[#00B074]/30'
-                                            : 'bg-white/10 hover:bg-white/20 text-white'
+                                            : 'bg-slate-900 dark:bg-white/10 hover:bg-slate-800 dark:hover:bg-white/20 text-white'
                             }`}
                         >
                             <span>{isExtraPlan ? 'Ek Kota Satın Al' : 'Paket Seç & Öde'}</span>
@@ -310,42 +310,42 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
         <Layout>
             <Head title="İndirme Paketleri & Üyelikler - SineKutu" />
 
-            <div className="min-h-screen bg-[#0A0D14] text-gray-200 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="min-h-screen bg-[#f4f5f8] dark:bg-[#0A0D14] text-slate-800 dark:text-gray-200 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
                 <div className="max-w-7xl mx-auto space-y-16">
                     
                     {/* CURRENT USER QUOTA BANNER */}
                     {user && quota && quota.has_subscription && (
-                        <div className="bg-gradient-to-r from-[#00B074]/15 via-emerald-950/20 to-[#00B074]/5 border border-[#00B074]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden space-y-4">
+                        <div className="bg-gradient-to-r from-[#00B074]/10 via-emerald-500/10 to-[#00B074]/5 dark:from-[#00B074]/15 dark:via-emerald-950/20 dark:to-[#00B074]/5 bg-white dark:bg-emerald-950/10 border border-[#00B074]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden space-y-4">
                             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#00B074] text-white flex items-center gap-1">
                                             <Sparkles className="w-3 h-3" /> Aktif Paketiniz
                                         </span>
-                                        <h3 className="text-xl font-bold text-white">{quota.plan_name}</h3>
+                                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">{quota.plan_name}</h3>
                                         {quota.allows_vps_access && (
-                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                                 Sunucu/VPS Erişimi Aktif
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-gray-400">
-                                        Kota yenilenme tarihi: <strong className="text-gray-200">{quota.period_end_formatted || 'Süresiz'}</strong>
+                                    <p className="text-xs text-slate-600 dark:text-gray-400">
+                                        Kota yenilenme tarihi: <strong className="text-slate-900 dark:text-gray-200">{quota.period_end_formatted || 'Süresiz'}</strong>
                                     </p>
                                 </div>
 
                                 <div className="w-full md:w-80 space-y-2">
                                     <div className="flex justify-between text-xs font-semibold">
-                                        <span className="text-gray-400">Toplam Kalan Kota</span>
+                                        <span className="text-slate-600 dark:text-gray-400">Toplam Kalan Kota</span>
                                         <span className="text-[#00B074] font-bold">{quota.formatted_remaining} / {quota.formatted_allocated}</span>
                                     </div>
-                                    <div className="w-full bg-black/40 h-2.5 rounded-full overflow-hidden border border-white/5">
+                                    <div className="w-full bg-slate-200 dark:bg-black/40 h-2.5 rounded-full overflow-hidden border border-slate-300 dark:border-white/5">
                                         <div 
                                             className="bg-gradient-to-r from-[#00B074] to-emerald-400 h-full rounded-full transition-all duration-500"
                                             style={{ width: `${quota.usage_percentage}%` }}
                                         />
                                     </div>
-                                    <div className="flex justify-between text-[11px] text-gray-400">
+                                    <div className="flex justify-between text-[11px] text-slate-600 dark:text-gray-400">
                                         <span>Kullanılan: {quota.formatted_used}</span>
                                         <span>%{quota.usage_percentage} Dolu</span>
                                     </div>
@@ -354,23 +354,23 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                             {/* Active Extra Quotas Breakdown */}
                             {quota.active_extra_quotas && quota.active_extra_quotas.length > 0 && (
-                                <div className="pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                <div className="pt-3 border-t border-slate-200 dark:border-white/10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                     {quota.active_extra_quotas.map((eq) => (
-                                        <div key={eq.id} className="p-3 rounded-xl bg-black/40 border border-[#00B074]/30 flex items-center justify-between gap-3 text-xs">
+                                        <div key={eq.id} className="p-3 rounded-xl bg-slate-50 dark:bg-black/40 border border-[#00B074]/30 flex items-center justify-between gap-3 text-xs">
                                             <div>
-                                                <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                                                <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300">
                                                     <PlusCircle className="w-3.5 h-3.5" />
                                                     <span>{eq.name}</span>
                                                 </div>
-                                                <span className="text-[10px] text-gray-400 block mt-0.5">
-                                                    Son Kullanma: <strong className="text-gray-200">{eq.expires_at_formatted}</strong>
+                                                <span className="text-[10px] text-slate-500 dark:text-gray-400 block mt-0.5">
+                                                    Son Kullanma: <strong className="text-slate-800 dark:text-gray-200">{eq.expires_at_formatted}</strong>
                                                 </span>
                                             </div>
                                             <div className="text-right shrink-0">
                                                 <span className="text-xs font-black text-[#00B074] block">
                                                     {eq.formatted_remaining}
                                                 </span>
-                                                <span className="text-[9px] text-gray-400 block">Öncelikli Kota</span>
+                                                <span className="text-[9px] text-slate-500 dark:text-gray-400 block">Öncelikli Kota</span>
                                             </div>
                                         </div>
                                     ))}
@@ -384,16 +384,16 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                         <span className="px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#00B074]/10 border border-[#00B074]/30 text-[#00B074] inline-flex items-center gap-2">
                             <Sparkles className="w-3.5 h-3.5" /> Yüksek Hızlı İndirme Paketleri
                         </span>
-                        <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
+                        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                             İhtiyacınıza Uygun <span className="text-[#00B074]">İndirme Paketleri</span>
                         </h1>
-                        <p className="text-sm sm:text-base text-gray-400">
+                        <p className="text-sm sm:text-base text-slate-600 dark:text-gray-400">
                             Bireysel, Business veya Ek Kota seçeneklerimizden dilediğinizi tercih edebilirsiniz. Yalnızca indirdiğiniz tam bayt kotanızdan düşer.
                         </p>
 
                         {/* GLOBAL DURATION TOGGLE (FOR INDIVIDUAL & BUSINESS) */}
                         <div className="pt-6 flex justify-center">
-                            <div className="bg-[#121620] p-1.5 rounded-2xl border border-white/10 flex items-center gap-1 max-w-md w-full">
+                            <div className="bg-slate-200/80 dark:bg-[#121620] p-1.5 rounded-2xl border border-slate-300/80 dark:border-white/10 flex items-center gap-1 max-w-md w-full">
                                 {durationOptions.map((opt) => (
                                     <button
                                         key={opt.months}
@@ -402,7 +402,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                         className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${
                                             selectedDuration === opt.months
                                                 ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
-                                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                                : 'text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/60 dark:hover:bg-white/5'
                                         }`}
                                     >
                                         {opt.label}
@@ -419,18 +419,18 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                     {/* SECTION 1: BİREYSEL PAKETLER */}
                     <div className="space-y-6 pt-4">
-                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-white/10">
                             <div className="w-10 h-10 rounded-2xl bg-[#00B074]/15 text-[#00B074] border border-[#00B074]/30 flex items-center justify-center">
                                 <HardDrive className="w-5 h-5" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                     <span>Bireysel Paketler</span>
                                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00B074]/20 text-[#00B074] border border-[#00B074]/30">
                                         Standart Ev & Mobil Kullanım
                                     </span>
                                 </h2>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-slate-600 dark:text-gray-400">
                                     Kişisel indirmeleriniz için yüksek hızlı ve uygun fiyatlı aylık transfer paketleri.
                                 </p>
                             </div>
@@ -438,7 +438,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-2">
                             {individualPlans.length === 0 ? (
-                                <div className="col-span-full py-8 text-center text-gray-400 bg-[#121620] rounded-3xl border border-white/5 text-xs">
+                                <div className="col-span-full py-8 text-center text-slate-500 dark:text-gray-400 bg-white dark:bg-[#121620] rounded-3xl border border-slate-200 dark:border-white/5 text-xs">
                                     Bireysel paket bulunmamaktadır.
                                 </div>
                             ) : (
@@ -449,18 +449,18 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                     {/* SECTION 2: BUSINESS PAKETLER */}
                     <div className="space-y-6 pt-6">
-                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
-                            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                        <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-white/10">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center">
                                 <Server className="w-5 h-5" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                     <span>Business Paketler</span>
-                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                                         Sunucu & VPS Destekli
                                     </span>
                                 </h2>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-slate-600 dark:text-gray-400">
                                     Sunucu / VPS IP adreslerine izin veren, yüksek kotalı ve eşzamanlı indirme sınırı olmayan profesyonel paketler.
                                 </p>
                             </div>
@@ -468,7 +468,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-2">
                             {businessPlans.length === 0 ? (
-                                <div className="col-span-full py-8 text-center text-gray-400 bg-[#121620] rounded-3xl border border-white/5 text-xs">
+                                <div className="col-span-full py-8 text-center text-slate-500 dark:text-gray-400 bg-white dark:bg-[#121620] rounded-3xl border border-slate-200 dark:border-white/5 text-xs">
                                     Business paket bulunmamaktadır.
                                 </div>
                             ) : (
@@ -479,29 +479,29 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                     {/* SECTION 3: EK KOTA PAKETLERİ */}
                     <div className="space-y-6 pt-6">
-                        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
-                            <div className="w-10 h-10 rounded-2xl bg-sky-500/15 text-sky-400 border border-sky-500/30 flex items-center justify-center">
+                        <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-white/10">
+                            <div className="w-10 h-10 rounded-2xl bg-sky-500/15 text-sky-500 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center">
                                 <PlusCircle className="w-5 h-5" />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                     <span>Ek Kota Paketleri</span>
-                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30">
                                         30 Gün Kullanım Süreli
                                     </span>
                                 </h2>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-slate-600 dark:text-gray-400">
                                     Ay içerisinde kotası biten aktif paketi olan kullanıcılarımız için öncelikli harcanan ek kota paketleri.
                                 </p>
                             </div>
                         </div>
 
                         {/* NOTICE BOX */}
-                        <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-start gap-3 text-xs text-sky-200">
-                            <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                        <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 flex items-start gap-3 text-xs text-sky-900 dark:text-sky-200">
+                            <Info className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                             <div className="space-y-1">
-                                <strong className="block text-white font-bold">Ek Kota Bilgilendirmesi:</strong>
-                                <p className="leading-relaxed">
+                                <strong className="block text-slate-900 dark:text-white font-bold">Ek Kota Bilgilendirmesi:</strong>
+                                <p className="leading-relaxed text-slate-700 dark:text-sky-200">
                                     Ek kota paketleri <strong>30 gün geçerlidir</strong> ve indirmelerinizde <strong>ilk olarak ek kotanız harcanır</strong>. Ek kota satın alabilmek için hesabınızda aktif bir Bireysel veya Business paketinin bulunması gerekmektedir.
                                 </p>
                             </div>
@@ -509,7 +509,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-2">
                             {extraPlans.length === 0 ? (
-                                <div className="col-span-full py-8 text-center text-gray-400 bg-[#121620] rounded-3xl border border-white/5 text-xs">
+                                <div className="col-span-full py-8 text-center text-slate-500 dark:text-gray-400 bg-white dark:bg-[#121620] rounded-3xl border border-slate-200 dark:border-white/5 text-xs">
                                     Ek kota paketi bulunmamaktadır.
                                 </div>
                             ) : (
@@ -519,10 +519,10 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                     </div>
 
                     {/* FAQ / SYSTEM INFO */}
-                    <div className="bg-[#121620] border border-white/5 rounded-3xl p-8 max-w-4xl mx-auto space-y-6">
+                    <div className="bg-white dark:bg-[#121620] border border-slate-200 dark:border-white/5 rounded-3xl p-8 max-w-4xl mx-auto space-y-6 shadow-sm dark:shadow-none">
                         <div className="text-center space-y-1">
-                            <h3 className="text-lg font-bold text-white">Sistem Nasıl Çalışır?</h3>
-                            <p className="text-xs text-gray-400">Şeffaf, adil ve tam bayt ölçümlü indirme altyapısı</p>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Sistem Nasıl Çalışır?</h3>
+                            <p className="text-xs text-slate-600 dark:text-gray-400">Şeffaf, adil ve tam bayt ölçümlü indirme altyapısı</p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
@@ -530,28 +530,28 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                 <div className="w-8 h-8 rounded-xl bg-[#00B074]/10 text-[#00B074] flex items-center justify-center font-bold text-xs">
                                     1
                                 </div>
-                                <h4 className="text-sm font-bold text-white">Gerçek Bayt Hesabı</h4>
-                                <p className="text-xs text-gray-400 leading-relaxed">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Gerçek Bayt Hesabı</h4>
+                                <p className="text-xs text-slate-600 dark:text-gray-400 leading-relaxed">
                                     10 GB'lık bir dosyanın indirilmesi yarıda kesilip 3 GB çekildiğinde kotanızdan asla 10 GB düşülmez. Tam olarak indirilen 3 GB sayılır.
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-xs">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
                                     2
                                 </div>
-                                <h4 className="text-sm font-bold text-white">Business & Sunucu IP</h4>
-                                <p className="text-xs text-gray-400 leading-relaxed">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Business & Sunucu IP</h4>
+                                <p className="text-xs text-slate-600 dark:text-gray-400 leading-relaxed">
                                     Business paketlerde Sunucu/VPS IP adreslerinden indirme engeline takılmadan yüksek omurga hızıyla sınırsız paralel indirme yapabilirsiniz.
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold text-xs">
+                                <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-xs">
                                     3
                                 </div>
-                                <h4 className="text-sm font-bold text-white">Ek Kota Önceliği</h4>
-                                <p className="text-xs text-gray-400 leading-relaxed">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Ek Kota Önceliği</h4>
+                                <p className="text-xs text-slate-600 dark:text-gray-400 leading-relaxed">
                                     Kotanız bittiğinde veya azaldığında ek kota alabilirsiniz. İndirme yaparken sistem ilk olarak 30 gün geçerli ek kotanızı tüketir.
                                 </p>
                             </div>
@@ -563,42 +563,42 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
             {/* CHECKOUT & PAYMENT NOTIFICATION MODAL */}
             {checkoutPlan && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                    <div className="bg-[#0D111A] border border-white/10 rounded-3xl max-w-xl w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh] space-y-5">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md">
+                    <div className="bg-white dark:bg-[#0D111A] border border-slate-200 dark:border-white/10 rounded-3xl max-w-xl w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh] space-y-5 text-slate-800 dark:text-gray-200">
                         
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.08]">
                             <div>
                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                                    checkoutPlan.type === 'business' ? 'text-amber-400' : checkoutPlan.type === 'extra' ? 'text-sky-400' : 'text-[#00B074]'
+                                    checkoutPlan.type === 'business' ? 'text-amber-600 dark:text-amber-400' : checkoutPlan.type === 'extra' ? 'text-sky-600 dark:text-sky-400' : 'text-[#00B074]'
                                 }`}>
                                     Sipariş ve Ödeme Bildirimi
                                 </span>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2 mt-0.5">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
                                     <span>{checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : `(${selectedDuration} Ay)`}</span>
                                 </h3>
                             </div>
                             <button
                                 onClick={() => setCheckoutPlan(null)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         {/* Order Summary Box */}
-                        <div className="p-4 rounded-2xl bg-[#07090E] border border-white/[0.06] flex items-center justify-between">
+                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
                             <div>
-                                <span className="text-xs text-gray-400 block">Ödenecek Tutar</span>
-                                <span className="text-2xl font-black text-white font-mono">
+                                <span className="text-xs text-slate-500 dark:text-gray-400 block">Ödenecek Tutar</span>
+                                <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
                                     ₺{getPrice(checkoutPlan, selectedDuration)}
                                 </span>
                             </div>
                             <div className="text-right">
-                                <span className="text-xs text-gray-400 block">
+                                <span className="text-xs text-slate-500 dark:text-gray-400 block">
                                     {checkoutPlan.type === 'extra' ? 'Ek İndirme Kotası' : 'Aylık İndirme Kotası'}
                                 </span>
-                                <span className="text-sm font-bold text-emerald-400 font-mono">
+                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                                     {checkoutPlan.monthly_quota_gb} GB {checkoutPlan.type === 'extra' ? '(30 Gün)' : '/ Ay'}
                                 </span>
                             </div>
@@ -606,14 +606,14 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                         {/* Payment Methods Selector Tabs */}
                         {paymentMethods.length === 0 ? (
-                            <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-3">
+                            <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-3">
                                 <AlertCircle className="w-5 h-5 shrink-0" />
                                 <span>Şu anda kullanılabilir ödeme yöntemi bulunmamaktadır. Lütfen yönetici ile iletişime geçiniz.</span>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmitPaymentNotice} className="space-y-5">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-2">
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-2">
                                         Ödeme Yöntemi Seçin *
                                     </label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -626,18 +626,18 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                                     onClick={() => setSelectedMethodId(pm.id)}
                                                     className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 ${
                                                         isSelected
-                                                            ? 'bg-[#00B074]/15 border-[#00B074] text-white shadow-lg shadow-[#00B074]/10'
-                                                            : 'bg-[#07090E] border-white/[0.08] text-gray-400 hover:text-gray-200 hover:border-white/20'
+                                                            ? 'bg-[#00B074]/10 dark:bg-[#00B074]/15 border-[#00B074] text-slate-900 dark:text-white shadow-lg shadow-[#00B074]/10'
+                                                            : 'bg-slate-50 dark:bg-[#07090E] border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:border-slate-300 dark:hover:border-white/20'
                                                     }`}
                                                 >
                                                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                                                        isSelected ? 'bg-[#00B074] text-white' : 'bg-white/5 text-gray-400'
+                                                        isSelected ? 'bg-[#00B074] text-white' : 'bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-gray-400'
                                                     }`}>
                                                         {pm.driver === 'bank' ? <Building2 className="w-5 h-5" /> : <Coins className="w-5 h-5" />}
                                                     </div>
                                                     <div>
-                                                        <span className="text-xs font-bold block text-white">{pm.name}</span>
-                                                        <span className="text-[10px] text-gray-400 block line-clamp-1">{pm.description}</span>
+                                                        <span className="text-xs font-bold block text-slate-900 dark:text-white">{pm.name}</span>
+                                                        <span className="text-[10px] text-slate-500 dark:text-gray-400 block line-clamp-1">{pm.description}</span>
                                                     </div>
                                                 </button>
                                             );
@@ -652,8 +652,8 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                     const settings = activeMethod.settings || {};
 
                                     return (
-                                        <div className="p-4 rounded-2xl bg-[#07090E] border border-white/[0.08] space-y-3">
-                                            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.08] space-y-3">
+                                            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/[0.06] pb-2">
                                                 <span className="text-xs font-bold text-[#00B074] flex items-center gap-1.5">
                                                     <Info className="w-4 h-4" />
                                                     {activeMethod.name} Hesap Bilgileri
@@ -663,17 +663,17 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             {activeMethod.driver === 'bank' && (
                                                 <div className="space-y-2 text-xs">
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-gray-400">Banka:</span>
-                                                        <span className="text-white font-semibold">{settings.bank_name || 'Banka Belirtilmedi'}</span>
+                                                        <span className="text-slate-500 dark:text-gray-400">Banka:</span>
+                                                        <span className="text-slate-900 dark:text-white font-semibold">{settings.bank_name || 'Banka Belirtilmedi'}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-gray-400">Alıcı (Hesap Sahibi):</span>
-                                                        <span className="text-white font-semibold">{settings.account_holder || '-'}</span>
+                                                        <span className="text-slate-500 dark:text-gray-400">Alıcı (Hesap Sahibi):</span>
+                                                        <span className="text-slate-900 dark:text-white font-semibold">{settings.account_holder || '-'}</span>
                                                     </div>
-                                                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between gap-2">
+                                                    <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.06] flex items-center justify-between gap-2">
                                                         <div>
-                                                            <span className="text-[10px] text-gray-500 block">IBAN Numarası</span>
-                                                            <span className="text-xs font-mono font-bold text-emerald-400 tracking-wider">
+                                                            <span className="text-[10px] text-slate-500 dark:text-gray-500 block">IBAN Numarası</span>
+                                                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
                                                                 {settings.iban || '-'}
                                                             </span>
                                                         </div>
@@ -681,9 +681,9 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleCopy(settings.iban, 'iban')}
-                                                                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
+                                                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
                                                             >
-                                                                {copiedField === 'iban' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                {copiedField === 'iban' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                                                                 <span>{copiedField === 'iban' ? 'Kopyalandı' : 'Kopyala'}</span>
                                                             </button>
                                                         )}
@@ -694,13 +694,13 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             {activeMethod.driver === 'crypto' && (
                                                 <div className="space-y-2 text-xs">
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-gray-400">Ağ (Network):</span>
-                                                        <span className="text-emerald-400 font-bold font-mono">{settings.network || 'TRC-20'}</span>
+                                                        <span className="text-slate-500 dark:text-gray-400">Ağ (Network):</span>
+                                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">{settings.network || 'TRC-20'}</span>
                                                     </div>
-                                                    <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between gap-2">
+                                                    <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.06] flex items-center justify-between gap-2">
                                                         <div className="overflow-hidden">
-                                                            <span className="text-[10px] text-gray-500 block">TRC-20 USDT Cüzdan Adresi</span>
-                                                            <span className="text-xs font-mono font-bold text-emerald-400 truncate block">
+                                                            <span className="text-[10px] text-slate-500 dark:text-gray-500 block">TRC-20 USDT Cüzdan Adresi</span>
+                                                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate block">
                                                                 {settings.wallet_address || '-'}
                                                             </span>
                                                         </div>
@@ -708,9 +708,9 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleCopy(settings.wallet_address, 'wallet')}
-                                                                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
+                                                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
                                                             >
-                                                                {copiedField === 'wallet' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                {copiedField === 'wallet' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                                                                 <span>{copiedField === 'wallet' ? 'Kopyalandı' : 'Kopyala'}</span>
                                                             </button>
                                                         )}
@@ -719,7 +719,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             )}
 
                                             {activeMethod.instructions && (
-                                                <div className="pt-2 text-[11px] text-gray-400 border-t border-white/[0.04] whitespace-pre-line leading-relaxed">
+                                                <div className="pt-2 text-[11px] text-slate-600 dark:text-gray-400 border-t border-slate-200 dark:border-white/[0.04] whitespace-pre-line leading-relaxed">
                                                     {activeMethod.instructions}
                                                 </div>
                                             )}
@@ -729,10 +729,10 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                                 {/* User Notice Form Fields */}
                                 <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-white">Ödeme Bildirimi Formu</h4>
+                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">Ödeme Bildirimi Formu</h4>
 
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                             Gönderen Ad Soyad veya Hesap Sahibi *
                                         </label>
                                         <input
@@ -741,12 +741,12 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             placeholder="Örn: Ahmet Yılmaz"
                                             value={senderName}
                                             onChange={(e) => setSenderName(e.target.value)}
-                                            className="w-full px-3.5 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074]"
+                                            className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                             TxID / İşlem Hash veya Dekont Referans No (Opsiyonel)
                                         </label>
                                         <input
@@ -754,12 +754,12 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             placeholder="Kripto TxID veya banka dekont referansı..."
                                             value={txHash}
                                             onChange={(e) => setTxHash(e.target.value)}
-                                            className="w-full px-3.5 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074]"
+                                            className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
                                             Not (Opsiyonel)
                                         </label>
                                         <input
@@ -767,23 +767,23 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             placeholder="Varsa eklemek istediğiniz not..."
                                             value={userNotes}
                                             onChange={(e) => setUserNotes(e.target.value)}
-                                            className="w-full px-3.5 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074]"
+                                            className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.08]">
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
                                     <button
                                         type="button"
                                         onClick={() => setCheckoutPlan(null)}
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] text-gray-300 text-xs font-semibold hover:bg-white/[0.08]"
+                                        className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-gray-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-white/[0.08]"
                                     >
                                         İptal
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isSubmittingNotice}
-                                        className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-lg shadow-[#00B074]/20 flex items-center gap-2"
+                                        className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-lg shadow-[#00B074]/20 flex items-center gap-2 cursor-pointer"
                                     >
                                         {isSubmittingNotice ? (
                                             <RefreshCw className="w-4 h-4 animate-spin" />
