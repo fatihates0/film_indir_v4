@@ -1275,8 +1275,33 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const Busboy = require('busboy');
+const { Transform } = require('stream');
 
 const app = express();
+
+function createThrottleStream(bytesPerSec) {
+    let startTime = Date.now();
+    let totalSent = 0;
+
+    return new Transform({
+        transform(chunk, encoding, callback) {
+            totalSent += chunk.length;
+            const expectedMs = (totalSent / bytesPerSec) * 1000;
+            const actualMs = Date.now() - startTime;
+            const waitMs = expectedMs - actualMs;
+
+            if (waitMs > 10) {
+                setTimeout(() => {
+                    this.push(chunk);
+                    callback();
+                }, waitMs);
+            } else {
+                this.push(chunk);
+                callback();
+            }
+        }
+    });
+}
 
 function getEnvConfig() {
     const envPath = path.join(__dirname, '.env');
@@ -1771,7 +1796,13 @@ app.get('/download', verifyToken, (req, res) => {
         file.on('data', (chunk) => {
             bytesSent += chunk.length;
         });
-        file.pipe(res);
+
+        if (speedLimitBytesPerSec > 0) {
+            const throttle = createThrottleStream(speedLimitBytesPerSec);
+            file.pipe(throttle).pipe(res);
+        } else {
+            file.pipe(res);
+        }
     } else {
         const head = {
             'Content-Length': fileSize,
@@ -1786,7 +1817,13 @@ app.get('/download', verifyToken, (req, res) => {
         stream.on('data', (chunk) => {
             bytesSent += chunk.length;
         });
-        stream.pipe(res);
+
+        if (speedLimitBytesPerSec > 0) {
+            const throttle = createThrottleStream(speedLimitBytesPerSec);
+            stream.pipe(throttle).pipe(res);
+        } else {
+            stream.pipe(res);
+        }
     }
     });
 });
