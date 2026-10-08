@@ -87,7 +87,7 @@ class DownloadController extends Controller
             'media_file_id' => $mediaFile->id,
             'subscription_period_id' => $activePeriod?->id,
             'bytes_downloaded' => 0,
-            'ip_address' => $request->ip(),
+            'ip_address' => $this->getCleanIp($request),
             'user_agent' => $request->userAgent(),
             'status' => 'pending',
             'expires_at' => now()->addHours(3),
@@ -122,17 +122,18 @@ class DownloadController extends Controller
             abort(403, 'Aylık indirme kotanız tükenmiş durumdadır.');
         }
 
+        $clientIp = $this->getCleanIp($request);
+
         // Check VPS / Datacenter IP restrictions
         if (! $user->isAdmin() && ! $this->subscriptionService->allowsVpsAccess($user)) {
-            $clientIp = $request->ip();
             if ($clientIp && $this->vpsDetectionService->isVpsIp($clientIp)) {
                 abort(403, 'Mevcut paketiniz ile VPS / Sunucu IP adreslerinden indirme yapılmasına izin verilmemektedir.');
             }
         }
 
         // Update ticket IP address with actual streaming client IP
-        if ($request->ip()) {
-            $ticket->update(['ip_address' => $request->ip()]);
+        if ($clientIp) {
+            $ticket->update(['ip_address' => $clientIp]);
         }
 
         $mediaFile = $ticket->mediaFile;
@@ -213,7 +214,7 @@ class DownloadController extends Controller
         $token = $request->input('token');
         $userId = $request->input('user_id');
         $mediaFileId = (int) $request->input('media_file_id');
-        $clientIp = $request->input('client_ip') ?: $request->ip();
+        $clientIp = $this->getCleanIp($request, $request->input('client_ip'));
 
         /** @var DownloadTicket|null $ticket */
         $ticket = null;
@@ -271,5 +272,82 @@ class DownloadController extends Controller
             'allowed' => true,
             'speed_limit_mbps' => $speedLimitMbps,
         ]);
+    }
+
+    /**
+     * Extract a clean IPv4 address from request headers or candidate IP.
+     * Strips IPv4-mapped IPv6 prefixes (::ffff:), filters out Cloudflare proxy IPs, and prefers real client IPv4.
+     */
+    protected function getCleanIp(Request $request, ?string $candidateIp = null): string
+    {
+        $headersToCheck = ['cf-connecting-ip', 'x-forwarded-for', 'x-real-ip', 'client-ip'];
+        foreach ($headersToCheck as $headerName) {
+            $headerValue = $request->header($headerName);
+            if (! empty($headerValue)) {
+                $ips = explode(',', $headerValue);
+                foreach ($ips as $ip) {
+                    $clean = trim(preg_replace('/^::ffff:/i', '', $ip));
+                    if (filter_var($clean, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                        if (! $this->isCloudflareOrProxyIp($clean)) {
+                            return $clean;
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($candidateIp) {
+            $cleanCandidate = trim(preg_replace('/^::ffff:/i', '', $candidateIp));
+            if (filter_var($cleanCandidate, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                if (! $this->isCloudflareOrProxyIp($cleanCandidate)) {
+                    return $cleanCandidate;
+                }
+            }
+        }
+
+        $directIp = trim(preg_replace('/^::ffff:/i', '', $request->ip() ?? ''));
+        if (filter_var($directIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            if (! $this->isCloudflareOrProxyIp($directIp)) {
+                return $directIp;
+            }
+        }
+
+        return $candidateIp ? trim(preg_replace('/^::ffff:/i', '', $candidateIp)) : $directIp;
+    }
+
+    /**
+     * Check if an IP address belongs to Cloudflare's known IPv4 proxy ranges.
+     */
+    protected function isCloudflareOrProxyIp(string $ip): bool
+    {
+        $long = ip2long($ip);
+        if ($long === false) {
+            return false;
+        }
+
+        $cfRanges = [
+            ['173.245.48.0', '173.245.63.255'],
+            ['103.21.244.0', '103.21.247.255'],
+            ['103.22.200.0', '103.22.203.255'],
+            ['103.31.4.0', '103.31.7.255'],
+            ['141.101.64.0', '141.101.127.255'],
+            ['108.162.192.0', '108.162.255.255'],
+            ['190.93.240.0', '190.93.255.255'],
+            ['188.114.96.0', '188.114.111.255'],
+            ['197.234.240.0', '197.234.243.255'],
+            ['198.41.128.0', '198.41.255.255'],
+            ['162.158.0.0', '162.159.255.255'],
+            ['104.16.0.0', '104.31.255.255'],
+            ['172.64.0.0', '172.71.255.255'],
+            ['131.0.72.0', '131.0.75.255'],
+        ];
+
+        foreach ($cfRanges as [$start, $end]) {
+            if ($long >= ip2long($start) && $long <= ip2long($end)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

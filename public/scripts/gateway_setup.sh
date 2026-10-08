@@ -1712,11 +1712,59 @@ function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
     }
 }
 
+function isCloudflareIp(ip) {
+    if (!ip || typeof ip !== 'string') return false;
+    const parts = ip.split('.').map(Number);
+    if (parts.length !== 4) return false;
+
+    // 172.64.0.0 - 172.71.255.255
+    if (parts[0] === 172 && parts[1] >= 64 && parts[1] <= 71) return true;
+    // 162.158.0.0 - 162.159.255.255
+    if (parts[0] === 162 && (parts[1] === 158 || parts[1] === 159)) return true;
+    // 104.16.0.0 - 104.31.255.255
+    if (parts[0] === 104 && parts[1] >= 16 && parts[1] <= 31) return true;
+    // 173.245.48.0 - 173.245.63.255
+    if (parts[0] === 173 && parts[1] === 245 && parts[2] >= 48 && parts[2] <= 63) return true;
+    // 198.41.128.0 - 198.41.255.255
+    if (parts[0] === 198 && parts[1] === 41 && parts[2] >= 128) return true;
+
+    return false;
+}
+
+function extractClientIpv4(req) {
+    const rawHeaders = [
+        req.headers['cf-connecting-ip'],
+        req.headers['x-forwarded-for'],
+        req.headers['x-real-ip'],
+        req.headers['client-ip']
+    ];
+
+    for (const header of rawHeaders) {
+        if (header) {
+            const parts = header.split(',').map(s => s.trim().replace(/^::ffff:/i, ''));
+            for (const ip of parts) {
+                if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ip)) {
+                    if (!isCloudflareIp(ip)) {
+                        return ip;
+                    }
+                }
+            }
+        }
+    }
+
+    let remote = (req.socket && req.socket.remoteAddress) ? req.socket.remoteAddress.replace(/^::ffff:/i, '') : '';
+    if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(remote)) {
+        return remote;
+    }
+
+    return remote;
+}
+
 app.get('/download', verifyToken, (req, res) => {
     const userId = req.downloadInfo.user_id;
     const mediaFileId = req.downloadInfo.media_file_id;
     const maxParallel = parseInt(req.downloadInfo.max_parallel_downloads || 0, 10);
-    const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+    const clientIp = extractClientIpv4(req);
 
     if (userId && maxParallel > 0) {
         const activeFilesCount = getActiveUserFileCount(userId, mediaFileId);
