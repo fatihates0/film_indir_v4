@@ -1276,6 +1276,7 @@ const http = require('http');
 const https = require('https');
 const Busboy = require('busboy');
 const { Transform } = require('stream');
+const { execFile } = require('child_process');
 
 const app = express();
 
@@ -1599,6 +1600,79 @@ app.get('/disks', verifyToken, (req, res) => {
 });
 
 
+function scanDisksWithFind(activeDisks, callback) {
+    if (!activeDisks || activeDisks.length === 0) {
+        return callback(null, []);
+    }
+
+    const validDisks = activeDisks.filter(d => {
+        try { return fs.existsSync(d); } catch (e) { return false; }
+    });
+
+    if (validDisks.length === 0) {
+        return callback(null, []);
+    }
+
+    const args = [...validDisks, '-type', 'f', '-printf', '%p\t%s\t%T@\n'];
+
+    execFile('find', args, { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
+        if (!stdout) {
+            return callback(err || new Error('Empty stdout'), null);
+        }
+
+        const fileListMap = new Map();
+        const lines = stdout.split('\n');
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const parts = line.split('\t');
+            if (parts.length < 3) continue;
+
+            const fullPath = parts[0];
+            const sizeBytes = parseInt(parts[1], 10) || 0;
+            const mtimeEpoch = parseFloat(parts[2]) || 0;
+
+            const itemName = path.basename(fullPath);
+            const ext = path.extname(itemName).toLowerCase().replace('.', '');
+
+            if (!VIDEO_EXTENSIONS.has(ext)) continue;
+
+            let matchedRoot = null;
+            for (const root of validDisks) {
+                if (fullPath.startsWith(root)) {
+                    matchedRoot = root;
+                    break;
+                }
+            }
+            if (!matchedRoot) continue;
+
+            let relativePath = fullPath.substring(matchedRoot.length);
+            if (!relativePath.startsWith('/')) {
+                relativePath = '/' + relativePath;
+            }
+            relativePath = relativePath.replace(/\\/g, '/');
+
+            const normalizedRelPath = relativePath;
+
+            if (!fileListMap.has(normalizedRelPath)) {
+                const dirPath = path.dirname(normalizedRelPath).replace(/\\/g, '/');
+                fileListMap.set(normalizedRelPath, {
+                    filename: itemName,
+                    path: normalizedRelPath,
+                    directory: dirPath === '.' ? '/' : (dirPath.startsWith('/') ? dirPath : '/' + dirPath),
+                    extension: ext,
+                    size_bytes: sizeBytes,
+                    modified_at: new Date(mtimeEpoch * 1000).toISOString()
+                });
+            }
+        }
+
+        callback(null, Array.from(fileListMap.values()));
+    });
+}
+
 function scanDirectory(dirPath, relativeDir, fileListMap, visited = new Set()) {
     try {
         if (!fs.existsSync(dirPath)) return;
@@ -1638,17 +1712,68 @@ function scanDirectory(dirPath, relativeDir, fileListMap, visited = new Set()) {
     } catch (err) {}
 }
 
+let cachedScanResult = null;
+let isScanningCache = false;
+let scanCallbacks = [];
+
+function updateScanCache(activeDisks, cb = null) {
+    if (cb) {
+        scanCallbacks.push(cb);
+    }
+
+    if (isScanningCache) {
+        return;
+    }
+    isScanningCache = true;
+
+    const notifyCallbacks = (err, result) => {
+        const callbacks = scanCallbacks;
+        scanCallbacks = [];
+        callbacks.forEach(fn => {
+            try { fn(err, result); } catch (e) {}
+        });
+    };
+
+    scanDisksWithFind(activeDisks, (err, files) => {
+        if (err || !files || files.length === 0) {
+            const fileListMap = new Map();
+            activeDisks.forEach((diskRoot) => {
+                scanDirectory(diskRoot, '/', fileListMap);
+            });
+            cachedScanResult = Array.from(fileListMap.values());
+        } else {
+            cachedScanResult = files;
+        }
+        isScanningCache = false;
+        notifyCallbacks(null, cachedScanResult);
+    });
+}
+
+setTimeout(() => {
+    try {
+        updateScanCache(getActiveStorageDisks());
+    } catch (e) {}
+}, 1000);
+
+setInterval(() => {
+    try {
+        updateScanCache(getActiveStorageDisks());
+    } catch (e) {}
+}, 10 * 60 * 1000);
+
 app.get('/scan', verifyToken, (req, res) => {
     try {
         const activeDisks = getActiveStorageDisks();
-        const fileListMap = new Map();
 
-        activeDisks.forEach((diskRoot) => {
-            scanDirectory(diskRoot, '/', fileListMap);
-        });
+        if (req.query.refresh === 'true' || !cachedScanResult) {
+            updateScanCache(activeDisks, (err, files) => {
+                const resultFiles = files || cachedScanResult || [];
+                return res.json({ success: true, count: resultFiles.length, files: resultFiles });
+            });
+            return;
+        }
 
-        const files = Array.from(fileListMap.values());
-        res.json({ success: true, count: files.length, files: files });
+        res.json({ success: true, count: cachedScanResult.length, files: cachedScanResult });
     } catch (err) {
         res.status(500).json({ success: false, error: 'Tarama hatasi: ' + err.message });
     }
