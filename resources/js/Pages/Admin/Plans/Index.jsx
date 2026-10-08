@@ -28,7 +28,8 @@ import {
     ToggleRight,
     Check,
     XCircle,
-    BellRing
+    BellRing,
+    Gauge
 } from 'lucide-react';
 
 export default function PlansIndex({ 
