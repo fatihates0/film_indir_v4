@@ -95,6 +95,7 @@ export default function PlansIndex({
         user_id: '',
         plan_id: 'custom', // plan ID or 'custom' or 'none'
         custom_quota_gb: 500,
+        custom_speed_limit_mbps: '',
         duration_type: '1', // '1', '3', '6', '12', 'custom', 'perpetual'
         custom_months: 1,
         price_paid: '',
@@ -316,6 +317,7 @@ export default function PlansIndex({
                 user_id: user.id,
                 plan_id: user.plan_id ? String(user.plan_id) : 'custom',
                 custom_quota_gb: user.quota_allocated_bytes ? Math.round(user.quota_allocated_bytes / (1024 * 1024 * 1024)) : 500,
+                custom_speed_limit_mbps: user.custom_speed_limit_mbps !== null && user.custom_speed_limit_mbps !== undefined ? user.custom_speed_limit_mbps : '',
                 duration_type: user.is_perpetual ? 'perpetual' : '1',
                 custom_months: 1,
                 price_paid: '',
@@ -687,6 +689,7 @@ export default function PlansIndex({
                                             <th className="px-6 py-4">Kullanıcı</th>
                                             <th className="px-6 py-4">Aktif Paket / Kota</th>
                                             <th className="px-6 py-4">Kota Kullanımı</th>
+                                            <th className="px-6 py-4">Hız Limiti</th>
                                             <th className="px-6 py-4">Bitiş Tarihi</th>
                                             <th className="px-6 py-4 text-right">İşlemler</th>
                                         </tr>
@@ -694,7 +697,7 @@ export default function PlansIndex({
                                     <tbody className="divide-y divide-white/[0.04]">
                                         {filteredUsers.length === 0 ? (
                                             <tr>
-                                                <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                                                <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                                                     Aramanıza veya filtrenize uygun kullanıcı bulunamadı.
                                                 </td>
                                             </tr>
@@ -756,6 +759,26 @@ export default function PlansIndex({
                                                             </div>
                                                         ) : (
                                                             <span className="text-gray-500 text-xs">Kota Tanımlanmamış</span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-6 py-4">
+                                                        {user.custom_speed_limit_mbps !== null && user.custom_speed_limit_mbps !== undefined ? (
+                                                            user.custom_speed_limit_mbps === 0 ? (
+                                                                <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold text-[11px] flex items-center gap-1 w-fit">
+                                                                    ⚡ Sınırsız (Özel)
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold font-mono text-[11px] flex items-center gap-1 w-fit">
+                                                                    <Gauge className="w-3.5 h-3.5" />
+                                                                    {user.custom_speed_limit_mbps} Mbps (Özel)
+                                                                </span>
+                                                            )
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs flex items-center gap-1">
+                                                                <Gauge className="w-3.5 h-3.5 text-gray-500" />
+                                                                Paket Varsayılanı
+                                                            </span>
                                                         )}
                                                     </td>
 
@@ -1416,6 +1439,22 @@ export default function PlansIndex({
                                         onChange={(e) => setAssignForm({ ...assignForm, custom_quota_gb: parseInt(e.target.value) || 0 })}
                                         className="w-full p-3 bg-[#07090E] border border-emerald-500/30 rounded-xl text-emerald-400 font-bold font-mono focus:outline-none"
                                         required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-gray-300 font-semibold mb-1 text-xs">
+                                        Kullanıcıya Özel Hız Limiti (Mbps)
+                                        <span className="text-[10px] text-gray-400 font-normal ml-2 block sm:inline">(Boş = Paket Varsayılanını Kullan, 0 = Sınırsız / Tam Hız)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="10000"
+                                        placeholder="Paket Varsayılanı (Boş)"
+                                        value={assignForm.custom_speed_limit_mbps}
+                                        onChange={(e) => setAssignForm({ ...assignForm, custom_speed_limit_mbps: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                                        className="w-full p-3 bg-[#07090E] border border-white/[0.08] rounded-xl text-white font-mono focus:outline-none focus:border-[#00B074] text-xs"
                                     />
                                 </div>
 

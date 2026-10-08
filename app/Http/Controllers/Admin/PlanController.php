@@ -51,6 +51,7 @@ class PlanController extends Controller
                     'quota_used_bytes' => $period?->used_bytes ?? 0,
                     'quota_allocated_bytes' => $period?->allocated_bytes ?? 0,
                     'quota_percentage' => $period ? $period->usage_percentage : 0,
+                    'custom_speed_limit_mbps' => $u->custom_speed_limit_mbps,
                     'expires_at' => $activeSub ? ($activeSub->is_perpetual ? 'Süresiz' : $activeSub->expires_at->format('d.m.Y H:i')) : null,
                     'created_at' => $u->created_at->format('d.m.Y H:i'),
                 ];
@@ -278,6 +279,7 @@ class PlanController extends Controller
             'user_id' => 'required|exists:users,id',
             'plan_id' => 'nullable|string', // plan ID or 'custom' or 'none'
             'custom_quota_gb' => 'nullable|integer|min:1|max:100000',
+            'custom_speed_limit_mbps' => 'nullable|integer|min:0|max:100000',
             'duration_type' => 'required|string|in:1,3,6,12,custom,perpetual',
             'custom_months' => 'nullable|integer|min:1|max:120',
             'price_paid' => 'nullable|numeric|min:0',
@@ -286,11 +288,18 @@ class PlanController extends Controller
 
         $user = User::findOrFail($validated['user_id']);
 
+        $customSpeed = isset($validated['custom_speed_limit_mbps']) && $validated['custom_speed_limit_mbps'] !== ''
+            ? (int) $validated['custom_speed_limit_mbps']
+            : null;
+
         if ($validated['plan_id'] === 'none') {
             // Remove user subscription
             $user->subscriptions()->where('status', 'active')->update(['status' => 'cancelled']);
             $user->subscriptionPeriods()->where('is_active', true)->update(['is_active' => false]);
-            $user->update(['plan' => 'free']);
+            $user->update([
+                'plan' => 'free',
+                'custom_speed_limit_mbps' => $customSpeed,
+            ]);
 
             return redirect()->back()->with('success', "{$user->name} kullanıcısının paketi kaldırıldı.");
         }
@@ -330,6 +339,10 @@ class PlanController extends Controller
             $isPerpetual
         );
 
+        $user->update([
+            'custom_speed_limit_mbps' => $customSpeed,
+        ]);
+
         $targetLabel = $plan ? $plan->name : "Özel Kota ({$customQuotaGb} GB)";
         $durationLabel = $isPerpetual ? 'Süresiz' : "{$durationMonths} Ay";
 
@@ -343,7 +356,10 @@ class PlanController extends Controller
     {
         $user->subscriptions()->where('status', 'active')->update(['status' => 'cancelled']);
         $user->subscriptionPeriods()->where('is_active', true)->update(['is_active' => false]);
-        $user->update(['plan' => 'free']);
+        $user->update([
+            'plan' => 'free',
+            'custom_speed_limit_mbps' => null,
+        ]);
 
         return redirect()->back()->with('success', "{$user->name} kullanıcısının tüm paket ve kotası temizlendi.");
     }

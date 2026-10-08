@@ -274,7 +274,11 @@ class SubscriptionService
     public function getSpeedLimitMbps(User $user): ?int
     {
         if ($user->isAdmin()) {
-            return null;
+            return $user->custom_speed_limit_mbps;
+        }
+
+        if ($user->custom_speed_limit_mbps !== null) {
+            return $user->custom_speed_limit_mbps > 0 ? $user->custom_speed_limit_mbps : null;
         }
 
         $period = $this->getCurrentPeriod($user);
