@@ -1714,6 +1714,19 @@ function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
 
 function isCloudflareIp(ip) {
     if (!ip || typeof ip !== 'string') return false;
+    
+    // IPv6 Cloudflare ranges check
+    if (ip.includes(':')) {
+        const lower = ip.toLowerCase();
+        if (lower.startsWith('2400:cb00:') || lower.startsWith('2606:4700:') || 
+            lower.startsWith('2803:f800:') || lower.startsWith('2405:b500:') || 
+            lower.startsWith('2405:8100:') || lower.startsWith('2a06:98c0:') || 
+            lower.startsWith('2c0f:f248:')) {
+            return true;
+        }
+        return false;
+    }
+
     const parts = ip.split('.').map(Number);
     if (parts.length !== 4) return false;
 
@@ -1743,20 +1756,14 @@ function extractClientIpv4(req) {
         if (header) {
             const parts = header.split(',').map(s => s.trim().replace(/^::ffff:/i, ''));
             for (const ip of parts) {
-                if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ip)) {
-                    if (!isCloudflareIp(ip)) {
-                        return ip;
-                    }
+                if (ip && !isCloudflareIp(ip)) {
+                    return ip;
                 }
             }
         }
     }
 
     let remote = (req.socket && req.socket.remoteAddress) ? req.socket.remoteAddress.replace(/^::ffff:/i, '') : '';
-    if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(remote)) {
-        return remote;
-    }
-
     return remote;
 }
 

@@ -20,7 +20,9 @@ import {
     Loader2,
     CheckCircle2,
     AlertCircle,
-    X
+    X,
+    ShieldCheck,
+    ShieldAlert
 } from 'lucide-react';
 
 export default function AdminDashboard({ 
@@ -29,7 +31,8 @@ export default function AdminDashboard({
     storageBoxes = [],
     plans = [],
     heroSettings = { mode: 'auto', slots: { '1': '', '2': '', '3': '', '4': '', '5': '' } },
-    heroSlotPreviews = {}
+    heroSlotPreviews = {},
+    ipAccessSettings = { whitelist: [], blacklist: [] }
 }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
@@ -87,6 +90,36 @@ export default function AdminDashboard({
     const [syncLimit, setSyncLimit] = useState(50);
     const [syncOutput, setSyncOutput] = useState(null);
     const [syncSuccess, setSyncSuccess] = useState(null);
+
+    // IP Access Control state
+    const [whitelistText, setWhitelistText] = useState((ipAccessSettings?.whitelist || []).join('\n'));
+    const [blacklistText, setBlacklistText] = useState((ipAccessSettings?.blacklist || []).join('\n'));
+    const [isSavingIpAccess, setIsSavingIpAccess] = useState(false);
+    const [ipAccessNotice, setIpAccessNotice] = useState(null);
+
+    const handleSaveIpAccessSettings = (e) => {
+        e?.preventDefault();
+        setIsSavingIpAccess(true);
+        const whitelist = whitelistText.split('\n').map(ip => ip.trim()).filter(Boolean);
+        const blacklist = blacklistText.split('\n').map(ip => ip.trim()).filter(Boolean);
+
+        router.post('/admin/ip-access-settings', {
+            whitelist,
+            blacklist,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsSavingIpAccess(false);
+                setIpAccessNotice('IP Erişim Listeleri (White List / Black List) başarıyla güncellendi.');
+                setTimeout(() => setIpAccessNotice(null), 4000);
+            },
+            onError: () => {
+                setIsSavingIpAccess(false);
+                setIpAccessNotice('IP ayarları kaydedilirken bir hata oluştu.');
+                setTimeout(() => setIpAccessNotice(null), 4000);
+            }
+        });
+    };
 
     const handleLookupImdb = async (slotNum, imdbId) => {
         const cleanId = (imdbId || '').trim();
@@ -999,7 +1032,7 @@ export default function AdminDashboard({
                                     </div>
                                 )}
 
-                                {syncOutput && (
+                                 {syncOutput && (
                                     <div className="space-y-1.5 animate-in fade-in">
                                         <div className="flex items-center justify-between text-[11px] text-gray-400">
                                             <span className="font-mono">Konsol Çıktısı (Artisan Output):</span>
@@ -1016,6 +1049,102 @@ export default function AdminDashboard({
                                         </pre>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* 3. IP ACCESS CONTROL (WHITE LIST & BLACK LIST) CARD */}
+                            <div className="bg-[#0D111A] border border-white/[0.06] rounded-xl p-6 space-y-6 shadow-sm">
+                                <div className="border-b border-white/[0.06] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5">
+                                            <ShieldCheck className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                                                IP Erişim Kuralları (White List & Black List)
+                                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                    Güvenlik Filtresi
+                                                </span>
+                                            </h2>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                İndirme sunucusu için özel IP izin ve engelleme listelerini yapılandırın.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {ipAccessNotice && (
+                                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between animate-in fade-in">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                            <span>{ipAccessNotice}</span>
+                                        </div>
+                                        <span className="font-mono text-[10px] text-emerald-400/80">IP_FILTER_200</span>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* White List */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                                                <ShieldCheck className="w-4 h-4" />
+                                                <span>White List (Her Durumda İzin Verilen IP'ler)</span>
+                                            </label>
+                                            <span className="text-[10px] font-mono text-gray-500">
+                                                {whitelistText.split('\n').filter(l => l.trim()).length} IP
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-400 leading-relaxed">
+                                            White list'e eklenen IP adreslerine (ör: ev/ofis IP'si, VPN, özel sunucu) VPS/Datacenter kısıtlaması uygulanmaz ve indirmelere her zaman izin verilir.
+                                        </p>
+                                        <textarea
+                                            rows={6}
+                                            value={whitelistText}
+                                            onChange={(e) => setWhitelistText(e.target.value)}
+                                            placeholder={"Her satıra tek IP veya CIDR bloğu yazın:\n192.168.1.100\n10.0.0.0/24\n2.28.141.70"}
+                                            className="w-full bg-[#07090E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl p-3 text-xs text-white placeholder-gray-600 font-mono focus:outline-none leading-relaxed"
+                                        />
+                                    </div>
+
+                                    {/* Black List */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-semibold text-red-400 flex items-center gap-1.5">
+                                                <ShieldAlert className="w-4 h-4" />
+                                                <span>Black List (Kesin Engellenen IP'ler)</span>
+                                            </label>
+                                            <span className="text-[10px] font-mono text-gray-500">
+                                                {blacklistText.split('\n').filter(l => l.trim()).length} IP
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-400 leading-relaxed">
+                                            Black list'e eklenen IP adreslerinin indirme yapmasına asla izin verilmez (HTTP 403 Engellendi yanıtı döner).
+                                        </p>
+                                        <textarea
+                                            rows={6}
+                                            value={blacklistText}
+                                            onChange={(e) => setBlacklistText(e.target.value)}
+                                            placeholder={"Her satıra tek IP veya CIDR bloğu yazın:\n5.6.7.8\n185.220.101.0/24"}
+                                            className="w-full bg-[#07090E] border border-white/[0.08] focus:border-red-500/50 rounded-xl p-3 text-xs text-white placeholder-gray-600 font-mono focus:outline-none leading-relaxed"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveIpAccessSettings}
+                                        disabled={isSavingIpAccess}
+                                        className="px-5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white font-medium text-xs transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isSavingIpAccess ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Check className="w-4 h-4" />
+                                        )}
+                                        <span>IP Listelerini Kaydet</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <form onSubmit={handleSaveSettings} className="space-y-6">

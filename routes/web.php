@@ -55,6 +55,7 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::get('/', [AdminController::class, 'index'])->name('dashboard');
     Route::post('/users/{user}/assign-plan', [AdminController::class, 'assignPlan'])->name('users.assign-plan');
     Route::post('/hero-settings', [AdminController::class, 'updateHeroSettings'])->name('hero-settings.update');
+    Route::post('/ip-access-settings', [AdminController::class, 'updateIpAccessSettings'])->name('ip-access-settings.update');
     Route::post('/sync-trailers', [AdminController::class, 'syncTrailers'])->name('sync-trailers');
     Route::get('/lookup-imdb', [AdminController::class, 'lookupImdb'])->name('lookup-imdb');
 

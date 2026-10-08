@@ -122,6 +122,11 @@ class AdminController extends Controller
             }
         }
 
+        $ipAccessSettings = Setting::get('ip_access_settings', [
+            'whitelist' => [],
+            'blacklist' => [],
+        ]);
+
         return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
             'recentUsers' => $recentUsers,
@@ -129,7 +134,31 @@ class AdminController extends Controller
             'plans' => $plans,
             'heroSettings' => $heroSettings,
             'heroSlotPreviews' => $heroSlotPreviews,
+            'ipAccessSettings' => $ipAccessSettings,
         ]);
+    }
+
+    /**
+     * Update IP Access Settings (Whitelist & Blacklist).
+     */
+    public function updateIpAccessSettings(Request $request)
+    {
+        $validated = $request->validate([
+            'whitelist' => ['nullable', 'array'],
+            'whitelist.*' => ['nullable', 'string', 'max:50'],
+            'blacklist' => ['nullable', 'array'],
+            'blacklist.*' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $whitelist = array_values(array_filter(array_map('trim', $validated['whitelist'] ?? [])));
+        $blacklist = array_values(array_filter(array_map('trim', $validated['blacklist'] ?? [])));
+
+        Setting::set('ip_access_settings', [
+            'whitelist' => $whitelist,
+            'blacklist' => $blacklist,
+        ]);
+
+        return redirect()->back()->with('success', 'IP Erişim Listeleri (Whitelist / Blacklist) başarıyla güncellendi.');
     }
 
     /**
