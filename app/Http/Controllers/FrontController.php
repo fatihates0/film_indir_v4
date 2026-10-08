@@ -1478,6 +1478,11 @@ class FrontController extends Controller
         ]);
 
         $duration = (int) $validated['duration_months'];
+
+        if (! $plan->isDurationAllowed($duration)) {
+            return redirect()->back()->with('error', "{$plan->name} paketi için seçilen {$duration} aylık abonelik döngüsü geçerli değildir.");
+        }
+
         $subscriptionService->subscribe($user, $plan, $duration);
 
         return redirect()->back()->with('success', "Tebrikler! {$plan->name} ({$duration} Ay) paketiniz aktif edildi.");

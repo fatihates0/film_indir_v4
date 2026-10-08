@@ -83,6 +83,7 @@ export default function PlansIndex({
         price_3m: 269.00,
         price_6m: 499.00,
         price_12m: 899.00,
+        allowed_durations: [1, 3, 6, 12],
         max_parallel_downloads: 4,
         speed_limit_mbps: '',
         is_active: true,
@@ -90,6 +91,17 @@ export default function PlansIndex({
     };
     const [planForm, setPlanForm] = useState(initialPlanForm);
     const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
+
+    // Helper to toggle allowed duration in plan form
+    const toggleAllowedDuration = (months) => {
+        const current = planForm.allowed_durations || [1, 3, 6, 12];
+        if (current.includes(months)) {
+            if (current.length <= 1) return; // Prevent unchecking all
+            setPlanForm({ ...planForm, allowed_durations: current.filter(m => m !== months) });
+        } else {
+            setPlanForm({ ...planForm, allowed_durations: [...current, months].sort((a, b) => a - b) });
+        }
+    };
 
     // Initial user assignment form state
     const initialAssignForm = {
@@ -180,6 +192,7 @@ export default function PlansIndex({
     const handleOpenCreatePlan = () => {
         setPlanForm({
             ...initialPlanForm,
+            allowed_durations: [1, 3, 6, 12],
             sort_order: plans.length + 1,
         });
         setEditingPlan(null);
@@ -198,6 +211,7 @@ export default function PlansIndex({
             price_3m: plan.price_3m || 0,
             price_6m: plan.price_6m || 0,
             price_12m: plan.price_12m || 0,
+            allowed_durations: plan.allowed_durations || [1, 3, 6, 12],
             max_parallel_downloads: plan.max_parallel_downloads || 4,
             speed_limit_mbps: plan.speed_limit_mbps || '',
             is_active: Boolean(plan.is_active),
@@ -581,22 +595,39 @@ export default function PlansIndex({
                                         {/* Pricing & Limits Body */}
                                         <div className="p-6 space-y-4 flex-1">
                                             <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div className="bg-[#07090E] p-2.5 rounded-xl border border-white/[0.04]">
-                                                    <span className="text-gray-500 block text-[10px] uppercase tracking-wider font-semibold">1 Aylık</span>
-                                                    <span className="text-sm font-bold text-white">₺{parseFloat(plan.price_1m).toFixed(2)}</span>
-                                                </div>
-                                                <div className="bg-[#07090E] p-2.5 rounded-xl border border-white/[0.04]">
-                                                    <span className="text-gray-500 block text-[10px] uppercase tracking-wider font-semibold">3 Aylık</span>
-                                                    <span className="text-sm font-bold text-white">₺{parseFloat(plan.price_3m).toFixed(2)}</span>
-                                                </div>
-                                                <div className="bg-[#07090E] p-2.5 rounded-xl border border-white/[0.04]">
-                                                    <span className="text-gray-500 block text-[10px] uppercase tracking-wider font-semibold">6 Aylık</span>
-                                                    <span className="text-sm font-bold text-white">₺{parseFloat(plan.price_6m).toFixed(2)}</span>
-                                                </div>
-                                                <div className="bg-[#07090E] p-2.5 rounded-xl border border-white/[0.04]">
-                                                    <span className="text-gray-500 block text-[10px] uppercase tracking-wider font-semibold">12 Aylık</span>
-                                                    <span className="text-sm font-bold text-emerald-400">₺{parseFloat(plan.price_12m).toFixed(2)}</span>
-                                                </div>
+                                                {(() => {
+                                                    const allowed = plan.allowed_durations || [1, 3, 6, 12];
+                                                    return [
+                                                        { months: 1, label: '1 Aylık', price: plan.price_1m },
+                                                        { months: 3, label: '3 Aylık', price: plan.price_3m },
+                                                        { months: 6, label: '6 Aylık', price: plan.price_6m },
+                                                        { months: 12, label: '12 Aylık', price: plan.price_12m },
+                                                    ].map((item) => {
+                                                        const isAllowed = allowed.includes(item.months);
+                                                        return (
+                                                            <div
+                                                                key={item.months}
+                                                                className={`p-2.5 rounded-xl border ${
+                                                                    isAllowed
+                                                                        ? 'bg-[#07090E] border-white/[0.06]'
+                                                                        : 'bg-rose-950/10 border-rose-500/20 opacity-50'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-gray-500 text-[10px] uppercase tracking-wider font-semibold">
+                                                                        {item.label}
+                                                                    </span>
+                                                                    {!isAllowed && (
+                                                                        <span className="text-[9px] font-bold text-rose-400">Kapalı</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`text-sm font-bold ${isAllowed ? 'text-white' : 'text-gray-500 line-through'}`}>
+                                                                    ₺{parseFloat(item.price || 0).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })()}
                                             </div>
 
                                             <div className="pt-2 border-t border-white/[0.06] space-y-2 text-xs text-gray-400">
@@ -1342,6 +1373,43 @@ export default function PlansIndex({
                                                 className="w-full px-3 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
                                             />
                                         </div>
+                                    </div>
+                                {/* Allowed Durations Toggle */}
+                                <div className="space-y-2 pt-2 border-t border-white/[0.06]">
+                                    <label className="block text-xs font-semibold text-gray-300">
+                                        Geçerli Abonelik Döngüleri (Satın Alınabilir Süreler) *
+                                    </label>
+                                    <p className="text-[11px] text-gray-400">
+                                        Bu paket için aktif edilecek döngüleri seçin. Örneğin sadece 6 ay ve 1 yıla özel paket oluşturmak için 1 ve 3 ayı kapatabilirsiniz.
+                                    </p>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+                                        {[
+                                            { months: 1, label: '1 Aylık' },
+                                            { months: 3, label: '3 Aylık' },
+                                            { months: 6, label: '6 Aylık' },
+                                            { months: 12, label: '12 Aylık' },
+                                        ].map((opt) => {
+                                            const isAllowed = (planForm.allowed_durations || [1, 3, 6, 12]).includes(opt.months);
+                                            return (
+                                                <button
+                                                    key={opt.months}
+                                                    type="button"
+                                                    onClick={() => toggleAllowedDuration(opt.months)}
+                                                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                                                        isAllowed
+                                                            ? 'bg-[#00B074]/15 border-[#00B074] text-white shadow-sm'
+                                                            : 'bg-[#07090E] border-white/[0.08] text-gray-500 hover:text-gray-300'
+                                                    }`}
+                                                >
+                                                    <span>{opt.label}</span>
+                                                    {isAllowed ? (
+                                                        <Check className="w-4 h-4 text-[#00B074]" />
+                                                    ) : (
+                                                        <XCircle className="w-4 h-4 text-gray-600" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 

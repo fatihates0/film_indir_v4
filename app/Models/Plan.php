@@ -27,6 +27,7 @@ class Plan extends Model
         'price_3m',
         'price_6m',
         'price_12m',
+        'allowed_durations',
         'max_parallel_downloads',
         'speed_limit_mbps',
         'is_active',
@@ -56,6 +57,7 @@ class Plan extends Model
             'price_3m' => 'decimal:2',
             'price_6m' => 'decimal:2',
             'price_12m' => 'decimal:2',
+            'allowed_durations' => 'array',
             'max_parallel_downloads' => 'integer',
             'speed_limit_mbps' => 'integer',
             'is_active' => 'boolean',
@@ -87,6 +89,34 @@ class Plan extends Model
         return Attribute::make(
             get: fn (): string => number_format($this->monthly_quota_gb, 0, ',', '.').' GB'
         );
+    }
+
+    /**
+     * Allowed durations array fallback.
+     */
+    protected function allowedDurations(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value): array {
+                if (empty($value)) {
+                    return [1, 3, 6, 12];
+                }
+                $decoded = is_string($value) ? json_decode($value, true) : $value;
+                if (! is_array($decoded) || empty($decoded)) {
+                    return [1, 3, 6, 12];
+                }
+
+                return array_values(array_map('intval', $decoded));
+            }
+        );
+    }
+
+    /**
+     * Check if a duration (in months) is allowed for this plan.
+     */
+    public function isDurationAllowed(int $months): bool
+    {
+        return in_array($months, $this->allowed_durations, true);
     }
 
     /**

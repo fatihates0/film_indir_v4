@@ -40,6 +40,11 @@ class PaymentNotificationController extends Controller
 
         $plan = Plan::findOrFail($validated['plan_id']);
         $durationMonths = (int) $validated['duration_months'];
+
+        if (! $plan->isDurationAllowed($durationMonths)) {
+            return redirect()->back()->with('error', "{$plan->name} paketi için seçilen {$durationMonths} aylık abonelik döngüsü geçerli değildir.");
+        }
+
         $amount = $plan->getPriceForDuration($durationMonths);
 
         $referenceCode = 'PAY-'.date('Ymd').'-'.strtoupper(Str::random(6));

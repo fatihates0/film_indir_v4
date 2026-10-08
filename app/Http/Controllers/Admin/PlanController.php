@@ -147,6 +147,8 @@ class PlanController extends Controller
             'price_3m' => 'required|numeric|min:0',
             'price_6m' => 'required|numeric|min:0',
             'price_12m' => 'required|numeric|min:0',
+            'allowed_durations' => 'nullable|array',
+            'allowed_durations.*' => 'integer|in:1,3,6,12',
             'max_parallel_downloads' => 'required|integer|min:1|max:20',
             'speed_limit_mbps' => 'nullable|integer|min:1',
             'is_active' => 'required|boolean',
@@ -159,6 +161,7 @@ class PlanController extends Controller
         }
 
         $monthlyQuotaBytes = (int) $validated['monthly_quota_gb'] * 1024 * 1024 * 1024;
+        $allowedDurations = ! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12];
 
         Plan::create([
             'name' => $validated['name'],
@@ -170,6 +173,7 @@ class PlanController extends Controller
             'price_3m' => $validated['price_3m'],
             'price_6m' => $validated['price_6m'],
             'price_12m' => $validated['price_12m'],
+            'allowed_durations' => $allowedDurations,
             'max_parallel_downloads' => $validated['max_parallel_downloads'],
             'speed_limit_mbps' => $validated['speed_limit_mbps'] ?? null,
             'is_active' => $validated['is_active'],
@@ -193,6 +197,8 @@ class PlanController extends Controller
             'price_3m' => 'required|numeric|min:0',
             'price_6m' => 'required|numeric|min:0',
             'price_12m' => 'required|numeric|min:0',
+            'allowed_durations' => 'nullable|array',
+            'allowed_durations.*' => 'integer|in:1,3,6,12',
             'max_parallel_downloads' => 'required|integer|min:1|max:20',
             'speed_limit_mbps' => 'nullable|integer|min:1',
             'is_active' => 'required|boolean',
@@ -200,6 +206,7 @@ class PlanController extends Controller
         ]);
 
         $monthlyQuotaBytes = (int) $validated['monthly_quota_gb'] * 1024 * 1024 * 1024;
+        $allowedDurations = ! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12];
 
         $plan->update([
             'name' => $validated['name'],
@@ -211,6 +218,7 @@ class PlanController extends Controller
             'price_3m' => $validated['price_3m'],
             'price_6m' => $validated['price_6m'],
             'price_12m' => $validated['price_12m'],
+            'allowed_durations' => $allowedDurations,
             'max_parallel_downloads' => $validated['max_parallel_downloads'],
             'speed_limit_mbps' => $validated['speed_limit_mbps'] ?? null,
             'is_active' => $validated['is_active'],

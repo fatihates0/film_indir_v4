@@ -48,11 +48,28 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
         }
     };
 
+    const isDurationAllowedForPlan = (plan, months) => {
+        if (!plan) return true;
+        const allowed = plan.allowed_durations || [1, 3, 6, 12];
+        return allowed.includes(months);
+    };
+
+    const getAllowedDurationLabels = (plan) => {
+        const allowed = plan?.allowed_durations || [1, 3, 6, 12];
+        return allowed.map(m => m === 12 ? '12 Aylık' : `${m} Aylık`).join(', ');
+    };
+
     const handleOpenCheckout = (plan) => {
         if (!user) {
             setAuthModalMode('login');
             setAuthModalOpen(true);
             return;
+        }
+
+        const allowed = plan.allowed_durations || [1, 3, 6, 12];
+        if (!allowed.includes(selectedDuration)) {
+            const firstAllowed = allowed[0] || 1;
+            setSelectedDuration(firstAllowed);
         }
 
         setCheckoutPlan(plan);
@@ -176,9 +193,12 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                     {/* PRICING CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch pt-4">
                         {plans.map((plan, index) => {
+                            const isAllowed = isDurationAllowedForPlan(plan, selectedDuration);
                             const price = getPrice(plan, selectedDuration);
                             const monthlyEquivalent = (price / selectedDuration).toFixed(0);
                             const isFeatured = index === 1; // 2nd plan is popular
+                            const allowedLabel = getAllowedDurationLabels(plan);
+                            const hasRestrictedDurations = (plan.allowed_durations || [1, 3, 6, 12]).length < 4;
 
                             return (
                                 <div
@@ -187,7 +207,7 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                         isFeatured
                                             ? 'bg-gradient-to-b from-[#161D2B] to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
                                             : 'bg-[#121620] border border-white/10 hover:border-white/20'
-                                    }`}
+                                    } ${!isAllowed ? 'opacity-80' : ''}`}
                                 >
                                     {isFeatured && (
                                         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00B074] text-white shadow-lg shadow-[#00B074]/30">
@@ -198,7 +218,14 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                     <div className="space-y-6">
                                         {/* Plan Header */}
                                         <div className="space-y-2">
-                                            <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                                                {hasRestrictedDurations && (
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                                        Sadece: {allowedLabel}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-xs text-gray-400 line-clamp-2">{plan.description}</p>
                                         </div>
 
@@ -213,14 +240,28 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
 
                                         {/* Price */}
                                         <div className="space-y-1">
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-3xl sm:text-4xl font-black text-white">₺{price}</span>
-                                                <span className="text-xs text-gray-400 font-medium">/ {selectedDuration} Ay</span>
-                                            </div>
-                                            {selectedDuration > 1 && (
-                                                <p className="text-[11px] text-[#00B074]">
-                                                    Aylık ~₺{monthlyEquivalent} denk gelir
-                                                </p>
+                                            {isAllowed ? (
+                                                <>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-3xl sm:text-4xl font-black text-white">₺{price}</span>
+                                                        <span className="text-xs text-gray-400 font-medium">/ {selectedDuration} Ay</span>
+                                                    </div>
+                                                    {selectedDuration > 1 && (
+                                                        <p className="text-[11px] text-[#00B074]">
+                                                            Aylık ~₺{monthlyEquivalent} denk gelir
+                                                        </p>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 space-y-1">
+                                                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                                        <span>{selectedDuration} Aylık Seçenekte Geçersiz</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-gray-300">
+                                                        Bu paket sadece <strong className="text-amber-400">{allowedLabel}</strong> alımda geçerlidir.
+                                                    </p>
+                                                </div>
                                             )}
                                         </div>
 
@@ -259,13 +300,24 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                                             type="button"
                                             onClick={() => handleOpenCheckout(plan)}
                                             className={`w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                                isFeatured
-                                                    ? 'bg-[#00B074] hover:bg-[#009663] text-white shadow-xl shadow-[#00B074]/30'
-                                                    : 'bg-white/10 hover:bg-white/20 text-white'
+                                                isAllowed
+                                                    ? isFeatured
+                                                        ? 'bg-[#00B074] hover:bg-[#009663] text-white shadow-xl shadow-[#00B074]/30'
+                                                        : 'bg-white/10 hover:bg-white/20 text-white'
+                                                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-lg'
                                             }`}
                                         >
-                                            <span>Paket Seç & Öde</span>
-                                            <ArrowRight className="w-4 h-4" />
+                                            {isAllowed ? (
+                                                <>
+                                                    <span>Paket Seç & Öde</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Süreyi Değiştir & İncele ({allowedLabel})</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 </div>
