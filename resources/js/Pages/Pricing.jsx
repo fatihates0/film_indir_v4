@@ -5,12 +5,14 @@ import AuthModal from '../Components/AuthModal';
 import { 
     Check, Zap, Shield, HardDrive, Download, ArrowRight, 
     Sparkles, RefreshCw, Clock, AlertCircle, Building2, Coins, 
-    Copy, CheckCircle2, X, Info, Server, PlusCircle, UserCheck, Lock
+    Copy, CheckCircle2, X, Info, Server, PlusCircle, UserCheck, Lock,
+    HelpCircle, ChevronDown
 } from 'lucide-react';
 
-export default function Pricing({ plans = [], paymentMethods = [] }) {
+export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) {
     const { auth, flash } = usePage().props;
     const [selectedDuration, setSelectedDuration] = useState(1); // 1, 3, 6, 12
+    const [openFaqIndex, setOpenFaqIndex] = useState(0); // Default open first FAQ item
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authModalMode, setAuthModalMode] = useState('login');
 
@@ -557,6 +559,63 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
                             </div>
                         </div>
                     </div>
+
+                    {/* SECTION 4: SIKÇA SORULAN SORULAR (SSS / FAQ) */}
+                    {faqs && faqs.length > 0 && (
+                        <div className="space-y-8 pt-8 border-t border-slate-200 dark:border-white/10">
+                            <div className="text-center max-w-2xl mx-auto space-y-3">
+                                <span className="px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#00B074]/10 border border-[#00B074]/30 text-[#00B074] inline-flex items-center gap-2">
+                                    <HelpCircle className="w-3.5 h-3.5" /> Sıkça Sorulan Sorular
+                                </span>
+                                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                                    Aklınıza Takılan <span className="text-[#00B074]">Sorular ve Yanıtlar</span>
+                                </h2>
+                                <p className="text-xs sm:text-sm text-slate-600 dark:text-gray-400">
+                                    Abonelikler, indirme hızı, kotalar ve ödeme yöntemleri hakkında merak ettiğiniz tüm detaylar.
+                                </p>
+                            </div>
+
+                            <div className="max-w-3xl mx-auto space-y-3">
+                                {faqs.map((faq, index) => {
+                                    const isOpen = openFaqIndex === index;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                                                isOpen
+                                                    ? 'bg-white dark:bg-[#121620] border-[#00B074]/50 shadow-xl shadow-[#00B074]/5'
+                                                    : 'bg-white/70 dark:bg-[#0D111A]/80 border-slate-200 dark:border-white/[0.06] hover:border-slate-300 dark:hover:border-white/15'
+                                            }`}
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                                                className="w-full px-6 py-4 text-left flex items-center justify-between gap-4 font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer select-none"
+                                            >
+                                                <span className="flex items-center gap-3 min-w-0">
+                                                    <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs shrink-0 font-mono font-bold ${
+                                                        isOpen ? 'bg-[#00B074] text-white' : 'bg-[#00B074]/10 text-[#00B074] border border-[#00B074]/20'
+                                                    }`}>
+                                                        ?
+                                                    </span>
+                                                    <span className="truncate">{faq.question}</span>
+                                                </span>
+                                                <span className={`p-1.5 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-gray-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-[#00B074]' : ''}`}>
+                                                    <ChevronDown className="w-4 h-4" />
+                                                </span>
+                                            </button>
+
+                                            {isOpen && (
+                                                <div className="px-6 pb-5 pt-1 text-xs text-slate-600 dark:text-gray-300 leading-relaxed border-t border-slate-100 dark:border-white/[0.04] whitespace-pre-line animate-in fade-in duration-200">
+                                                    {faq.answer}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>

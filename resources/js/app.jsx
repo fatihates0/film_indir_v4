@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ThemeProvider } from './Context/ThemeContext';
+import { UploadProvider } from './Context/UploadContext';
 
 const appName = import.meta.env.VITE_APP_NAME || 'SineKutu';
 
@@ -15,7 +16,9 @@ createInertiaApp({
         const root = createRoot(el);
         root.render(
             <ThemeProvider>
-                <App {...props} />
+                <UploadProvider>
+                    <App {...props} />
+                </UploadProvider>
             </ThemeProvider>
         );
     },

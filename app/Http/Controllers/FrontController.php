@@ -1456,10 +1456,12 @@ class FrontController extends Controller
     {
         $plans = Plan::active()->get();
         $paymentMethods = PaymentMethod::active()->get();
+        $faqs = Setting::get('pricing_faq_settings', AdminController::defaultFaqs());
 
         return Inertia::render('Pricing', array_merge($this->getCommonData(), [
             'plans' => $plans,
             'paymentMethods' => $paymentMethods,
+            'faqs' => $faqs,
         ]));
     }
 

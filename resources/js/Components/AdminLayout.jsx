@@ -1,13 +1,17 @@
 import React from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import Layout from './Layout';
+import AdminUploadWidget from './AdminUploadWidget';
+import TmdbWizardModal from './TmdbWizardModal';
+import { useUpload } from '../Context/UploadContext';
 import { 
     LayoutDashboard, 
     HardDrive, 
     Film, 
     Package, 
     ShieldCheck, 
-    ChevronRight
+    ChevronRight,
+    Upload
 } from 'lucide-react';
 
 export default function AdminLayout({ 
@@ -20,6 +24,9 @@ export default function AdminLayout({
 }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
+    const { setIsUploadModalOpen, queue } = useUpload();
+
+    const activeUploadsCount = queue.filter(i => i.status === 'uploading' || i.status === 'init').length;
 
     const navItems = [
         {
@@ -83,34 +90,49 @@ export default function AdminLayout({
                             </div>
                         </div>
 
-                        {/* Navigation Tabs (Console Navigation) */}
-                        <nav className="flex items-center gap-1 bg-[#10141F] p-1.5 rounded-xl border border-white/[0.08] text-xs overflow-x-auto no-scrollbar scrollbar-none self-start md:self-auto">
-                            {navItems.map((item) => {
-                                const Icon = item.icon;
-                                const isActive = activeTab === item.id;
-                                return (
-                                    <Link
-                                        key={item.id}
-                                        href={item.href}
-                                        className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
-                                            isActive
-                                                ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
-                                                : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.04]'
-                                        }`}
-                                    >
-                                        <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
-                                        <span>{item.label}</span>
-                                        {item.badge !== null && item.badge !== undefined && (
-                                            <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
-                                                isActive ? 'bg-white/20 text-white' : 'bg-white/5 text-gray-400'
-                                            }`}>
-                                                {item.badge}
-                                            </span>
-                                        )}
-                                    </Link>
-                                );
-                            })}
-                        </nav>
+                        {/* Navigation Tabs & Quick Upload Button */}
+                        <div className="flex items-center gap-3 self-start md:self-auto">
+                            <button
+                                onClick={() => setIsUploadModalOpen(true)}
+                                className="px-3.5 py-1.5 bg-[#00B074] hover:bg-[#009b66] text-white text-xs font-bold rounded-xl shadow-lg shadow-[#00B074]/20 flex items-center gap-2 transition-all shrink-0"
+                            >
+                                <Upload className={`w-3.5 h-3.5 ${activeUploadsCount > 0 ? 'animate-bounce' : ''}`} />
+                                <span>Dosya Yükle</span>
+                                {queue.length > 0 && (
+                                    <span className="px-1.5 py-0.2 text-[10px] bg-white/20 rounded-md font-mono">
+                                        {queue.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            <nav className="flex items-center gap-1 bg-[#10141F] p-1.5 rounded-xl border border-white/[0.08] text-xs overflow-x-auto no-scrollbar scrollbar-none">
+                                {navItems.map((item) => {
+                                    const Icon = item.icon;
+                                    const isActive = activeTab === item.id;
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            href={item.href}
+                                            className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                                isActive
+                                                    ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
+                                                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.04]'
+                                            }`}
+                                        >
+                                            <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                                            <span>{item.label}</span>
+                                            {item.badge !== null && item.badge !== undefined && (
+                                                <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
+                                                    isActive ? 'bg-white/20 text-white' : 'bg-white/5 text-gray-400'
+                                                }`}>
+                                                    {item.badge}
+                                                </span>
+                                            )}
+                                        </Link>
+                                    );
+                                })}
+                            </nav>
+                        </div>
                     </div>
                 </div>
 
@@ -147,6 +169,10 @@ export default function AdminLayout({
                     {children}
                 </div>
             </div>
+
+            {/* Persistent Floating Upload Bar & TMDB Matching Wizard */}
+            <AdminUploadWidget />
+            <TmdbWizardModal />
         </Layout>
     );
 }

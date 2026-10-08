@@ -1437,6 +1437,16 @@ function reportBytesToLaravel(downloadInfo, bytesSent, isClosed = false) {
 
 const VIDEO_EXTENSIONS = new Set(['mkv', 'mp4', 'avi', 'mov', 'wmv', 'webm', 'flv', 'm4v', 'ts', 'm2ts', 'iso']);
 
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Storage-Token, X-Upload-Id, X-Chunk-Index, X-Chunk-Count, X-File-Path');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+    }
+    next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -1924,6 +1934,231 @@ app.get('/download', verifyToken, (req, res) => {
         }
     }
     });
+});
+
+app.post('/upload/init', verifyToken, (req, res) => {
+    try {
+        const filename = req.body.filename || req.query.filename;
+        const fileSize = parseInt(req.body.file_size || req.query.file_size || 0, 10);
+        const targetPathRel = req.body.file_path || req.query.file_path || (req.downloadInfo && req.downloadInfo.file_path) || `/Filmler/${filename}`;
+
+        if (!filename) {
+            return res.status(400).json({ success: false, error: 'filename parametresi eksik.' });
+        }
+
+        const targetDisk = getBestTargetDisk();
+        const uploadId = req.body.upload_id || req.query.upload_id || (req.downloadInfo && req.downloadInfo.upload_id) || crypto.randomBytes(16).toString('hex');
+        const tempDir = path.join(targetDisk, '.tmp_uploads', uploadId);
+
+        fs.mkdirSync(tempDir, { recursive: true });
+
+        const meta = {
+            upload_id: uploadId,
+            filename: filename,
+            file_size: fileSize,
+            target_path_rel: targetPathRel,
+            target_disk: targetDisk,
+            created_at: new Date().toISOString()
+        };
+
+        fs.writeFileSync(path.join(tempDir, 'meta.json'), JSON.stringify(meta, null, 2));
+
+        res.json({
+            success: true,
+            upload_id: uploadId,
+            allocated_disk: targetDisk,
+            file_path: targetPathRel,
+            chunk_size: 5 * 1024 * 1024
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Oturum baslatma hatasi: ' + err.message });
+    }
+});
+
+app.post('/upload/chunk', verifyToken, (req, res) => {
+    try {
+        const uploadId = req.headers['x-upload-id'] || req.query.upload_id || (req.downloadInfo && req.downloadInfo.upload_id);
+        const chunkIndex = parseInt(req.headers['x-chunk-index'] || req.query.chunk_index || '0', 10);
+
+        if (!uploadId) {
+            return res.status(400).json({ success: false, error: 'upload_id eksik.' });
+        }
+
+        const activeDisks = getActiveStorageDisks();
+        let tempDir = null;
+
+        for (const diskRoot of activeDisks) {
+            const candidate = path.join(diskRoot, '.tmp_uploads', uploadId);
+            if (fs.existsSync(candidate)) {
+                tempDir = candidate;
+                break;
+            }
+        }
+
+        if (!tempDir) {
+            return res.status(404).json({ success: false, error: 'Yukleme oturumu bulunamadi.' });
+        }
+
+        const chunkPath = path.join(tempDir, `chunk_${chunkIndex}`);
+        const writeStream = fs.createWriteStream(chunkPath);
+
+        req.pipe(writeStream);
+
+        writeStream.on('finish', () => {
+            const stat = fs.statSync(chunkPath);
+            res.json({
+                success: true,
+                upload_id: uploadId,
+                chunk_index: chunkIndex,
+                bytes_written: stat.size
+            });
+        });
+
+        writeStream.on('error', (err) => {
+            res.status(500).json({ success: false, error: 'Dilim kaydetme hatasi: ' + err.message });
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Dilim yukleme hatasi: ' + err.message });
+    }
+});
+
+app.get('/upload/status', verifyToken, (req, res) => {
+    try {
+        const uploadId = req.query.upload_id || (req.downloadInfo && req.downloadInfo.upload_id);
+        if (!uploadId) {
+            return res.status(400).json({ success: false, error: 'upload_id eksik.' });
+        }
+
+        const activeDisks = getActiveStorageDisks();
+        let tempDir = null;
+
+        for (const diskRoot of activeDisks) {
+            const candidate = path.join(diskRoot, '.tmp_uploads', uploadId);
+            if (fs.existsSync(candidate)) {
+                tempDir = candidate;
+                break;
+            }
+        }
+
+        if (!tempDir) {
+            return res.status(404).json({ success: false, error: 'Yukleme oturumu bulunamadi.' });
+        }
+
+        const files = fs.readdirSync(tempDir);
+        const uploadedChunks = [];
+        let totalBytes = 0;
+
+        for (const f of files) {
+            if (f.startsWith('chunk_')) {
+                const idx = parseInt(f.replace('chunk_', ''), 10);
+                if (!isNaN(idx)) {
+                    uploadedChunks.push(idx);
+                    totalBytes += fs.statSync(path.join(tempDir, f)).size;
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            upload_id: uploadId,
+            chunks: uploadedChunks.sort((a, b) => a - b),
+            total_bytes_uploaded: totalBytes
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Durum sorgulama hatasi: ' + err.message });
+    }
+});
+
+app.post('/upload/finish', verifyToken, (req, res) => {
+    try {
+        const uploadId = req.body.upload_id || req.query.upload_id || (req.downloadInfo && req.downloadInfo.upload_id);
+        if (!uploadId) {
+            return res.status(400).json({ success: false, error: 'upload_id eksik.' });
+        }
+
+        const activeDisks = getActiveStorageDisks();
+        let tempDir = null;
+
+        for (const diskRoot of activeDisks) {
+            const candidate = path.join(diskRoot, '.tmp_uploads', uploadId);
+            if (fs.existsSync(candidate)) {
+                tempDir = candidate;
+                break;
+            }
+        }
+
+        if (!tempDir) {
+            return res.status(404).json({ success: false, error: 'Yukleme oturumu bulunamadi.' });
+        }
+
+        const metaPath = path.join(tempDir, 'meta.json');
+        let meta = {};
+        if (fs.existsSync(metaPath)) {
+            try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch(e) {}
+        }
+
+        const targetDisk = meta.target_disk || path.dirname(path.dirname(tempDir));
+        const targetPathRel = req.body.file_path || req.query.file_path || meta.target_path_rel || `/Filmler/${meta.filename || 'media.mkv'}`;
+        const fullPath = path.resolve(targetDisk, targetPathRel.replace(/^\/+/, ''));
+
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+        const files = fs.readdirSync(tempDir);
+        const chunkIndices = [];
+        for (const f of files) {
+            if (f.startsWith('chunk_')) {
+                const idx = parseInt(f.replace('chunk_', ''), 10);
+                if (!isNaN(idx)) chunkIndices.push(idx);
+            }
+        }
+        chunkIndices.sort((a, b) => a - b);
+
+        const destStream = fs.createWriteStream(fullPath);
+
+        let currentIndex = 0;
+        function appendNextChunk() {
+            if (currentIndex >= chunkIndices.length) {
+                destStream.end();
+                return;
+            }
+
+            const chunkFile = path.join(tempDir, `chunk_${chunkIndices[currentIndex]}`);
+            const srcStream = fs.createReadStream(chunkFile);
+
+            srcStream.pipe(destStream, { end: false });
+            srcStream.on('end', () => {
+                currentIndex++;
+                appendNextChunk();
+            });
+            srcStream.on('error', (err) => {
+                destStream.destroy(err);
+            });
+        }
+
+        destStream.on('finish', () => {
+            const stat = fs.statSync(fullPath);
+            try {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            } catch (e) {}
+
+            res.json({
+                success: true,
+                message: 'Dosya birlesimi ve yukleme tamamlandi.',
+                file_path: targetPathRel,
+                allocated_disk: targetDisk,
+                full_path: fullPath,
+                size_bytes: stat.size
+            });
+        });
+
+        destStream.on('error', (err) => {
+            res.status(500).json({ success: false, error: 'Dosya birlesimi hatasi: ' + err.message });
+        });
+
+        appendNextChunk();
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Yukleme tamamlama hatasi: ' + err.message });
+    }
 });
 
 app.post('/upload', verifyToken, (req, res) => {

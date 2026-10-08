@@ -22,7 +22,13 @@ import {
     AlertCircle,
     X,
     ShieldCheck,
-    ShieldAlert
+    ShieldAlert,
+    HelpCircle,
+    Plus,
+    Trash2,
+    ChevronUp,
+    ChevronDown,
+    MessageSquare
 } from 'lucide-react';
 
 export default function AdminDashboard({ 
@@ -32,7 +38,8 @@ export default function AdminDashboard({
     plans = [],
     heroSettings = { mode: 'auto', slots: { '1': '', '2': '', '3': '', '4': '', '5': '' } },
     heroSlotPreviews = {},
-    ipAccessSettings = { whitelist: [], blacklist: [] }
+    ipAccessSettings = { whitelist: [], blacklist: [] },
+    faqSettings = []
 }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
@@ -96,6 +103,53 @@ export default function AdminDashboard({
     const [blacklistText, setBlacklistText] = useState((ipAccessSettings?.blacklist || []).join('\n'));
     const [isSavingIpAccess, setIsSavingIpAccess] = useState(false);
     const [ipAccessNotice, setIpAccessNotice] = useState(null);
+
+    // FAQ Management state
+    const [faqsList, setFaqsList] = useState(faqSettings || []);
+    const [isSavingFaqs, setIsSavingFaqs] = useState(false);
+    const [faqNotice, setFaqNotice] = useState(null);
+
+    const handleAddFaqItem = () => {
+        setFaqsList(prev => [...prev, { question: '', answer: '' }]);
+    };
+
+    const handleRemoveFaqItem = (index) => {
+        setFaqsList(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleUpdateFaqItem = (index, field, value) => {
+        setFaqsList(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+    };
+
+    const handleMoveFaqItem = (index, direction) => {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= faqsList.length) return;
+        const newFaqs = [...faqsList];
+        const temp = newFaqs[index];
+        newFaqs[index] = newFaqs[targetIndex];
+        newFaqs[targetIndex] = temp;
+        setFaqsList(newFaqs);
+    };
+
+    const handleSaveFaqSettings = (e) => {
+        e?.preventDefault();
+        setIsSavingFaqs(true);
+        router.post('/admin/faq-settings', {
+            faqs: faqsList
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsSavingFaqs(false);
+                setFaqNotice('Fiyatlandırma Sıkça Sorulan Sorular (SSS) başarıyla güncellendi.');
+                setTimeout(() => setFaqNotice(null), 4000);
+            },
+            onError: () => {
+                setIsSavingFaqs(false);
+                setFaqNotice('SSS kaydedilirken bir hata oluştu.');
+                setTimeout(() => setFaqNotice(null), 4000);
+            }
+        });
+    };
 
     const handleSaveIpAccessSettings = (e) => {
         e?.preventDefault();
@@ -1145,6 +1199,145 @@ export default function AdminDashboard({
                                         <span>IP Listelerini Kaydet</span>
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* 4. PRICING FAQ (SSS) MANAGEMENT CARD */}
+                            <div className="bg-[#0D111A] border border-white/[0.06] rounded-xl p-6 space-y-6 shadow-sm">
+                                <div className="border-b border-white/[0.06] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5">
+                                            <HelpCircle className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                                                Fiyatlandırma Sıkça Sorulan Sorular (SSS / FAQ)
+                                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                    {faqsList.length} Soru
+                                                </span>
+                                            </h2>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                Sitede /pricing sayfasında kullanıcılara gösterilecek soru ve cevapları yönetin. Dilediğiniz kadar soru ekleyebilirsiniz.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={handleAddFaqItem}
+                                            className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>Yeni Soru Ekle</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveFaqSettings}
+                                            disabled={isSavingFaqs}
+                                            className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white font-semibold text-xs transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                                        >
+                                            {isSavingFaqs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                            <span>SSS Kaydet</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {faqNotice && (
+                                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between animate-in fade-in">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                            <span>{faqNotice}</span>
+                                        </div>
+                                        <span className="font-mono text-[10px] text-emerald-400/80">FAQ_UPDATE_200</span>
+                                    </div>
+                                )}
+
+                                {faqsList.length === 0 ? (
+                                    <div className="p-8 text-center bg-[#07090E] border border-white/[0.04] rounded-xl space-y-3">
+                                        <HelpCircle className="w-8 h-8 text-gray-600 mx-auto" />
+                                        <p className="text-xs font-semibold text-gray-400">Henüz eklenmiş soru yok.</p>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddFaqItem}
+                                            className="px-3.5 py-1.5 bg-emerald-500 text-white text-xs font-bold rounded-lg inline-flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>İlk Soruyu Ekle</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {faqsList.map((faq, index) => (
+                                            <div key={index} className="p-4 bg-[#07090E] border border-white/[0.08] hover:border-white/15 rounded-xl space-y-3 transition-all">
+                                                <div className="flex items-center justify-between gap-2 border-b border-white/[0.04] pb-2">
+                                                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                                                        <span className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-mono text-[10px]">
+                                                            {index + 1}
+                                                        </span>
+                                                        <span>Soru #{index + 1}</span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMoveFaqItem(index, -1)}
+                                                            disabled={index === 0}
+                                                            className="p-1 bg-white/5 hover:bg-white/10 disabled:opacity-20 text-gray-300 rounded transition-all"
+                                                            title="Yukarı Taşı"
+                                                        >
+                                                            <ChevronUp className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMoveFaqItem(index, 1)}
+                                                            disabled={index === faqsList.length - 1}
+                                                            className="p-1 bg-white/5 hover:bg-white/10 disabled:opacity-20 text-gray-300 rounded transition-all"
+                                                            title="Aşağı Taşı"
+                                                        >
+                                                            <ChevronDown className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveFaqItem(index)}
+                                                            className="p-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded border border-red-500/20 transition-all ml-1"
+                                                            title="Sil"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+                                                            Soru Başlığı (Kullanıcıların Göreceği Soru)
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={faq.question || ''}
+                                                            onChange={(e) => handleUpdateFaqItem(index, 'question', e.target.value)}
+                                                            placeholder="Örn: İndirme kotaları nasıl yenilenir?"
+                                                            className="w-full bg-[#0D111A] border border-white/10 focus:border-emerald-500/50 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+                                                            Cevap Açıklaması
+                                                        </label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={faq.answer || ''}
+                                                            onChange={(e) => handleUpdateFaqItem(index, 'answer', e.target.value)}
+                                                            placeholder="Soruya verilecek detaylı yanıt..."
+                                                            className="w-full bg-[#0D111A] border border-white/10 focus:border-emerald-500/50 rounded-lg p-3 text-xs text-white placeholder-gray-600 focus:outline-none leading-relaxed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <form onSubmit={handleSaveSettings} className="space-y-6">

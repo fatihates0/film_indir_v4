@@ -127,6 +127,8 @@ class AdminController extends Controller
             'blacklist' => [],
         ]);
 
+        $faqSettings = Setting::get('pricing_faq_settings', self::defaultFaqs());
+
         return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
             'recentUsers' => $recentUsers,
@@ -135,6 +137,7 @@ class AdminController extends Controller
             'heroSettings' => $heroSettings,
             'heroSlotPreviews' => $heroSlotPreviews,
             'ipAccessSettings' => $ipAccessSettings,
+            'faqSettings' => $faqSettings,
         ]);
     }
 
@@ -275,5 +278,54 @@ class AdminController extends Controller
         );
 
         return back()->with('success', "{$user->name} kullanıcısına {$plan->name} ({$validated['duration_months']} Ay) başarıyla tanımlandı.");
+    }
+
+    /**
+     * Update Pricing FAQ (SSS) settings.
+     */
+    public function updateFaqSettings(Request $request)
+    {
+        $validated = $request->validate([
+            'faqs' => ['nullable', 'array'],
+            'faqs.*.question' => ['required', 'string', 'max:255'],
+            'faqs.*.answer' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $faqs = array_values(array_filter($validated['faqs'] ?? [], function ($item) {
+            return ! empty(trim($item['question'] ?? '')) && ! empty(trim($item['answer'] ?? ''));
+        }));
+
+        Setting::set('pricing_faq_settings', $faqs);
+
+        return redirect()->back()->with('success', 'Fiyatlandırma Sıkça Sorulan Sorular (SSS) başarıyla güncellendi.');
+    }
+
+    /**
+     * Default FAQ list.
+     */
+    public static function defaultFaqs(): array
+    {
+        return [
+            [
+                'question' => 'İndirmeler VIP/Premium sunuculardan mı yapılıyor?',
+                'answer' => 'Evet! Tüm indirmeler yüksek hızlı Dedicated Gateway (Storage Box) sunucularımız üzerinden doğrudan bağlantı ile maksimum hızınızda gerçekleştirilir.',
+            ],
+            [
+                'question' => 'Aynı anda birden fazla dosya indirebilir miyim?',
+                'answer' => 'Paket seviyenize bağlı olarak aynı anda 2, 5 veya sınırsız eş zamanlı indirme yapabilirsiniz. Detaylar paket özelliklerinde belirtilmiştir.',
+            ],
+            [
+                'question' => 'Kotalarım ne zaman yenilenir?',
+                'answer' => 'Aylık paket kotalarınız abonelik süreniz boyunca her 30 günde bir otomatik yenilenir. Kullanılmayan kotalar bir sonraki aya devretmez. Ek kotalar ise 30 gün geçerlidir.',
+            ],
+            [
+                'question' => 'Hangi ödeme yöntemleri destekleniyor?',
+                'answer' => 'Banka havalesi, EFT, FAST ve Kripto para (USDT, BTC vb.) ile ödeme yapabilirsiniz.',
+            ],
+            [
+                'question' => 'İndirme hızı sınırı var mı?',
+                'answer' => 'Hayır! İndirmelerde herhangi bir sunucu kaynaklı hız kısıtlaması uygulanmaz. İnternet servis sağlayıcınızın desteklediği maksimum bant genişliğini kullanabilirsiniz.',
+            ],
+        ];
     }
 }

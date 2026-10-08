@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminUploadController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\PlanController;
@@ -56,6 +57,7 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::post('/users/{user}/assign-plan', [AdminController::class, 'assignPlan'])->name('users.assign-plan');
     Route::post('/hero-settings', [AdminController::class, 'updateHeroSettings'])->name('hero-settings.update');
     Route::post('/ip-access-settings', [AdminController::class, 'updateIpAccessSettings'])->name('ip-access-settings.update');
+    Route::post('/faq-settings', [AdminController::class, 'updateFaqSettings'])->name('faq-settings.update');
     Route::post('/sync-trailers', [AdminController::class, 'syncTrailers'])->name('sync-trailers');
     Route::get('/lookup-imdb', [AdminController::class, 'lookupImdb'])->name('lookup-imdb');
 
@@ -74,6 +76,10 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::delete('/medias/{mediaFile}', [MediaController::class, 'destroy'])->name('medias.destroy');
     Route::post('/medias/bulk-delete', [MediaController::class, 'bulkDestroy'])->name('medias.bulk-delete');
     Route::post('/medias/clear-all', [MediaController::class, 'clearAll'])->name('medias.clear-all');
+
+    // Resumable Gateway Chunk Upload Routes
+    Route::post('/uploads/init', [AdminUploadController::class, 'init'])->name('uploads.init');
+    Route::post('/uploads/complete', [AdminUploadController::class, 'complete'])->name('uploads.complete');
 
     // TMDB Integration Routes
     Route::post('/medias/tmdb-scan-all', [MediaController::class, 'tmdbScanAll'])->name('medias.tmdb-scan-all');
