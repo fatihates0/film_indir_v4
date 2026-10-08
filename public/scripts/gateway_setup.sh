@@ -1604,6 +1604,70 @@ app.get('/scan', verifyToken, (req, res) => {
     }
 });
 
+function checkActiveWithLaravel(downloadInfo, callback) {
+    if (!downloadInfo || !downloadInfo.ticket_token) {
+        return callback(null, true);
+    }
+
+    let appUrl = getEnvConfig().LARAVEL_WEBHOOK_URL;
+    if (!appUrl && downloadInfo.app_url) {
+        if (!downloadInfo.app_url.includes('127.0.0.1') && !downloadInfo.app_url.includes('localhost')) {
+            appUrl = downloadInfo.app_url;
+        }
+    }
+
+    if (!appUrl) {
+        return callback(null, true);
+    }
+
+    try {
+        const targetUrl = new URL('/api/internal/downloads/check-active', appUrl);
+        const postData = JSON.stringify({
+            token: downloadInfo.ticket_token,
+            user_id: downloadInfo.user_id,
+            media_file_id: downloadInfo.media_file_id,
+            max_parallel_downloads: downloadInfo.max_parallel_downloads
+        });
+
+        const transport = targetUrl.protocol === 'https:' ? https : http;
+        const req = transport.request(targetUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            },
+            timeout: 3000
+        });
+
+        req.on('error', () => callback(null, true));
+        req.on('timeout', () => {
+            try { req.destroy(); } catch(e) {}
+            callback(null, true);
+        });
+
+        req.on('response', (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    if (data && data.allowed === false) {
+                        return callback(null, false, data);
+                    }
+                    callback(null, true);
+                } catch (e) {
+                    callback(null, true);
+                }
+            });
+        });
+
+        req.write(postData);
+        req.end();
+    } catch (e) {
+        callback(null, true);
+    }
+}
+
 app.get('/download', verifyToken, (req, res) => {
     const userId = req.downloadInfo.user_id;
     const mediaFileId = req.downloadInfo.media_file_id;
@@ -1622,7 +1686,17 @@ app.get('/download', verifyToken, (req, res) => {
         }
     }
 
-    const relativePath = req.downloadInfo.file_path || req.query.file_path;
+    checkActiveWithLaravel(req.downloadInfo, (err, allowed, reasonData) => {
+        if (allowed === false) {
+            return res.status(429).json({
+                success: false,
+                code: reasonData ? reasonData.code : 'PARALLEL_LIMIT_EXCEEDED',
+                error: reasonData ? reasonData.message : `Paketiniz ayni anda en fazla ${maxParallel} farkli dosya indirmenize izin vermektedir.`,
+                max_parallel_downloads: maxParallel
+            });
+        }
+
+        const relativePath = req.downloadInfo.file_path || req.query.file_path;
 
     if (!relativePath) {
         return res.status(400).json({ success: false, error: 'file_path eksik.' });
@@ -1705,6 +1779,7 @@ app.get('/download', verifyToken, (req, res) => {
         });
         stream.pipe(res);
     }
+    });
 });
 
 app.post('/upload', verifyToken, (req, res) => {

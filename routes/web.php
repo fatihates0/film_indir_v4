@@ -43,6 +43,7 @@ Route::get('/downloads', [FrontController::class, 'downloads'])->name('downloads
 Route::match(['get', 'post'], '/downloads/prepare/{mediaFile}', [DownloadController::class, 'prepare'])->name('downloads.prepare');
 Route::get('/downloads/file/{token}', [DownloadController::class, 'stream'])->name('downloads.stream');
 Route::post('/api/internal/downloads/log-bytes', [DownloadController::class, 'logBytes'])->name('downloads.log-bytes');
+Route::post('/api/internal/downloads/check-active', [DownloadController::class, 'checkActive'])->name('downloads.check-active');
 
 // Authentication Routes
 Route::post('/login', [AuthController::class, 'login'])->name('login');

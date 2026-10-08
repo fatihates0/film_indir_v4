@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DownloadTicket;
 use App\Models\MediaFile;
 use App\Models\SubscriptionPeriod;
+use App\Models\User;
 use App\Services\StorageGatewayService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
@@ -182,12 +183,51 @@ class DownloadController extends Controller
         $bytesSent = (int) $request->input('bytes_sent', 0);
         $isClosed = (bool) ($request->input('closed') || $request->input('is_closed') || $request->input('finished'));
 
-        if (! $token) {
-            return response()->json(['status' => 'ignored'], 200);
-        }
-
         $this->subscriptionService->recordBytes($token, $bytesSent, $isClosed);
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Internal endpoint for Gateway nodes to check real-time parallel download authorization.
+     */
+    public function checkActive(Request $request): JsonResponse
+    {
+        $token = $request->input('token');
+        $userId = $request->input('user_id');
+        $mediaFileId = (int) $request->input('media_file_id');
+
+        /** @var DownloadTicket|null $ticket */
+        $ticket = null;
+        if ($token) {
+            $ticket = DownloadTicket::where('token', $token)->with(['user'])->first();
+        }
+
+        $user = $ticket?->user ?? ($userId ? User::find($userId) : null);
+
+        if (! $user || $user->isAdmin()) {
+            return response()->json(['allowed' => true]);
+        }
+
+        $targetFileId = $mediaFileId ?: ($ticket?->media_file_id ?? 0);
+
+        if (! $this->subscriptionService->canStartParallelDownload($user, $targetFileId)) {
+            $maxParallel = $this->subscriptionService->getMaxParallelDownloads($user);
+            $activeParallel = $this->subscriptionService->getActiveParallelDownloadsCount($user, $targetFileId);
+
+            return response()->json([
+                'allowed' => false,
+                'code' => 'PARALLEL_LIMIT_EXCEEDED',
+                'message' => "Paketiniz aynı anda en fazla {$maxParallel} farklı dosya indirmenize izin vermektedir. (Şu an aktif: {$activeParallel} dosya). Lütfen devam eden indirmelerinizin tamamlanmasını bekleyin.",
+                'max_parallel_downloads' => $maxParallel,
+                'active_parallel_downloads' => $activeParallel,
+            ], 429);
+        }
+
+        if ($ticket) {
+            $ticket->update(['status' => 'active']);
+        }
+
+        return response()->json(['allowed' => true]);
     }
 }

@@ -511,4 +511,70 @@ class SubscriptionQuotaTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson(['success' => true]);
     }
+
+    public function test_check_active_endpoint_rejects_download_if_another_gateway_has_active_download(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+        $plan->update(['max_parallel_downloads' => 1]);
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+
+        $box = StorageBox::create([
+            'name' => 'Box 1',
+            'host' => 'storage1.filmindir.com',
+            'protocol' => 'custom_gateway',
+            'port' => 443,
+            'username' => 'u123',
+            'password' => 'secret',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $file1 = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Movie1.mkv',
+            'path' => '/movies/Movie1.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 2000000000,
+        ]);
+
+        $file2 = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'Movie2.mkv',
+            'path' => '/movies/Movie2.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 2000000000,
+        ]);
+
+        // Active ticket on Gateway 1 for File 1
+        $ticket1 = DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file1->id,
+            'bytes_downloaded' => 100,
+            'status' => 'active',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        // Gateway 2 calls check-active endpoint for File 2
+        $response = $this->postJson(route('downloads.check-active'), [
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file2->id,
+            'max_parallel_downloads' => 1,
+        ]);
+
+        $response->assertStatus(429);
+        $response->assertJson([
+            'allowed' => false,
+            'code' => 'PARALLEL_LIMIT_EXCEEDED',
+        ]);
+    }
 }
