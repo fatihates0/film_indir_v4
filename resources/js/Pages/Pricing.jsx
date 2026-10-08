@@ -60,16 +60,20 @@ export default function Pricing({ plans = [], paymentMethods = [] }) {
     };
 
     const handleOpenCheckout = (plan) => {
+        const allowed = plan.allowed_durations || [1, 3, 6, 12];
+        const isAllowed = allowed.includes(selectedDuration);
+
+        if (!isAllowed) {
+            // Just switch the page duration tab to the first allowed duration so the user can inspect details first
+            const firstAllowed = allowed[0] || 1;
+            setSelectedDuration(firstAllowed);
+            return;
+        }
+
         if (!user) {
             setAuthModalMode('login');
             setAuthModalOpen(true);
             return;
-        }
-
-        const allowed = plan.allowed_durations || [1, 3, 6, 12];
-        if (!allowed.includes(selectedDuration)) {
-            const firstAllowed = allowed[0] || 1;
-            setSelectedDuration(firstAllowed);
         }
 
         setCheckoutPlan(plan);
