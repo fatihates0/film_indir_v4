@@ -151,6 +151,7 @@ class PlanController extends Controller
             'allowed_durations.*' => 'integer|in:1,3,6,12',
             'max_parallel_downloads' => 'required|integer|min:1|max:20',
             'speed_limit_mbps' => 'nullable|integer|min:1',
+            'allow_vps_access' => 'nullable|boolean',
             'is_active' => 'required|boolean',
             'sort_order' => 'required|integer|min:0',
         ]);
@@ -176,6 +177,7 @@ class PlanController extends Controller
             'allowed_durations' => $allowedDurations,
             'max_parallel_downloads' => $validated['max_parallel_downloads'],
             'speed_limit_mbps' => $validated['speed_limit_mbps'] ?? null,
+            'allow_vps_access' => (bool) ($validated['allow_vps_access'] ?? false),
             'is_active' => $validated['is_active'],
             'sort_order' => $validated['sort_order'],
         ]);
@@ -201,6 +203,7 @@ class PlanController extends Controller
             'allowed_durations.*' => 'integer|in:1,3,6,12',
             'max_parallel_downloads' => 'required|integer|min:1|max:20',
             'speed_limit_mbps' => 'nullable|integer|min:1',
+            'allow_vps_access' => 'nullable|boolean',
             'is_active' => 'required|boolean',
             'sort_order' => 'required|integer|min:0',
         ]);
@@ -221,6 +224,7 @@ class PlanController extends Controller
             'allowed_durations' => $allowedDurations,
             'max_parallel_downloads' => $validated['max_parallel_downloads'],
             'speed_limit_mbps' => $validated['speed_limit_mbps'] ?? null,
+            'allow_vps_access' => (bool) ($validated['allow_vps_access'] ?? false),
             'is_active' => $validated['is_active'],
             'sort_order' => $validated['sort_order'],
         ]);

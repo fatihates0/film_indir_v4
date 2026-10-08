@@ -290,6 +290,23 @@ class SubscriptionService
     }
 
     /**
+     * Check if a user is allowed to download from VPS / Server IP addresses.
+     */
+    public function allowsVpsAccess(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $period = $this->getCurrentPeriod($user);
+        if ($period && $period->subscription && $period->subscription->plan) {
+            return (bool) $period->subscription->plan->allow_vps_access;
+        }
+
+        return false;
+    }
+
+    /**
      * Get the count of distinct active media files currently being downloaded by a user.
      */
     public function getActiveParallelDownloadsCount(User $user, ?int $excludeMediaFileId = null): int

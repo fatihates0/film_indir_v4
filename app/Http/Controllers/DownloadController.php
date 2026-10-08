@@ -6,6 +6,7 @@ use App\Models\DownloadTicket;
 use App\Models\MediaFile;
 use App\Models\SubscriptionPeriod;
 use App\Models\User;
+use App\Services\IpVpsDetectionService;
 use App\Services\StorageGatewayService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,8 @@ class DownloadController extends Controller
 {
     public function __construct(
         protected SubscriptionService $subscriptionService,
-        protected StorageGatewayService $gatewayService
+        protected StorageGatewayService $gatewayService,
+        protected IpVpsDetectionService $vpsDetectionService
     ) {}
 
     /**
@@ -120,6 +122,14 @@ class DownloadController extends Controller
             abort(403, 'Aylık indirme kotanız tükenmiş durumdadır.');
         }
 
+        // Check VPS / Datacenter IP restrictions
+        if (! $user->isAdmin() && ! $this->subscriptionService->allowsVpsAccess($user)) {
+            $clientIp = $request->ip();
+            if ($clientIp && $this->vpsDetectionService->isVpsIp($clientIp)) {
+                abort(403, 'Mevcut paketiniz ile VPS / Sunucu IP adreslerinden indirme yapılmasına izin verilmemektedir.');
+            }
+        }
+
         $mediaFile = $ticket->mediaFile;
         if (! $mediaFile || ! $mediaFile->storageBox) {
             abort(404, 'İstenen medya dosyası veya depolama alanı bulunamadı.');
@@ -191,13 +201,14 @@ class DownloadController extends Controller
     }
 
     /**
-     * Internal endpoint for Gateway nodes to check real-time parallel download authorization.
+     * Internal endpoint for Gateway nodes to check real-time parallel download authorization and VPS IP limits.
      */
     public function checkActive(Request $request): JsonResponse
     {
         $token = $request->input('token');
         $userId = $request->input('user_id');
         $mediaFileId = (int) $request->input('media_file_id');
+        $clientIp = $request->input('client_ip') ?: $request->ip();
 
         /** @var DownloadTicket|null $ticket */
         $ticket = null;
@@ -209,6 +220,17 @@ class DownloadController extends Controller
 
         if (! $user || $user->isAdmin()) {
             return response()->json(['allowed' => true]);
+        }
+
+        // Check VPS / Datacenter IP restrictions
+        if (! $this->subscriptionService->allowsVpsAccess($user)) {
+            if ($clientIp && $this->vpsDetectionService->isVpsIp($clientIp)) {
+                return response()->json([
+                    'allowed' => false,
+                    'code' => 'VPS_ACCESS_DENIED',
+                    'message' => 'Mevcut paketiniz ile VPS / Sunucu IP adreslerinden indirme yapılmasına izin verilmemektedir.',
+                ], 403);
+            }
         }
 
         $targetFileId = $mediaFileId ?: ($ticket?->media_file_id ?? 0);

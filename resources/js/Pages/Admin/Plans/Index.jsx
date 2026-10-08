@@ -86,6 +86,7 @@ export default function PlansIndex({
         allowed_durations: [1, 3, 6, 12],
         max_parallel_downloads: 4,
         speed_limit_mbps: '',
+        allow_vps_access: false,
         is_active: true,
         sort_order: plans.length + 1,
     };
@@ -214,6 +215,7 @@ export default function PlansIndex({
             allowed_durations: plan.allowed_durations || [1, 3, 6, 12],
             max_parallel_downloads: plan.max_parallel_downloads || 4,
             speed_limit_mbps: plan.speed_limit_mbps || '',
+            allow_vps_access: Boolean(plan.allow_vps_access),
             is_active: Boolean(plan.is_active),
             sort_order: plan.sort_order || 0,
         });
@@ -639,6 +641,16 @@ export default function PlansIndex({
                                                     <span>Hız Sınırı:</span>
                                                     <span className="text-white font-semibold">
                                                         {plan.speed_limit_mbps ? `${plan.speed_limit_mbps} Mbps` : 'Sınırsız / Tam Hız'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span>VPS / Sunucu IP İzni:</span>
+                                                    <span className={`font-semibold px-2 py-0.5 rounded text-[11px] ${
+                                                        plan.allow_vps_access
+                                                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                                                    }`}>
+                                                        {plan.allow_vps_access ? 'İzin Verildi' : 'Engellendi'}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
@@ -1412,6 +1424,32 @@ export default function PlansIndex({
                                                 </button>
                                             );
                                         })}
+                                    </div>
+                                </div>
+
+                                {/* VPS / Sunucu IP İzni Toggle */}
+                                <div className="space-y-2 pt-2 border-t border-white/[0.06]">
+                                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#07090E] border border-white/[0.08]">
+                                        <div>
+                                            <label className="text-xs font-bold text-white block">
+                                                VPS / Sunucu IP İndirme İzni
+                                            </label>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">
+                                                Açık olursa kullanıcılar VPS, Veri Merkezi veya Sunucu IP'lerinden indirme yapabilir. Kapalı olursa sadece ev/mobil IP'lerden indirme yapabilirler.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPlanForm({ ...planForm, allow_vps_access: !planForm.allow_vps_access })}
+                                            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                                                planForm.allow_vps_access
+                                                    ? 'bg-[#00B074]/20 border border-[#00B074]/40 text-[#00B074]'
+                                                    : 'bg-gray-800 border border-gray-700 text-gray-400'
+                                            }`}
+                                        >
+                                            {planForm.allow_vps_access ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                                            <span>{planForm.allow_vps_access ? 'İZİN VERİLDİ' : 'ENGELLE (KAPALI)'}</span>
+                                        </button>
                                     </div>
                                 </div>
 

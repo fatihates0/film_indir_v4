@@ -1644,7 +1644,7 @@ app.get('/scan', verifyToken, (req, res) => {
     }
 });
 
-function checkActiveWithLaravel(downloadInfo, callback) {
+function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
     if (!downloadInfo || !downloadInfo.ticket_token) {
         return callback(null, true);
     }
@@ -1666,7 +1666,8 @@ function checkActiveWithLaravel(downloadInfo, callback) {
             token: downloadInfo.ticket_token,
             user_id: downloadInfo.user_id,
             media_file_id: downloadInfo.media_file_id,
-            max_parallel_downloads: downloadInfo.max_parallel_downloads
+            max_parallel_downloads: downloadInfo.max_parallel_downloads,
+            client_ip: clientIp
         });
 
         const transport = targetUrl.protocol === 'https:' ? https : http;
@@ -1715,6 +1716,7 @@ app.get('/download', verifyToken, (req, res) => {
     const userId = req.downloadInfo.user_id;
     const mediaFileId = req.downloadInfo.media_file_id;
     const maxParallel = parseInt(req.downloadInfo.max_parallel_downloads || 0, 10);
+    const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
 
     if (userId && maxParallel > 0) {
         const activeFilesCount = getActiveUserFileCount(userId, mediaFileId);
@@ -1729,9 +1731,10 @@ app.get('/download', verifyToken, (req, res) => {
         }
     }
 
-    checkActiveWithLaravel(req.downloadInfo, (err, allowed, reasonData) => {
+    checkActiveWithLaravel(clientIp, req.downloadInfo, (err, allowed, reasonData) => {
         if (allowed === false) {
-            return res.status(429).json({
+            const statusCode = (reasonData && reasonData.code === 'VPS_ACCESS_DENIED') ? 403 : 429;
+            return res.status(statusCode).json({
                 success: false,
                 code: reasonData ? reasonData.code : 'PARALLEL_LIMIT_EXCEEDED',
                 error: reasonData ? reasonData.message : `Paketiniz ayni anda en fazla ${maxParallel} farkli dosya indirmenize izin vermektedir.`,

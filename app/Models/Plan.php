@@ -30,6 +30,7 @@ class Plan extends Model
         'allowed_durations',
         'max_parallel_downloads',
         'speed_limit_mbps',
+        'allow_vps_access',
         'is_active',
         'sort_order',
     ];
@@ -60,6 +61,7 @@ class Plan extends Model
             'allowed_durations' => 'array',
             'max_parallel_downloads' => 'integer',
             'speed_limit_mbps' => 'integer',
+            'allow_vps_access' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
