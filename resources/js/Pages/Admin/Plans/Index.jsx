@@ -1229,7 +1229,7 @@ export default function PlansIndex({
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl bg-[#07090E] border border-white/[0.06]">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-[#07090E] border border-white/[0.06]">
                                     <div>
                                         <label className="block text-xs font-semibold text-emerald-400 mb-1">Aylık İndirme Kotası (GB) *</label>
                                         <input
@@ -1253,6 +1253,18 @@ export default function PlansIndex({
                                             max="20"
                                             value={planForm.max_parallel_downloads}
                                             onChange={(e) => setPlanForm({ ...planForm, max_parallel_downloads: parseInt(e.target.value) || 4 })}
+                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Hız Limiti (Mbps)</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            placeholder="Sınırsız (Boş)"
+                                            value={planForm.speed_limit_mbps}
+                                            onChange={(e) => setPlanForm({ ...planForm, speed_limit_mbps: e.target.value === '' ? '' : parseInt(e.target.value) || '' })}
                                             className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
                                         />
                                     </div>
