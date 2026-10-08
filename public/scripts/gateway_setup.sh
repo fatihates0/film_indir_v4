@@ -1279,14 +1279,29 @@ const { Transform } = require('stream');
 
 const app = express();
 
-function createThrottleStream(bytesPerSec) {
+function getActiveSocketCountForFile(userId, mediaFileId) {
+    if (!userId || !mediaFileId) return 1;
+    const strUserId = String(userId);
+    const strFileId = String(mediaFileId);
+    if (activeUserStreamsMap.has(strUserId)) {
+        const userFiles = activeUserStreamsMap.get(strUserId);
+        if (userFiles.has(strFileId)) {
+            return Math.max(1, userFiles.get(strFileId).size);
+        }
+    }
+    return 1;
+}
+
+function createThrottleStream(totalBytesPerSec, userId, mediaFileId) {
     let startTime = Date.now();
     let totalSent = 0;
 
     return new Transform({
         transform(chunk, encoding, callback) {
             totalSent += chunk.length;
-            const expectedMs = (totalSent / bytesPerSec) * 1000;
+            const activeSockets = getActiveSocketCountForFile(userId, mediaFileId);
+            const currentStreamBytesPerSec = Math.max(8192, Math.floor(totalBytesPerSec / activeSockets));
+            const expectedMs = (totalSent / currentStreamBytesPerSec) * 1000;
             const actualMs = Date.now() - startTime;
             const waitMs = expectedMs - actualMs;
 
@@ -1789,7 +1804,9 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
         if (speedLimitBytesPerSec > 0) {
-            head['X-Accel-Limit-Rate'] = speedLimitBytesPerSec.toString();
+            const activeSockets = getActiveSocketCountForFile(userId, mediaFileId);
+            const perSocketRate = Math.max(8192, Math.floor(speedLimitBytesPerSec / activeSockets));
+            head['X-Accel-Limit-Rate'] = perSocketRate.toString();
         }
 
         res.writeHead(206, head);
@@ -1798,7 +1815,7 @@ app.get('/download', verifyToken, (req, res) => {
         });
 
         if (speedLimitBytesPerSec > 0) {
-            const throttle = createThrottleStream(speedLimitBytesPerSec);
+            const throttle = createThrottleStream(speedLimitBytesPerSec, userId, mediaFileId);
             file.pipe(throttle).pipe(res);
         } else {
             file.pipe(res);
@@ -1810,7 +1827,9 @@ app.get('/download', verifyToken, (req, res) => {
             'Content-Disposition': `attachment; filename="${encodeURIComponent(path.basename(fullPath))}"`,
         };
         if (speedLimitBytesPerSec > 0) {
-            head['X-Accel-Limit-Rate'] = speedLimitBytesPerSec.toString();
+            const activeSockets = getActiveSocketCountForFile(userId, mediaFileId);
+            const perSocketRate = Math.max(8192, Math.floor(speedLimitBytesPerSec / activeSockets));
+            head['X-Accel-Limit-Rate'] = perSocketRate.toString();
         }
         res.writeHead(200, head);
         const stream = fs.createReadStream(fullPath, { highWaterMark: 256 * 1024 });
@@ -1819,7 +1838,7 @@ app.get('/download', verifyToken, (req, res) => {
         });
 
         if (speedLimitBytesPerSec > 0) {
-            const throttle = createThrottleStream(speedLimitBytesPerSec);
+            const throttle = createThrottleStream(speedLimitBytesPerSec, userId, mediaFileId);
             stream.pipe(throttle).pipe(res);
         } else {
             stream.pipe(res);
