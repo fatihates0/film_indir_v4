@@ -130,6 +130,11 @@ class DownloadController extends Controller
             }
         }
 
+        // Update ticket IP address with actual streaming client IP
+        if ($request->ip()) {
+            $ticket->update(['ip_address' => $request->ip()]);
+        }
+
         $mediaFile = $ticket->mediaFile;
         if (! $mediaFile || ! $mediaFile->storageBox) {
             abort(404, 'İstenen medya dosyası veya depolama alanı bulunamadı.');
@@ -219,6 +224,10 @@ class DownloadController extends Controller
         $user = $ticket?->user ?? ($userId ? User::find($userId) : null);
 
         if (! $user || $user->isAdmin()) {
+            if ($ticket && $clientIp) {
+                $ticket->update(['status' => 'active', 'ip_address' => $clientIp]);
+            }
+
             return response()->json(['allowed' => true]);
         }
 
@@ -249,7 +258,11 @@ class DownloadController extends Controller
         }
 
         if ($ticket) {
-            $ticket->update(['status' => 'active']);
+            $ticketData = ['status' => 'active'];
+            if ($clientIp) {
+                $ticketData['ip_address'] = $clientIp;
+            }
+            $ticket->update($ticketData);
         }
 
         $speedLimitMbps = $this->subscriptionService->getSpeedLimitMbps($user);
