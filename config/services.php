@@ -49,4 +49,14 @@ return [
         'app_url' => env('STORAGE_APP_URL', env('APP_URL')),
     ],
 
+    'jellyfin' => [
+        'url' => env('JELLYFIN_URL', ''),
+        'api_key' => env('JELLYFIN_API_KEY', ''),
+    ],
+
+    'emby' => [
+        'url' => env('EMBY_URL', ''),
+        'api_key' => env('EMBY_API_KEY', ''),
+    ],
+
 ];

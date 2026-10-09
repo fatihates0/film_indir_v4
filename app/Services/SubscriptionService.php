@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\ProvisionMediaAccount;
 use App\Models\DownloadTicket;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -104,7 +105,10 @@ class SubscriptionService
                 $user->update(['plan' => 'premium']);
             }
 
-            return $subscription->load(['plan', 'activePeriod']);
+            $result = $subscription->load(['plan', 'activePeriod']);
+            ProvisionMediaAccount::dispatch($user);
+
+            return $result;
         });
     }
 
