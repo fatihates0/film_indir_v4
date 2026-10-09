@@ -27,14 +27,14 @@ class FrontController extends Controller
 {
     private function getDynamicPlatforms(): array
     {
-        $platforms = Cache::remember('platform_icons_list_v4', now()->addDay(), function () {
+        $platforms = Cache::remember('platform_icons_list_v5', now()->addDay(), function () {
             $iconsDir = public_path('icons');
 
             if (! File::isDirectory($iconsDir)) {
                 File::makeDirectory($iconsDir, 0755, true);
             }
 
-            $files = File::allFiles($iconsDir);
+            $files = File::isDirectory($iconsDir) ? File::allFiles($iconsDir) : [];
             $platformsByKey = [];
 
             foreach ($files as $file) {
@@ -57,6 +57,13 @@ class FrontController extends Controller
                         'paramountplus' => 'Paramount+',
                         'dsmartgo' => 'D-Smart GO',
                         'beinconnect' => 'BeIN Connect',
+                        'tvplus' => 'TV+',
+                        'tod' => 'TOD',
+                        'mubi' => 'MUBI',
+                        'hulu' => 'Hulu',
+                        'cosmogo' => 'Cosmogo',
+                        'disney' => 'Disney+',
+                        'netflix' => 'Netflix',
                         default => ucwords(str_replace(['_', '-'], ' ', $nameKey)),
                     };
 
@@ -64,18 +71,47 @@ class FrontController extends Controller
                     $hasLight = File::exists(public_path('icons/light/'.$filename));
                     $hasRoot = File::exists(public_path('icons/'.$filename));
 
+                    // Always use root-relative paths (/icons/...) so production HTTPS / proxy / custom domain never breaks or causes mixed-content / localhost mismatch
                     $platformsByKey[$nameKey] = [
                         'name' => $displayName,
-                        'logo_url' => $hasRoot ? asset('icons/'.$filename) : ($hasDark ? asset('icons/dark/'.$filename) : asset('icons/light/'.$filename)),
-                        'logo_dark_url' => $hasDark ? asset('icons/dark/'.$filename) : ($hasRoot ? asset('icons/'.$filename) : asset('icons/light/'.$filename)),
-                        'logo_light_url' => $hasLight ? asset('icons/light/'.$filename) : ($hasRoot ? asset('icons/'.$filename) : asset('icons/dark/'.$filename)),
+                        'logo_url' => $hasRoot ? '/icons/'.$filename : ($hasDark ? '/icons/dark/'.$filename : '/icons/light/'.$filename),
+                        'logo_dark_url' => $hasDark ? '/icons/dark/'.$filename : ($hasRoot ? '/icons/'.$filename : '/icons/light/'.$filename),
+                        'logo_light_url' => $hasLight ? '/icons/light/'.$filename : ($hasRoot ? '/icons/'.$filename : '/icons/dark/'.$filename),
                         'filename' => $filename,
                     ];
                 }
             }
 
+            // Fallback default platforms if disk scanning returned empty (e.g. deployment directory issue)
+            if (empty($platformsByKey)) {
+                $fallbackPlatforms = [
+                    ['key' => 'netflix', 'name' => 'Netflix', 'file' => 'netflix.png'],
+                    ['key' => 'hbomax', 'name' => 'HBO Max', 'file' => 'hbomax.png'],
+                    ['key' => 'disney', 'name' => 'Disney+', 'file' => 'disney.png'],
+                    ['key' => 'amazon', 'name' => 'Prime Video', 'file' => 'amazon.png'],
+                    ['key' => 'appletvplus', 'name' => 'Apple TV+', 'file' => 'appletvplus.png'],
+                    ['key' => 'beinconnect', 'name' => 'BeIN Connect', 'file' => 'beinconnect.png'],
+                    ['key' => 'tvplus', 'name' => 'TV+', 'file' => 'tvplus.png'],
+                    ['key' => 'dsmartgo', 'name' => 'D-Smart GO', 'file' => 'dsmartgo.png'],
+                    ['key' => 'tod', 'name' => 'TOD', 'file' => 'tod.png'],
+                    ['key' => 'cosmogo', 'name' => 'Cosmogo', 'file' => 'cosmogo.png'],
+                    ['key' => 'mubi', 'name' => 'MUBI', 'file' => 'mubi.png'],
+                    ['key' => 'hulu', 'name' => 'Hulu', 'file' => 'hulu.png'],
+                    ['key' => 'paramountplus', 'name' => 'Paramount+', 'file' => 'paramountplus.png'],
+                ];
+                foreach ($fallbackPlatforms as $item) {
+                    $platformsByKey[$item['key']] = [
+                        'name' => $item['name'],
+                        'logo_url' => '/icons/dark/'.$item['file'],
+                        'logo_dark_url' => '/icons/dark/'.$item['file'],
+                        'logo_light_url' => '/icons/light/'.$item['file'],
+                        'filename' => $item['file'],
+                    ];
+                }
+            }
+
             // Desired priority order matching reference design
-            $priorityOrder = ['netflix', 'hbomax', 'pixar', 'marvel', 'starwars', 'nationalgeographic', 'disney', 'primevideo', 'appletv'];
+            $priorityOrder = ['netflix', 'hbomax', 'disney', 'amazon', 'primevideo', 'appletvplus', 'appletv', 'beinconnect', 'tvplus', 'tod', 'dsmartgo', 'cosmogo', 'mubi', 'hulu', 'paramountplus'];
 
             $orderedPlatforms = [];
             foreach ($priorityOrder as $key) {

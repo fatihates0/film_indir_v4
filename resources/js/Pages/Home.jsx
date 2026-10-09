@@ -9,6 +9,81 @@ import { getCinemaVersion, cinemaConfig } from '../Config/cinemaConfig';
 import { useHeroIdleFade } from '../Utils/useHeroIdleFade';
 import { useTheme } from '../Context/ThemeContext';
 
+const DEFAULT_PLATFORMS = [
+    { name: 'Netflix', filename: 'netflix.png' },
+    { name: 'HBO Max', filename: 'hbomax.png' },
+    { name: 'Disney+', filename: 'disney.png' },
+    { name: 'Prime Video', filename: 'amazon.png' },
+    { name: 'Apple TV+', filename: 'appletvplus.png' },
+    { name: 'BeIN Connect', filename: 'beinconnect.png' },
+    { name: 'TV+', filename: 'tvplus.png' },
+    { name: 'TOD', filename: 'tod.png' },
+    { name: 'D-Smart GO', filename: 'dsmartgo.png' },
+    { name: 'Cosmogo', filename: 'cosmogo.png' },
+    { name: 'MUBI', filename: 'mubi.png' },
+    { name: 'Hulu', filename: 'hulu.png' },
+    { name: 'Paramount+', filename: 'paramountplus.png' },
+];
+
+function PlatformLogoCard({ platform, theme }) {
+    const [imgFailed, setImgFailed] = useState(false);
+    const [retryStage, setRetryStage] = useState(0);
+
+    const folder = theme === 'light' ? 'light' : 'dark';
+    const altFolder = theme === 'light' ? 'dark' : 'light';
+
+    const getInitialSrc = () => {
+        if (platform?.filename) {
+            return `/icons/${folder}/${platform.filename}`;
+        }
+        const raw = theme === 'light'
+            ? (platform?.logo_light_url || platform?.logo_url)
+            : (platform?.logo_dark_url || platform?.logo_url);
+        if (!raw) return null;
+        return raw.replace(/^https?:\/\/[^\/]+/, '');
+    };
+
+    const [currentSrc, setCurrentSrc] = useState(getInitialSrc);
+
+    useEffect(() => {
+        setImgFailed(false);
+        setRetryStage(0);
+        setCurrentSrc(getInitialSrc());
+    }, [theme, platform.filename, platform.logo_dark_url, platform.logo_light_url]);
+
+    const handleError = () => {
+        if (retryStage === 0 && platform?.filename) {
+            setRetryStage(1);
+            setCurrentSrc(`/icons/${altFolder}/${platform.filename}`);
+        } else if (retryStage === 1 && platform?.filename) {
+            setRetryStage(2);
+            setCurrentSrc(`/icons/${platform.filename}`);
+        } else {
+            setImgFailed(true);
+        }
+    };
+
+    return (
+        <div
+            className="group flex-shrink-0 w-36 sm:w-44 md:w-48 h-20 sm:h-22 border border-slate-300/70 dark:border-white/10 bg-white dark:bg-transparent rounded-[14px] flex items-center justify-center p-3.5 sm:p-4 shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.6)] hover:bg-slate-100 dark:hover:bg-[#1a1c24] hover:border-slate-400 dark:hover:border-white/30 hover:scale-[1.04] transition-all duration-300 ease-out cursor-pointer select-none"
+        >
+            {!imgFailed && currentSrc ? (
+                <img
+                    src={currentSrc}
+                    alt={platform.name || 'Platform Logo'}
+                    onError={handleError}
+                    loading="lazy"
+                    className="max-h-[52%] max-w-[76%] w-auto h-auto object-contain transition-transform duration-300 group-hover:scale-105 opacity-95 group-hover:opacity-100"
+                />
+            ) : (
+                <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-gray-200 tracking-wider text-center">
+                    {platform.name}
+                </span>
+            )}
+        </div>
+    );
+}
+
 export default function Home({
     hero,
     heroSlides = [],
@@ -22,6 +97,7 @@ export default function Home({
     platforms = []
 }) {
     const { theme } = useTheme();
+    const displayPlatforms = (Array.isArray(platforms) && platforms.length > 0) ? platforms : DEFAULT_PLATFORMS;
     const slides = Array.isArray(heroSlides) && heroSlides.length > 0 ? heroSlides : (hero ? [hero] : []);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const currentHero = slides[currentSlideIndex] || slides[0] || hero;
@@ -365,41 +441,21 @@ export default function Home({
             )}
 
             {/* STREAMING PLATFORMS BAR */}
-            {platforms && platforms.length > 0 && (
-                <div className="relative border-y border-slate-300/60 dark:border-white/[0.06] bg-slate-200/50 dark:bg-[#07080c] py-6 overflow-hidden">
-                    {/* Left & Right gradient fade masks */}
-                    <div className="absolute left-0 top-0 bottom-0 w-20 sm:w-36 bg-gradient-to-r from-[#f4f5f8] dark:from-[#07080c] via-[#f4f5f8]/80 dark:via-[#07080c]/80 to-transparent z-10 pointer-events-none" />
-                    <div className="absolute right-0 top-0 bottom-0 w-20 sm:w-36 bg-gradient-to-l from-[#f4f5f8] dark:from-[#07080c] via-[#f4f5f8]/80 dark:via-[#07080c]/80 to-transparent z-10 pointer-events-none" />
+            <div className="relative border-y border-slate-300/60 dark:border-white/[0.06] bg-slate-200/50 dark:bg-[#07080c] py-6 overflow-hidden">
+                {/* Left & Right gradient fade masks */}
+                <div className="absolute left-0 top-0 bottom-0 w-20 sm:w-36 bg-gradient-to-r from-[#f4f5f8] dark:from-[#07080c] via-[#f4f5f8]/80 dark:via-[#07080c]/80 to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-20 sm:w-36 bg-gradient-to-l from-[#f4f5f8] dark:from-[#07080c] via-[#f4f5f8]/80 dark:via-[#07080c]/80 to-transparent z-10 pointer-events-none" />
 
-                    <div className="flex animate-marquee gap-3 sm:gap-4 md:gap-5">
-                        {[...platforms, ...platforms, ...platforms, ...platforms].map((p, idx) => {
-                            const iconFolder = theme === 'light' ? 'light' : 'dark';
-                            const logoSrc = theme === 'light'
-                                ? (p.logo_light_url || (p.filename ? `/icons/light/${p.filename}` : p.logo_url?.replace(/\/icons\/(?:dark\/|light\/)?([^/]+)$/, '/icons/light/$1')))
-                                : (p.logo_dark_url || (p.filename ? `/icons/dark/${p.filename}` : p.logo_url?.replace(/\/icons\/(?:dark\/|light\/)?([^/]+)$/, '/icons/dark/$1')));
-
-                            return (
-                                <div
-                                    key={idx}
-                                    className="group flex-shrink-0 w-36 sm:w-44 md:w-48 h-20 sm:h-22 border border-slate-300/70 dark:border-white/10 bg-white dark:bg-transparent rounded-[14px] flex items-center justify-center p-3.5 sm:p-4 shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.6)] hover:bg-slate-100 dark:hover:bg-[#1a1c24] hover:border-slate-400 dark:hover:border-white/30 hover:scale-[1.04] transition-all duration-300 ease-out cursor-pointer"
-                                >
-                                    {logoSrc ? (
-                                        <img
-                                            src={logoSrc}
-                                            alt={p.name || 'Platform Logo'}
-                                            className="max-h-[52%] max-w-[76%] w-auto h-auto object-contain transition-transform duration-300 group-hover:scale-105 opacity-95 group-hover:opacity-100"
-                                        />
-                                    ) : (
-                                        <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-gray-200 tracking-wider">
-                                            {p.name}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                <div className="flex animate-marquee gap-3 sm:gap-4 md:gap-5">
+                    {[...displayPlatforms, ...displayPlatforms, ...displayPlatforms, ...displayPlatforms].map((p, idx) => (
+                        <PlatformLogoCard
+                            key={`${p.filename || p.name || 'platform'}-${idx}`}
+                            platform={p}
+                            theme={theme}
+                        />
+                    ))}
                 </div>
-            )}
+            </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 py-12">
                 {/* CONTINUE WATCHING */}
