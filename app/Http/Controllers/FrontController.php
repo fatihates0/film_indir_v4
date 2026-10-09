@@ -150,7 +150,7 @@ class FrontController extends Controller
     public function home()
     {
         // 1. Featured Hero Carousel Slides (Configurable: Manual IMDb Slots vs Auto Smart Hybrid Selection + Caching)
-        $heroSlides = Cache::remember('dashboard_hero_slides_v3', now()->addHours(6), function () {
+        $heroSlides = Cache::remember('dashboard_hero_slides_v4', now()->addHours(6), function () {
             $heroSettings = Setting::get('dashboard_hero_settings', ['mode' => 'auto', 'slots' => []]);
             $isManual = ($heroSettings['mode'] ?? 'auto') === 'manual';
 
@@ -303,8 +303,34 @@ class FrontController extends Controller
                 }
             }
 
-            return $selected->map(fn ($item) => $this->formatHeroItem($item))->filter()->values()->all();
+            // If library has no matched media yet (e.g. freshly installed project), try any title with trailer in DB
+            if ($selected->isEmpty()) {
+                $anyPlayable = TmdbTitle::with('trailers')
+                    ->hasPlayableTrailer()
+                    ->whereNotNull('backdrop_path')
+                    ->orderByDesc('popularity')
+                    ->take(5)
+                    ->get();
+
+                foreach ($anyPlayable as $item) {
+                    $selected->push($item);
+                }
+            }
+
+            // If still completely empty, fallback to sample Avengers: Endgame hero with Turkish Dubbed trailer
+            if ($selected->isEmpty()) {
+                return [$this->getDefaultAvengersHero()];
+            }
+
+            $formatted = $selected->map(fn ($item) => $this->formatHeroItem($item))->filter()->values()->all();
+
+            return ! empty($formatted) ? $formatted : [$this->getDefaultAvengersHero()];
         });
+
+        // Guaranteed fallback if cache or empty result
+        if (empty($heroSlides)) {
+            $heroSlides = [$this->getDefaultAvengersHero()];
+        }
 
         $hero = $heroSlides[0] ?? null;
         $heroIds = collect($heroSlides)->pluck('id')->filter()->all();
@@ -1539,6 +1565,69 @@ class FrontController extends Controller
                 'embed_url' => $t->embed_url,
                 'video_url' => $t->video_url,
             ])->values()->all(),
+        ];
+    }
+
+    /**
+     * Fallback hero slide with Avengers: Endgame Turkish Dubbed trailer
+     * when the system is freshly installed or has no matched media yet.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getDefaultAvengersHero(): array
+    {
+        return [
+            'id' => 999999,
+            'slug' => 'avengers-endgame',
+            'url' => '/movie/avengers-endgame',
+            'title' => 'Avengers: Endgame',
+            'season' => 'Film',
+            'rating' => '8.4',
+            'year' => '2019',
+            'genres' => ['Aksiyon', 'Macera', 'Bilim Kurgu'],
+            'description' => 'Thanos\'un evrenin yarısını yok etmesinin ardından geriye kalan Yenilmezler, kayıplarını geri getirmek ve evreni eski haline döndürmek için son bir fedakarlıkla bir araya gelir.',
+            'backdrop' => 'https://image.tmdb.org/t/p/original/7RyHsO4yDXtBv1zJW8Q92Zu070U.jpg',
+            'type' => 'Film',
+            'media_type' => 'movie',
+            'quality' => '4K Ultra HD',
+            'trailer' => [
+                'id' => 1,
+                'key' => 'kYJv1zT058k',
+                'name' => 'Avengers: Endgame - Dublajlı Resmi Fragman',
+                'label' => 'Türkçe Dublaj',
+                'site' => 'YouTube',
+                'type' => 'Trailer',
+                'is_dubbed' => true,
+                'is_subtitled' => false,
+                'embed_url' => 'https://www.youtube.com/embed/kYJv1zT058k',
+                'video_url' => 'https://www.youtube.com/watch?v=kYJv1zT058k',
+            ],
+            'trailers' => [
+                [
+                    'id' => 1,
+                    'key' => 'kYJv1zT058k',
+                    'name' => 'Avengers: Endgame - Dublajlı Resmi Fragman',
+                    'label' => 'Türkçe Dublaj',
+                    'site' => 'YouTube',
+                    'type' => 'Trailer',
+                    'is_dubbed' => true,
+                    'is_subtitled' => false,
+                    'embed_url' => 'https://www.youtube.com/embed/kYJv1zT058k',
+                    'video_url' => 'https://www.youtube.com/watch?v=kYJv1zT058k',
+                ],
+                [
+                    'id' => 2,
+                    'key' => 'J_gP4Ld6d7Q',
+                    'name' => 'Avengers: Endgame - Resmi Fragman',
+                    'label' => 'Türkçe Dublaj 2',
+                    'site' => 'YouTube',
+                    'type' => 'Trailer',
+                    'is_dubbed' => true,
+                    'is_subtitled' => false,
+                    'embed_url' => 'https://www.youtube.com/embed/J_gP4Ld6d7Q',
+                    'video_url' => 'https://www.youtube.com/watch?v=J_gP4Ld6d7Q',
+                ],
+            ],
         ];
     }
 

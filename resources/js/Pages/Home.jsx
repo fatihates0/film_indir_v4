@@ -84,6 +84,60 @@ function PlatformLogoCard({ platform, theme }) {
     );
 }
 
+const DEFAULT_AVENGERS_HERO = {
+    id: 999999,
+    slug: 'avengers-endgame',
+    url: '/movie/avengers-endgame',
+    title: 'Avengers: Endgame',
+    season: 'Film',
+    rating: '8.4',
+    year: '2019',
+    genres: ['Aksiyon', 'Macera', 'Bilim Kurgu'],
+    description: "Thanos'un evrenin yarısını yok etmesinin ardından geriye kalan Yenilmezler, kayıplarını geri getirmek ve evreni eski haline döndürmek için son bir fedakarlıkla bir araya gelir.",
+    backdrop: 'https://image.tmdb.org/t/p/original/7RyHsO4yDXtBv1zJW8Q92Zu070U.jpg',
+    type: 'Film',
+    media_type: 'movie',
+    quality: '4K Ultra HD',
+    trailer: {
+        id: 1,
+        key: 'kYJv1zT058k',
+        name: 'Avengers: Endgame - Dublajlı Resmi Fragman',
+        label: 'Türkçe Dublaj',
+        site: 'YouTube',
+        type: 'Trailer',
+        is_dubbed: true,
+        is_subtitled: false,
+        embed_url: 'https://www.youtube.com/embed/kYJv1zT058k',
+        video_url: 'https://www.youtube.com/watch?v=kYJv1zT058k',
+    },
+    trailers: [
+        {
+            id: 1,
+            key: 'kYJv1zT058k',
+            name: 'Avengers: Endgame - Dublajlı Resmi Fragman',
+            label: 'Türkçe Dublaj',
+            site: 'YouTube',
+            type: 'Trailer',
+            is_dubbed: true,
+            is_subtitled: false,
+            embed_url: 'https://www.youtube.com/embed/kYJv1zT058k',
+            video_url: 'https://www.youtube.com/watch?v=kYJv1zT058k',
+        },
+        {
+            id: 2,
+            key: 'J_gP4Ld6d7Q',
+            name: 'Avengers: Endgame - Resmi Fragman',
+            label: 'Türkçe Dublaj 2',
+            site: 'YouTube',
+            type: 'Trailer',
+            is_dubbed: true,
+            is_subtitled: false,
+            embed_url: 'https://www.youtube.com/embed/J_gP4Ld6d7Q',
+            video_url: 'https://www.youtube.com/watch?v=J_gP4Ld6d7Q',
+        },
+    ],
+};
+
 export default function Home({
     hero,
     heroSlides = [],
@@ -98,9 +152,10 @@ export default function Home({
 }) {
     const { theme } = useTheme();
     const displayPlatforms = (Array.isArray(platforms) && platforms.length > 0) ? platforms : DEFAULT_PLATFORMS;
-    const slides = Array.isArray(heroSlides) && heroSlides.length > 0 ? heroSlides : (hero ? [hero] : []);
+    const rawSlides = Array.isArray(heroSlides) && heroSlides.length > 0 ? heroSlides : (hero ? [hero] : []);
+    const slides = rawSlides.length > 0 ? rawSlides : [DEFAULT_AVENGERS_HERO];
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-    const currentHero = slides[currentSlideIndex] || slides[0] || hero;
+    const currentHero = slides[currentSlideIndex] || slides[0] || DEFAULT_AVENGERS_HERO;
 
     const genreSliderRef = useRef(null);
     const genreCards = Array.isArray(genreSpotlights) && genreSpotlights.length > 0
