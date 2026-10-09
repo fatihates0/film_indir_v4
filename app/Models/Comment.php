@@ -22,6 +22,7 @@ class Comment extends Model
         'likes_count',
         'dislikes_count',
         'is_approved',
+        'is_spoiler',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Comment extends Model
         'likes_count' => 'integer',
         'dislikes_count' => 'integer',
         'is_approved' => 'boolean',
+        'is_spoiler' => 'boolean',
     ];
 
     protected $appends = [

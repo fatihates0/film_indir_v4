@@ -20,6 +20,7 @@ class CommentController extends Controller
             'rating' => 'nullable|integer|min:1|max:10',
             'content' => 'required|string|min:3|max:2500',
             'guest_name' => 'nullable|string|max:50',
+            'is_spoiler' => 'nullable|boolean',
         ], [
             'content.required' => 'Lütfen bir yorum yazın.',
             'content.min' => 'Yorumunuz en az 3 karakter olmalıdır.',
@@ -44,6 +45,7 @@ class CommentController extends Controller
             'guest_name' => $user ? null : ($validated['guest_name'] ?? 'Sinemasever'),
             'rating' => $validated['parent_id'] ? null : ($validated['rating'] ?? null),
             'content' => trim($validated['content']),
+            'is_spoiler' => (bool) ($validated['is_spoiler'] ?? false),
             'is_approved' => true,
         ]);
 

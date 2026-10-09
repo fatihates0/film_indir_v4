@@ -771,7 +771,7 @@ export default function SeriesDetail({ series, episodes, similarSeries, comments
                                     return (
                                         <div
                                             key={ep.id || epIdx}
-                                            className={`group relative bg-white dark:bg-[#131722]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5 ${isAvail
+                                            className={`group relative bg-white dark:bg-[#0c0e14]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5 ${isAvail
                                                 ? 'border-slate-200 dark:border-white/10 hover:border-[#00B074]/50'
                                                 : 'border-slate-200/60 dark:border-white/5 opacity-60 hover:opacity-85'
                                                 }`}

@@ -1,8 +1,33 @@
 import React, { useState } from 'react';
 import { useForm, usePage, router } from '@inertiajs/react';
 import {
-    Star, ThumbsUp, ThumbsDown, MessageSquare, Reply, Trash2, Send, CornerDownRight, CheckCircle2, User, Sparkles, X
+    Star, ThumbsUp, ThumbsDown, MessageSquare, Reply, Trash2, Send, CornerDownRight, CheckCircle2, User, Sparkles, X, Eye, EyeOff, AlertTriangle
 } from 'lucide-react';
+
+function SpoilerToggle({ checked, onChange, label = "Spoiler (Sürpriz Bozan) İçeriyor" }) {
+    return (
+        <button
+            type="button"
+            onClick={() => onChange(!checked)}
+            className={`group inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none self-start sm:self-auto ${checked
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-500 dark:text-amber-400 shadow-sm shadow-amber-500/10 ring-1 ring-amber-500/20'
+                : 'bg-slate-50 dark:bg-white/[0.03] border-slate-200 dark:border-white/10 text-slate-500 dark:text-gray-400 hover:border-amber-500/40 hover:text-slate-700 dark:hover:text-gray-300'
+                }`}
+        >
+            <div className={`relative w-7 h-4 rounded-full transition-colors duration-200 shrink-0 ${checked ? 'bg-amber-500' : 'bg-slate-300 dark:bg-white/20'
+                }`}>
+                <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 shadow-sm ${checked ? 'translate-x-3' : 'translate-x-0'
+                    }`} />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+                <AlertTriangle className={`w-3.5 h-3.5 transition-colors ${checked ? 'text-amber-500 fill-amber-500/20 animate-pulse' : 'text-slate-400 dark:text-gray-500 group-hover:text-amber-500'
+                    }`} />
+                <span>{label}</span>
+            </div>
+        </button>
+    );
+}
 
 export default function MovieComments({ movieId, comments = [], userRatingAvg, userRatingCount }) {
     const { auth } = usePage().props;
@@ -22,6 +47,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
         content: '',
         guest_name: '',
         parent_id: null,
+        is_spoiler: false,
     });
 
     // Form for reply
@@ -30,6 +56,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
         content: '',
         guest_name: '',
         parent_id: null,
+        is_spoiler: false,
     });
 
     const handleMainSubmit = (e) => {
@@ -46,7 +73,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
         mainForm.post('/comments', {
             preserveScroll: true,
             onSuccess: () => {
-                mainForm.reset('content');
+                mainForm.reset('content', 'is_spoiler');
                 setUserRating(0);
                 setSuccessMessage('Yorumunuz başarıyla yayınlandı!');
                 setTimeout(() => setSuccessMessage(''), 4000);
@@ -68,7 +95,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
         replyForm.post('/comments', {
             preserveScroll: true,
             onSuccess: () => {
-                replyForm.reset('content');
+                replyForm.reset('content', 'is_spoiler');
                 setReplyingToId(null);
                 setSuccessMessage('Yanıtınız eklendi!');
                 setTimeout(() => setSuccessMessage(''), 4000);
@@ -121,7 +148,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
                 </div>
 
                 {userRatingAvg ? (
-                    <div className="flex items-center gap-3 bg-white dark:bg-[#131722] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 self-start sm:self-auto">
+                    <div className="flex items-center gap-3 bg-white dark:bg-[#0c0e14] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 self-start sm:self-auto">
                         <div className="flex items-center gap-1.5 text-amber-400 font-black text-lg">
                             <Star className="w-5 h-5 fill-amber-400" />
                             <span>{userRatingAvg}</span>
@@ -215,7 +242,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
                     <textarea
                         value={mainForm.data.content}
                         onChange={(e) => mainForm.setData('content', e.target.value)}
-                        placeholder="Film hakkındaki spoiler içermeyen duygu ve düşüncelerinizi detaylıca paylaşın..."
+                        placeholder="Film hakkındaki duygu ve düşüncelerinizi detaylıca paylaşın..."
                         rows={3}
                         className="w-full bg-slate-50 dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:border-[#00B074] transition-colors resize-y min-h-[90px]"
                     />
@@ -224,14 +251,18 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
                     )}
                 </div>
 
-                <div className="flex items-center justify-between pt-1">
-                    <p className="text-[11px] text-slate-400 dark:text-gray-500">
-                        Topluluk kurallarına uygun, küfür ve spoiler içermeyen yorumlar hemen yayınlanır.
-                    </p>
+                {/* Spoiler Option & Submit */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                    <SpoilerToggle
+                        checked={mainForm.data.is_spoiler}
+                        onChange={(val) => mainForm.setData('is_spoiler', val)}
+                        label="Bu yorum spoiler (sürpriz bozan) içeriyor"
+                    />
+
                     <button
                         type="submit"
                         disabled={mainForm.processing || !mainForm.data.content.trim()}
-                        className="bg-[#00B074] hover:bg-[#009663] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-2.5 rounded-xl text-xs transition-all shadow-md shadow-[#00B074]/20 flex items-center gap-2 cursor-pointer"
+                        className="bg-[#00B074] hover:bg-[#009663] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-2.5 rounded-xl text-xs transition-all shadow-md shadow-[#00B074]/20 flex items-center justify-center gap-2 cursor-pointer self-end sm:self-auto"
                     >
                         <Send className="w-3.5 h-3.5" />
                         <span>{mainForm.processing ? 'Gönderiliyor...' : 'Yorumu Gönder'}</span>
@@ -285,6 +316,7 @@ function CommentItem({
     isReply = false,
 }) {
     const isOwner = currentUser && (currentUser.id === comment.user_id || currentUser.is_admin);
+    const [showSpoiler, setShowSpoiler] = useState(false);
 
     return (
         <div className={`bg-white dark:bg-[#0c0e14] p-5 sm:p-6 rounded-2xl border ${isReply ? 'border-slate-200/80 dark:border-white/5 bg-slate-50/50 dark:bg-[#0F131C]' : 'border-slate-200 dark:border-white/10'
@@ -306,6 +338,12 @@ function CommentItem({
                             {comment.user?.role === 'admin' && (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-500/20 text-red-500 border border-red-500/30">
                                     YÖNETİCİ
+                                </span>
+                            )}
+                            {comment.is_spoiler && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    SPOILER
                                 </span>
                             )}
                         </div>
@@ -334,10 +372,45 @@ function CommentItem({
                 </div>
             </div>
 
-            {/* Comment Content */}
-            <p className="text-slate-700 dark:text-gray-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
-                {comment.content}
-            </p>
+            {/* Comment Content (with Spoiler Shield support) */}
+            {comment.is_spoiler && !showSpoiler ? (
+                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-600 dark:text-amber-400">
+                    <div className="flex items-center gap-2.5 text-xs font-semibold">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+                        <span>Bu yorum sürpriz bozan (spoiler) içeriyor.</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowSpoiler(true)}
+                        className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm"
+                    >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Spoiler'ı Göster</span>
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {comment.is_spoiler && showSpoiler && (
+                        <div className="flex items-center justify-between text-[11px] text-amber-500 font-semibold bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20">
+                            <span className="flex items-center gap-1.5">
+                                <AlertTriangle className="w-3 h-3" />
+                                Spoiler Gösteriliyor
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowSpoiler(false)}
+                                className="hover:underline flex items-center gap-1 text-slate-400 hover:text-slate-200 cursor-pointer"
+                            >
+                                <EyeOff className="w-3 h-3" />
+                                Gizle
+                            </button>
+                        </div>
+                    )}
+                    <p className="text-slate-700 dark:text-gray-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+                        {comment.content}
+                    </p>
+                </div>
+            )}
 
             {/* Action Bar (Like, Dislike, Reply) */}
             <div className="flex items-center gap-5 text-xs text-slate-500 dark:text-gray-400 pt-1 border-t border-slate-100 dark:border-white/5">
@@ -419,22 +492,30 @@ function CommentItem({
                         className="w-full bg-white dark:bg-[#0c0e14] border border-slate-200 dark:border-white/10 rounded-lg p-3 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074] resize-y min-h-[70px]"
                     />
 
-                    <div className="flex items-center justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setReplyingToId(null)}
-                            className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"
-                        >
-                            Vazgeç
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={replyForm.processing || !replyForm.data.content.trim()}
-                            className="px-4 py-2 bg-[#00B074] hover:bg-[#009663] disabled:opacity-50 text-white font-bold rounded-lg text-xs transition-all shadow-md shadow-[#00B074]/20 flex items-center gap-1.5"
-                        >
-                            <Send className="w-3 h-3" />
-                            <span>Yanıtı Gönder</span>
-                        </button>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                        <SpoilerToggle
+                            checked={replyForm.data.is_spoiler}
+                            onChange={(val) => replyForm.setData('is_spoiler', val)}
+                            label="Spoiler içeriyor"
+                        />
+
+                        <div className="flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setReplyingToId(null)}
+                                className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"
+                            >
+                                Vazgeç
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={replyForm.processing || !replyForm.data.content.trim()}
+                                className="px-4 py-2 bg-[#00B074] hover:bg-[#009663] disabled:opacity-50 text-white font-bold rounded-lg text-xs transition-all shadow-md shadow-[#00B074]/20 flex items-center gap-1.5"
+                            >
+                                <Send className="w-3 h-3" />
+                                <span>Yanıtı Gönder</span>
+                            </button>
+                        </div>
                     </div>
                 </form>
             )}
