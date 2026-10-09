@@ -19,3 +19,9 @@ Schedule::command('app:check-subscriptions')
     ->hourly()
     ->name('check-subscriptions')
     ->withoutOverlapping();
+
+// İndirme ticket'larının durgunluk temizliği (her dakika)
+Schedule::command('tickets:clean-stale')
+    ->everyMinute()
+    ->name('clean-stale-tickets')
+    ->withoutOverlapping();

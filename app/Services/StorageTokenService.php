@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\StorageBox;
+use RuntimeException;
 
 class StorageTokenService
 {
@@ -12,8 +13,17 @@ class StorageTokenService
 
     public function __construct()
     {
-        $this->defaultSecretKey = config('services.storage.secret_key', env('STORAGE_SECRET_KEY', 'test1'));
-        $this->defaultNodeUrl = config('services.storage.default_node_url', env('STORAGE_NODE_1_URL', 'https://dl3.fatihates.com.tr'));
+        $secretKey = config('services.storage.secret_key', '');
+
+        if (empty($secretKey)) {
+            throw new RuntimeException(
+                'STORAGE_SECRET_KEY env değişkeni tanımlanmamış. '.
+                '.env dosyasına güçlü bir değer ekleyin: STORAGE_SECRET_KEY=...'
+            );
+        }
+
+        $this->defaultSecretKey = $secretKey;
+        $this->defaultNodeUrl = rtrim(config('services.storage.default_node_url', 'https://dl3.fatihates.com.tr'), '/');
     }
 
     /**
@@ -34,10 +44,9 @@ class StorageTokenService
             $portSuffix = ($port === 80 || $port === 443 || $port === 0) ? '' : ":{$port}";
 
             return "{$scheme}://{$cleanHost}{$portSuffix}";
-
         }
 
-        return rtrim($this->defaultNodeUrl, '/');
+        return $this->defaultNodeUrl;
     }
 
     /**
@@ -89,13 +98,6 @@ class StorageTokenService
         ?int $speedLimitMbps = null
     ): string {
         $appUrl = config('services.storage.app_url', config('app.url', url('/')));
-
-        if ((str_contains($appUrl, '127.0.0.1') || str_contains($appUrl, 'localhost')) && request()->hasHeader('host')) {
-            $requestUrl = request()->schemeAndHttpHost();
-            if (! str_contains($requestUrl, '127.0.0.1') && ! str_contains($requestUrl, 'localhost')) {
-                $appUrl = $requestUrl;
-            }
-        }
 
         $extraPayload = [
             'file_path' => '/'.ltrim($filePath, '/'),

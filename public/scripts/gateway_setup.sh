@@ -255,8 +255,6 @@ clean_media_suffixes() {
 }
 
 show_dashboard() {
-    clean_media_suffixes
-    migrate_disks_to_depo_format
     clear
     echo -e "${CYAN}====================================================================${NC}"
     echo -e "${BOLD}${BLUE}   DYNAMIC VIRTUAL STORAGE GATEWAY MANAGER v3.3                     ${NC}"
@@ -584,9 +582,13 @@ test_quota_webhook() {
     log_info "Payload: {\"token\":\"$TICKET_TOKEN\", \"bytes_sent\":$bytes_sent} (${SIZE_MB} MB)"
     echo ""
 
+    local secret=$(get_env_val "STORAGE_SECRET_KEY")
+    [ -z "$secret" ] && secret=$(get_env_val "GATEWAY_WEBHOOK_SECRET")
+
     local http_response
     http_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST \
         -H "Content-Type: application/json" \
+        -H "X-Gateway-Secret: $secret" \
         -d "{\"token\":\"$TICKET_TOKEN\",\"bytes_sent\":$bytes_sent}" \
         --max-time 10 "$full_endpoint" 2>&1) || true
 
@@ -1274,9 +1276,10 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const readline = require('readline');
 const Busboy = require('busboy');
 const { Transform } = require('stream');
-const { execFile } = require('child_process');
+const { spawn } = require('child_process');
 
 const app = express();
 
@@ -1298,15 +1301,16 @@ function createThrottleStream(totalBytesPerSec, userId, mediaFileId) {
     let totalSent = 0;
 
     return new Transform({
+        highWaterMark: 64 * 1024,
         transform(chunk, encoding, callback) {
             totalSent += chunk.length;
             const activeSockets = getActiveSocketCountForFile(userId, mediaFileId);
-            const currentStreamBytesPerSec = Math.max(8192, Math.floor(totalBytesPerSec / activeSockets));
+            const currentStreamBytesPerSec = Math.max(16384, Math.floor(totalBytesPerSec / activeSockets));
             const expectedMs = (totalSent / currentStreamBytesPerSec) * 1000;
             const actualMs = Date.now() - startTime;
             const waitMs = expectedMs - actualMs;
 
-            if (waitMs > 10) {
+            if (waitMs > 20) {
                 setTimeout(() => {
                     this.push(chunk);
                     callback();
@@ -1395,7 +1399,8 @@ function reportBytesToLaravel(downloadInfo, bytesSent, isClosed = false) {
         return;
     }
 
-    let appUrl = getEnvConfig().LARAVEL_WEBHOOK_URL;
+    const cfg = getEnvConfig();
+    let appUrl = cfg.LARAVEL_WEBHOOK_URL;
     if (!appUrl && downloadInfo.app_url) {
         if (!downloadInfo.app_url.includes('127.0.0.1') && !downloadInfo.app_url.includes('localhost')) {
             appUrl = downloadInfo.app_url;
@@ -1407,6 +1412,7 @@ function reportBytesToLaravel(downloadInfo, bytesSent, isClosed = false) {
     }
 
     try {
+        const secret = cfg.STORAGE_SECRET_KEY || cfg.GATEWAY_WEBHOOK_SECRET || '';
         const targetUrl = new URL('/api/internal/downloads/log-bytes', appUrl);
         const postData = JSON.stringify({
             token: downloadInfo.ticket_token,
@@ -1420,7 +1426,8 @@ function reportBytesToLaravel(downloadInfo, bytesSent, isClosed = false) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
+                'Content-Length': Buffer.byteLength(postData),
+                'X-Gateway-Secret': secret
             },
             timeout: 5000
         });
@@ -1488,8 +1495,16 @@ function verifyToken(req, res, next) {
             .update(payloadBase64)
             .digest('hex');
 
-        if (signature.length !== expectedSignature.length ||
-            !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+        let isValid = false;
+        try {
+            const sigBuf = Buffer.from(signature, 'hex');
+            const expBuf = Buffer.from(expectedSignature, 'hex');
+            isValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
+        } catch (e) {
+            isValid = false;
+        }
+
+        if (!isValid) {
             return res.status(403).json({ success: false, error: 'Imza dogrulanamadi.' });
         }
 
@@ -1614,82 +1629,89 @@ function scanDisksWithFind(activeDisks, callback) {
     }
 
     const args = [...validDisks, '-type', 'f', '-printf', '%p\t%s\t%T@\n'];
+    const findProc = spawn('find', args);
+    const fileListMap = new Map();
 
-    execFile('find', args, { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
-        if (!stdout) {
-            return callback(err || new Error('Empty stdout'), null);
-        }
+    const rl = readline.createInterface({
+        input: findProc.stdout,
+        crlfDelay: Infinity
+    });
 
-        const fileListMap = new Map();
-        const lines = stdout.split('\n');
+    rl.on('line', (line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
+        const parts = trimmed.split('\t');
+        if (parts.length < 3) return;
 
-            const parts = line.split('\t');
-            if (parts.length < 3) continue;
+        const fullPath = parts[0];
+        const sizeBytes = parseInt(parts[1], 10) || 0;
+        const mtimeEpoch = parseFloat(parts[2]) || 0;
 
-            const fullPath = parts[0];
-            const sizeBytes = parseInt(parts[1], 10) || 0;
-            const mtimeEpoch = parseFloat(parts[2]) || 0;
+        const itemName = path.basename(fullPath);
+        const ext = path.extname(itemName).toLowerCase().replace('.', '');
 
-            const itemName = path.basename(fullPath);
-            const ext = path.extname(itemName).toLowerCase().replace('.', '');
+        if (!VIDEO_EXTENSIONS.has(ext)) return;
 
-            if (!VIDEO_EXTENSIONS.has(ext)) continue;
-
-            let matchedRoot = null;
-            for (const root of validDisks) {
-                if (fullPath.startsWith(root)) {
-                    matchedRoot = root;
-                    break;
-                }
-            }
-            if (!matchedRoot) continue;
-
-            let relativePath = fullPath.substring(matchedRoot.length);
-            if (!relativePath.startsWith('/')) {
-                relativePath = '/' + relativePath;
-            }
-            relativePath = relativePath.replace(/\\/g, '/');
-
-            const normalizedRelPath = relativePath;
-
-            if (!fileListMap.has(normalizedRelPath)) {
-                const dirPath = path.dirname(normalizedRelPath).replace(/\\/g, '/');
-                fileListMap.set(normalizedRelPath, {
-                    filename: itemName,
-                    path: normalizedRelPath,
-                    directory: dirPath === '.' ? '/' : (dirPath.startsWith('/') ? dirPath : '/' + dirPath),
-                    extension: ext,
-                    size_bytes: sizeBytes,
-                    modified_at: new Date(mtimeEpoch * 1000).toISOString()
-                });
+        let matchedRoot = null;
+        for (const root of validDisks) {
+            if (fullPath.startsWith(root)) {
+                matchedRoot = root;
+                break;
             }
         }
+        if (!matchedRoot) return;
 
+        let relativePath = fullPath.substring(matchedRoot.length);
+        if (!relativePath.startsWith('/')) {
+            relativePath = '/' + relativePath;
+        }
+        relativePath = relativePath.replace(/\\/g, '/');
+
+        const normalizedRelPath = relativePath;
+
+        if (!fileListMap.has(normalizedRelPath)) {
+            const dirPath = path.dirname(normalizedRelPath).replace(/\\/g, '/');
+            fileListMap.set(normalizedRelPath, {
+                filename: itemName,
+                path: normalizedRelPath,
+                directory: dirPath === '.' ? '/' : (dirPath.startsWith('/') ? dirPath : '/' + dirPath),
+                extension: ext,
+                size_bytes: sizeBytes,
+                modified_at: new Date(mtimeEpoch * 1000).toISOString()
+            });
+        }
+    });
+
+    let hasError = false;
+    findProc.on('error', (err) => {
+        hasError = true;
+        callback(err, null);
+    });
+
+    findProc.on('close', (code) => {
+        if (hasError) return;
         callback(null, Array.from(fileListMap.values()));
     });
 }
 
-function scanDirectory(dirPath, relativeDir, fileListMap, visited = new Set()) {
+async function scanDirectoryAsync(dirPath, relativeDir, fileListMap, visited = new Set()) {
     try {
         if (!fs.existsSync(dirPath)) return;
 
-        const realPath = fs.realpathSync(dirPath);
+        const realPath = await fs.promises.realpath(dirPath);
         if (visited.has(realPath)) return;
         visited.add(realPath);
 
-        const items = fs.readdirSync(dirPath);
+        const items = await fs.promises.readdir(dirPath);
         for (const itemName of items) {
             try {
                 const fullPath = path.join(dirPath, itemName);
                 const relPath = path.join(relativeDir, itemName).replace(/\\/g, '/');
-                const stat = fs.statSync(fullPath);
+                const stat = await fs.promises.stat(fullPath);
 
                 if (stat.isDirectory()) {
-                    scanDirectory(fullPath, relPath, fileListMap, visited);
+                    await scanDirectoryAsync(fullPath, relPath, fileListMap, visited);
                 } else if (stat.isFile()) {
                     const ext = path.extname(itemName).toLowerCase().replace('.', '');
                     if (VIDEO_EXTENSIONS.has(ext)) {
@@ -1734,12 +1756,12 @@ function updateScanCache(activeDisks, cb = null) {
         });
     };
 
-    scanDisksWithFind(activeDisks, (err, files) => {
+    scanDisksWithFind(activeDisks, async (err, files) => {
         if (err || !files || files.length === 0) {
             const fileListMap = new Map();
-            activeDisks.forEach((diskRoot) => {
-                scanDirectory(diskRoot, '/', fileListMap);
-            });
+            for (const diskRoot of activeDisks) {
+                await scanDirectoryAsync(diskRoot, '/', fileListMap);
+            }
             cachedScanResult = Array.from(fileListMap.values());
         } else {
             cachedScanResult = files;
@@ -1784,7 +1806,8 @@ function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
         return callback(null, true);
     }
 
-    let appUrl = getEnvConfig().LARAVEL_WEBHOOK_URL;
+    const cfg = getEnvConfig();
+    let appUrl = cfg.LARAVEL_WEBHOOK_URL;
     if (!appUrl && downloadInfo.app_url) {
         if (!downloadInfo.app_url.includes('127.0.0.1') && !downloadInfo.app_url.includes('localhost')) {
             appUrl = downloadInfo.app_url;
@@ -1796,6 +1819,7 @@ function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
     }
 
     try {
+        const secret = cfg.STORAGE_SECRET_KEY || cfg.GATEWAY_WEBHOOK_SECRET || '';
         const targetUrl = new URL('/api/internal/downloads/check-active', appUrl);
         const postData = JSON.stringify({
             token: downloadInfo.ticket_token,
@@ -1810,13 +1834,18 @@ function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
+                'Content-Length': Buffer.byteLength(postData),
+                'X-Gateway-Secret': secret
             },
             timeout: 3000
         });
 
-        req.on('error', () => callback(null, true));
+        req.on('error', (err) => {
+            console.error('Laravel check-active webhook hatasi:', err.message);
+            callback(null, true);
+        });
         req.on('timeout', () => {
+            console.warn('Laravel check-active webhook zaman asimi.');
             try { req.destroy(); } catch(e) {}
             callback(null, true);
         });
@@ -1843,6 +1872,7 @@ function checkActiveWithLaravel(clientIp, downloadInfo, callback) {
         req.write(postData);
         req.end();
     } catch (e) {
+        console.error('checkActiveWithLaravel hatasi:', e.message);
         callback(null, true);
     }
 }
@@ -2411,12 +2441,6 @@ quick_update() {
 
     log_step "Server.js ve Gateway Daemon Kodu Yenileniyor..."
     write_gateway_files
-
-    log_info "Ağ ve TCP İşletim Sistemi Tamponları Optimize Ediliyor..."
-    sysctl -w net.core.rmem_max=16777216 >/dev/null 2>&1 || true
-    sysctl -w net.core.wmem_max=16777216 >/dev/null 2>&1 || true
-    sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" >/dev/null 2>&1 || true
-    sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" >/dev/null 2>&1 || true
 
     log_info "Gateway servisi yeniden başlatılıyor..."
     systemctl restart "$SERVICE_NAME"

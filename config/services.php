@@ -43,8 +43,10 @@ return [
     ],
 
     'storage' => [
-        'secret_key' => env('STORAGE_SECRET_KEY', 'test1'),
+        'secret_key' => env('STORAGE_SECRET_KEY', ''),
         'default_node_url' => env('STORAGE_NODE_1_URL', 'https://dl3.fatihates.com.tr'),
+        'gateway_secret' => env('GATEWAY_WEBHOOK_SECRET', ''),
+        'app_url' => env('STORAGE_APP_URL', env('APP_URL')),
     ],
 
 ];

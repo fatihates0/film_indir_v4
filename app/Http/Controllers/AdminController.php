@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -160,6 +161,9 @@ class AdminController extends Controller
             'whitelist' => $whitelist,
             'blacklist' => $blacklist,
         ]);
+
+        // Invalidate cache so new rules apply immediately
+        Cache::forget('ip_access_settings');
 
         return redirect()->back()->with('success', 'IP Erişim Listeleri (Whitelist / Blacklist) başarıyla güncellendi.');
     }

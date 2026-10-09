@@ -157,7 +157,6 @@ class StorageGatewayService
                     // 2. Try MB if bytes not present
                     $totalMb = (float) ($data['total_mb'] ?? $summary['total_mb'] ?? 0);
                     $usedMb = (float) ($data['used_mb'] ?? $summary['used_mb'] ?? 0);
-                    $freeMb = (float) ($data['free_mb'] ?? $summary['free_mb'] ?? 0);
 
                     if ($totalMb > 0) {
                         $totalGb = (int) round($totalMb / 1024);
@@ -196,54 +195,19 @@ class StorageGatewayService
     }
 
     /**
-     * Alias for backward compatibility.
-     */
-    public function generateCustomGatewayUrl(
-        StorageBox $box,
-        string $filePath,
-        int|string $userId,
-        int $ttlMinutes = 180,
-        ?string $ticketToken = null,
-        ?int $mediaFileId = null,
-        ?int $maxParallelDownloads = null,
-        ?int $speedLimitMbps = null
-    ): string {
-        return $this->generateGatewayUrl($box, $filePath, $userId, $ttlMinutes, $ticketToken, $mediaFileId, $maxParallelDownloads, $speedLimitMbps);
-    }
-
-    /**
      * List files on the storage node via signed /scan API.
      *
      * @return array{path: string, files: list<array>, count: int}
      */
     public function listFiles(StorageBox $box, string $path = '/'): array
     {
-        $scanUrl = $this->tokenService->generateApiUrl('/scan', 0, $box, 15);
-
-        try {
-            $response = Http::withoutVerifying()
-                ->timeout($this->timeout)
-                ->connectTimeout($this->connectTimeout)
-                ->get($scanUrl);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                $files = $data['files'] ?? [];
-
-                return [
-                    'path' => $path,
-                    'count' => count($files),
-                    'files' => $files,
-                ];
-            }
-        } catch (Throwable $e) {
-            Log::warning("StorageGateway listFiles error ({$box->name}): ".$e->getMessage());
-        }
+        $data = $this->fetchScanData($box);
+        $files = $data['files'] ?? [];
 
         return [
             'path' => $path,
-            'count' => 0,
-            'files' => [],
+            'count' => count($files),
+            'files' => $files,
         ];
     }
 
@@ -254,6 +218,30 @@ class StorageGatewayService
      */
     public function fetchNodeMediaUsage(StorageBox $box): ?array
     {
+        $data = $this->fetchScanData($box);
+        if ($data === null) {
+            return null;
+        }
+
+        $files = $data['files'] ?? [];
+        $totalBytes = 0;
+        foreach ($files as $file) {
+            $totalBytes += (int) ($file['size_bytes'] ?? 0);
+        }
+
+        return [
+            'file_count' => count($files),
+            'total_bytes' => $totalBytes,
+        ];
+    }
+
+    /**
+     * Shared /scan endpoint fetch used by both listFiles() and fetchNodeMediaUsage().
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function fetchScanData(StorageBox $box): ?array
+    {
         $scanUrl = $this->tokenService->generateApiUrl('/scan', 0, $box, 15);
 
         try {
@@ -263,20 +251,10 @@ class StorageGatewayService
                 ->get($scanUrl);
 
             if ($response->successful()) {
-                $data = $response->json();
-                $files = $data['files'] ?? [];
-                $totalBytes = 0;
-                foreach ($files as $file) {
-                    $totalBytes += (int) ($file['size_bytes'] ?? 0);
-                }
-
-                return [
-                    'file_count' => count($files),
-                    'total_bytes' => $totalBytes,
-                ];
+                return $response->json() ?: [];
             }
         } catch (Throwable $e) {
-            // Silently ignore
+            Log::warning("StorageGateway fetchScanData error ({$box->name}): ".$e->getMessage());
         }
 
         return null;

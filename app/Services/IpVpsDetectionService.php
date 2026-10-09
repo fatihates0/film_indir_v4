@@ -70,7 +70,7 @@ class IpVpsDetectionService
                 continue;
             }
 
-            $settings = Setting::get('ip_access_settings', ['whitelist' => [], 'blacklist' => []]);
+            $settings = Cache::remember('ip_access_settings', 60, fn () => Setting::get('ip_access_settings', ['whitelist' => [], 'blacklist' => []]));
             $whitelist = is_array($settings) ? ($settings['whitelist'] ?? []) : [];
 
             if ($this->matchIpList($cleanIp, (array) $whitelist)) {
@@ -93,7 +93,7 @@ class IpVpsDetectionService
                 continue;
             }
 
-            $settings = Setting::get('ip_access_settings', ['whitelist' => [], 'blacklist' => []]);
+            $settings = Cache::remember('ip_access_settings', 60, fn () => Setting::get('ip_access_settings', ['whitelist' => [], 'blacklist' => []]));
             $blacklist = is_array($settings) ? ($settings['blacklist'] ?? []) : [];
 
             if ($this->matchIpList($cleanIp, (array) $blacklist)) {

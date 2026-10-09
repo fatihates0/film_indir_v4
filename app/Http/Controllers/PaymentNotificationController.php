@@ -7,6 +7,7 @@ use App\Models\PaymentNotification;
 use App\Models\Plan;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PaymentNotificationController extends Controller
@@ -90,33 +91,35 @@ class PaymentNotificationController extends Controller
             return redirect()->back()->with('error', 'Kullanıcı bulunamadı.');
         }
 
-        if ($plan && $plan->isExtra()) {
-            try {
-                $subscriptionService->purchaseExtraQuota(
-                    $user,
-                    $plan,
-                    (float) $notification->amount,
-                    "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
-                );
-            } catch (\Exception $e) {
-                return redirect()->back()->with('error', $e->getMessage());
-            }
-        } else {
-            $subscriptionService->subscribe(
-                $user,
-                $plan,
-                $notification->duration_months,
-                (float) $notification->amount,
-                "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
-            );
-        }
+        try {
+            DB::transaction(function () use ($notification, $subscriptionService, $user, $plan, $admin, $request) {
+                if ($plan && $plan->isExtra()) {
+                    $subscriptionService->purchaseExtraQuota(
+                        $user,
+                        $plan,
+                        (float) $notification->amount,
+                        "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
+                    );
+                } else {
+                    $subscriptionService->subscribe(
+                        $user,
+                        $plan,
+                        $notification->duration_months,
+                        (float) $notification->amount,
+                        "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
+                    );
+                }
 
-        $notification->update([
-            'status' => 'approved',
-            'processed_at' => now(),
-            'processed_by' => $admin?->id,
-            'admin_notes' => $request->input('admin_notes', 'Ödeme doğrulandı ve onaylandı.'),
-        ]);
+                $notification->update([
+                    'status' => 'approved',
+                    'processed_at' => now(),
+                    'processed_by' => $admin?->id,
+                    'admin_notes' => $request->input('admin_notes', 'Ödeme doğrulandı ve onaylandı.'),
+                ]);
+            });
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->back()->with('success', "#{$notification->reference_code} referanslı ödeme bildirimi onaylandı ve kullanıcının paketi tanımlandı.");
     }

@@ -177,21 +177,36 @@ class SubscriptionService
      *
      * @return Collection<int, UserExtraQuota>
      */
-    public function getActiveExtraQuotas(User $user): Collection
+    /**
+     * Auto-expire and auto-exhaust stale Extra Quotas. Call this BEFORE read queries.
+     */
+    public function expireStaleExtraQuotas(User $user): void
     {
         $now = Carbon::now();
 
-        // Auto-mark expired
         UserExtraQuota::where('user_id', $user->id)
             ->where('status', 'active')
             ->where('expires_at', '<=', $now)
             ->update(['status' => 'expired']);
 
-        // Auto-mark exhausted
         UserExtraQuota::where('user_id', $user->id)
             ->where('status', 'active')
             ->whereColumn('used_bytes', '>=', 'allocated_bytes')
             ->update(['status' => 'exhausted']);
+    }
+
+    /**
+     * Get all active and non-expired extra quotas for a user.
+     * Pure read — does NOT mutate state. Call expireStaleExtraQuotas() beforehand if needed.
+     *
+     * @return Collection<int, UserExtraQuota>
+     */
+    public function getActiveExtraQuotas(User $user): Collection
+    {
+        $now = Carbon::now();
+
+        // Expire/exhaust stale records before reading
+        $this->expireStaleExtraQuotas($user);
 
         return UserExtraQuota::where('user_id', $user->id)
             ->where('status', 'active')
@@ -344,7 +359,21 @@ class SubscriptionService
             $actualIncrement = $bytes;
         }
 
-        DB::transaction(function () use ($ticket, $actualIncrement, $fileSizeBytes, $isClosed) {
+        // Auto-expire/exhaust extra quotas BEFORE the transaction (avoids nested mutations)
+        $this->expireStaleExtraQuotas($ticket->user);
+
+        // Collect active extra quota IDs ordered by expiry (soonest first)
+        $activeExtraIds = DB::table('user_extra_quotas')
+            ->where('user_id', $ticket->user->id)
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where('expires_at', '>', now())
+            ->whereColumn('used_bytes', '<', 'allocated_bytes')
+            ->orderBy('expires_at', 'asc')
+            ->pluck('id')
+            ->toArray();
+
+        DB::transaction(function () use ($ticket, $actualIncrement, $fileSizeBytes, $isClosed, $activeExtraIds) {
             $newTotal = $ticket->bytes_downloaded + $actualIncrement;
             $ticket->bytes_downloaded = $newTotal;
 
@@ -363,28 +392,33 @@ class SubscriptionService
             if ($actualIncrement > 0 && $ticket->user) {
                 $bytesLeftToDeduct = $actualIncrement;
 
-                // 1. Check and deduct from active Extra Quotas first
-                $activeExtras = $this->getActiveExtraQuotas($ticket->user);
-                foreach ($activeExtras as $extra) {
-                    $rem = $extra->remaining_bytes;
+                // 1. Deduct from active Extra Quotas first (DB-level, no model loads inside tx)
+                foreach ($activeExtraIds as $extraId) {
+                    if ($bytesLeftToDeduct <= 0) {
+                        break;
+                    }
+
+                    $extra = DB::table('user_extra_quotas')->where('id', $extraId)->lockForUpdate()->first();
+                    if (! $extra) {
+                        continue;
+                    }
+
+                    $rem = max(0, $extra->allocated_bytes - $extra->used_bytes);
                     if ($rem <= 0) {
                         continue;
                     }
 
                     $deduct = min($bytesLeftToDeduct, $rem);
-                    $extra->increment('used_bytes', $deduct);
+                    DB::table('user_extra_quotas')->where('id', $extraId)->increment('used_bytes', $deduct);
                     $bytesLeftToDeduct -= $deduct;
 
-                    if ($extra->fresh()->used_bytes >= $extra->allocated_bytes) {
-                        $extra->update(['status' => 'exhausted']);
-                    }
-
-                    if ($bytesLeftToDeduct <= 0) {
-                        break;
+                    // Mark exhausted if now full
+                    if (($extra->used_bytes + $deduct) >= $extra->allocated_bytes) {
+                        DB::table('user_extra_quotas')->where('id', $extraId)->update(['status' => 'exhausted']);
                     }
                 }
 
-                // 2. If remaining bytes left to deduct, charge main subscription period
+                // 2. Charge main subscription period for any remainder
                 if ($bytesLeftToDeduct > 0 && $ticket->subscription_period_id) {
                     DB::table('subscription_periods')
                         ->where('id', $ticket->subscription_period_id)
@@ -476,27 +510,10 @@ class SubscriptionService
 
     /**
      * Get the count of distinct active media files currently being downloaded by a user.
+     * Stale ticket cleanup is handled by the tickets:clean-stale scheduled command.
      */
     public function getActiveParallelDownloadsCount(User $user, ?int $excludeMediaFileId = null): int
     {
-        // 1. Auto-clean stale or idle tickets for this user
-        DownloadTicket::where('user_id', $user->id)
-            ->whereIn('status', ['active', 'pending'])
-            ->where('updated_at', '<', now()->subSeconds(90))
-            ->update(['status' => 'stopped']);
-
-        DownloadTicket::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->where('created_at', '<', now()->subSeconds(60))
-            ->update(['status' => 'stopped']);
-
-        DownloadTicket::where('user_id', $user->id)
-            ->where('status', 'active')
-            ->where('bytes_downloaded', 0)
-            ->where('updated_at', '<', now()->subSeconds(60))
-            ->update(['status' => 'stopped']);
-
-        // 2. Count distinct media files in active tickets
         $query = DownloadTicket::where('user_id', $user->id)
             ->whereIn('status', ['active', 'pending'])
             ->where('expires_at', '>', now())
