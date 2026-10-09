@@ -452,4 +452,55 @@ class TmdbIntegrationTest extends TestCase
         $this->assertCount(1, $season->episodes);
         $this->assertEquals('Pilot', $season->episodes->first()->name);
     }
+
+    public function test_series_without_year_matches_directly_without_review(): void
+    {
+        $box = StorageBox::factory()->create();
+        $media = MediaFile::factory()->create([
+            'storage_box_id' => $box->id,
+            'clean_title' => 'The Umbrella Academy',
+            'year' => null,
+            'category' => 'series',
+            'tmdb_match_status' => 'unmatched',
+        ]);
+
+        Http::fake([
+            'https://api.themoviedb.org/3/search/tv*' => Http::response([
+                'results' => [
+                    [
+                        'id' => 75006,
+                        'media_type' => 'tv',
+                        'name' => 'The Umbrella Academy',
+                        'original_name' => 'The Umbrella Academy',
+                        'first_air_date' => '2019-02-15',
+                        'vote_average' => 8.5,
+                        'vote_count' => 5000,
+                        'poster_path' => '/umbrella.jpg',
+                        'overview' => 'Reunited by their fathers death...',
+                    ],
+                ],
+            ], 200),
+            'https://api.themoviedb.org/3/tv/75006*' => Http::response([
+                'id' => 75006,
+                'name' => 'The Umbrella Academy',
+                'original_name' => 'The Umbrella Academy',
+                'first_air_date' => '2019-02-15',
+                'vote_average' => 8.5,
+                'vote_count' => 5000,
+                'poster_path' => '/umbrella.jpg',
+                'genres' => [],
+                'external_ids' => [],
+            ], 200),
+        ]);
+
+        $service = app(TmdbService::class);
+        $result = $service->matchMediaFile($media);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('matched', $result['status']);
+        $media->refresh();
+        $this->assertEquals('matched', $media->tmdb_match_status);
+        $this->assertStringContainsString('Dizi - Yapım yılı olmadan', $media->tmdb_match_notes);
+        $this->assertNotNull($media->tmdb_title_id);
+    }
 }

@@ -40,7 +40,7 @@ class AdminController extends Controller
                     'role' => $u->role->value,
                     'role_label' => $u->role->label(),
                     'plan' => $u->plan->value,
-                    'plan_label' => $period ? $period->subscription->plan->name : $u->plan->label(),
+                    'plan_label' => $period?->subscription?->plan?->name ?? $u->plan->label(),
                     'quota_used' => $period ? $period->formatted_used : '0 GB',
                     'quota_total' => $period ? $period->formatted_allocated : '0 GB',
                     'quota_remaining' => $period ? $period->formatted_remaining : '0 GB',

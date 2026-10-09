@@ -59,6 +59,11 @@ class MediaScannerService
         $videoFiles = [];
         $this->collectGatewayVideos($box, $videoFiles);
 
+        // Pre-parse batch metadata using guessit-js in chunks of 500 to fill memory cache instantly
+        foreach (array_chunk($videoFiles, 500) as $chunk) {
+            GuessItService::parseBatch($chunk);
+        }
+
         foreach ($videoFiles as $item) {
             $metadata = MediaFile::parseMetadata($item['filename'], $item['path']);
 

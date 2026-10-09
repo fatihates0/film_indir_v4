@@ -933,6 +933,8 @@ class TmdbService
                 continue;
             }
 
+            $isTv = ($mediaType === 'tv') || (($candidate['media_type'] ?? '') === 'tv');
+
             // Case A: Exact Year Match
             if ($fileYear !== null && $candYear !== null && $fileYear === $candYear) {
                 $score = $similarity + 40;
@@ -954,13 +956,18 @@ class TmdbService
                 }
             }
             // Case C: File has no year, but high title similarity
-            elseif ($fileYear === null && $similarity >= 85) {
+            elseif ($fileYear === null && $similarity >= 80) {
                 $score = $similarity + 15;
                 if ($score > $bestScore) {
                     $bestScore = $score;
                     $bestCandidate = $candidate;
-                    $matchStatus = 'review';
-                    $matchNotes = 'Dosyada yapım yılı belirtilmemiş. İnceleme gerekiyor.';
+                    if ($isTv) {
+                        $matchStatus = 'matched';
+                        $matchNotes = 'Otomatik eşleşme (Dizi - Yapım yılı olmadan isim eşleşmesi)';
+                    } else {
+                        $matchStatus = 'review';
+                        $matchNotes = 'Dosyada yapım yılı belirtilmemiş. İnceleme gerekiyor.';
+                    }
                 }
             }
             // Case D: Year difference > 1 but high similarity (apply penalty for large year difference)
