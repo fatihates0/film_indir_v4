@@ -714,73 +714,79 @@ export default function MovieDetail({ movie, similarMovies, reviews, universe, n
                             })}
                         </div>
                     ) : (
-                        /* Modern List View */
+                        /* Modern Sleek List View */
                         <div className="space-y-3">
                             {downloadList.map((file, idx) => {
                                 const is4k = file.quality_grade === '4k';
                                 const is1080 = file.quality_grade === '1080p';
 
                                 const badgeClass = is4k
-                                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/40 shadow-amber-500/10'
+                                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10'
                                     : is1080
-                                        ? 'bg-[#00B074]/20 text-[#00B074] border-[#00B074]/40 shadow-[#00B074]/10'
-                                        : 'bg-sky-500/20 text-sky-600 dark:text-sky-300 border-sky-500/40 shadow-sky-500/10';
+                                        ? 'bg-[#00B074]/15 text-[#00B074] border-[#00B074]/40 shadow-sm shadow-[#00B074]/10'
+                                        : 'bg-sky-500/15 text-sky-600 dark:text-sky-300 border-sky-500/40 shadow-sm shadow-sky-500/10';
 
-                                const avatarBg = is4k
-                                    ? 'from-amber-500/20 to-amber-600/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                const labelBg = is4k
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black'
                                     : is1080
-                                        ? 'from-[#00B074]/20 to-emerald-600/10 text-[#00B074] border-[#00B074]/30'
-                                        : 'from-sky-500/20 to-blue-600/10 text-sky-600 dark:text-sky-400 border-sky-500/30';
+                                        ? 'bg-gradient-to-r from-[#00B074] to-emerald-600 text-white font-black'
+                                        : 'bg-gradient-to-r from-sky-500 to-cyan-600 text-white font-black';
 
                                 return (
                                     <div
                                         key={file.id || idx}
-                                        className="group relative bg-white dark:bg-[#131722]/80 hover:bg-slate-50 dark:hover:bg-[#181D2A] border border-slate-200 dark:border-white/10 hover:border-[#00B074]/50 rounded-2xl p-4 sm:p-5 transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-lg backdrop-blur-sm"
+                                        className="group relative bg-white dark:bg-[#0c0e14]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border border-slate-200 dark:border-white/10 hover:border-[#00B074]/50 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5"
                                     >
+                                        {/* Subtle top accent line on hover */}
+                                        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#00B074]/0 to-transparent group-hover:via-[#00B074] transition-all duration-500" />
+
+                                        {/* Left: Backdrop Preview + File Details */}
                                         <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
-                                            {/* Quality Icon Avatar */}
-                                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br border flex flex-col items-center justify-center shrink-0 shadow-inner ${avatarBg}`}>
-                                                <Film className="w-4 h-4 mb-0.5 opacity-80" />
-                                                <span className="text-[10px] font-black tracking-wider leading-none">
-                                                    {is4k ? '4K' : (is1080 ? '1080P' : '720P')}
+                                            {/* Media Thumbnail with Quality Tag */}
+                                            <div className="w-24 sm:w-32 aspect-[16/10] rounded-xl overflow-hidden relative shrink-0 border border-slate-200 dark:border-white/15 group-hover:border-[#00B074]/40 transition-colors shadow-md bg-slate-900 group/thumb">
+                                                <img
+                                                    src={defaultMovie.backdrop || defaultMovie.poster}
+                                                    alt={file.name}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                                                <span className={`absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider shadow-md ${labelBg}`}>
+                                                    {is4k ? '4K UHD' : (is1080 ? '1080P' : '720P HD')}
                                                 </span>
                                             </div>
 
                                             {/* Details & Metadata */}
-                                            <div className="min-w-0 flex-1 space-y-1.5">
+                                            <div className="min-w-0 flex-1 space-y-2">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <h3 className="text-slate-900 dark:text-white font-bold text-sm sm:text-base group-hover:text-[#00B074] transition-colors truncate">
+                                                    <h3 className="text-slate-900 dark:text-white font-bold text-sm sm:text-base group-hover:text-[#00B074] transition-colors truncate tracking-tight">
                                                         {file.clean_title || `${file.quality_badge} ${file.source || ''}`}
                                                     </h3>
-                                                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border shadow-sm ${badgeClass}`}>
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}`}>
                                                         {file.quality_badge}
                                                     </span>
                                                 </div>
 
-                                                {/* Technical tags */}
+                                                {/* Technical micro badges */}
                                                 <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                                                     {file.source && (
-                                                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-semibold text-slate-700 dark:text-gray-200">
+                                                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 font-bold text-slate-800 dark:text-gray-200 uppercase tracking-wider">
                                                             {file.source}
                                                         </span>
                                                     )}
                                                     {file.video_codec && (
-                                                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-300">
+                                                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-gray-300 font-medium flex items-center gap-1">
+                                                            <Film className="w-3 h-3 text-[#00B074]" />
                                                             {file.video_codec}
                                                         </span>
                                                     )}
                                                     {file.audio_codec && (
-                                                        <span className="px-2 py-0.5 rounded bg-[#00B074]/10 border border-[#00B074]/20 text-[#00B074] font-medium">
-                                                            {file.audio_codec}
-                                                        </span>
-                                                    )}
-                                                    {file.audio_channels && (
-                                                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-300">
-                                                            {file.audio_channels}
+                                                        <span className="px-2.5 py-1 rounded-lg bg-[#00B074]/10 border border-[#00B074]/20 text-[#00B074] font-semibold flex items-center gap-1">
+                                                            <Volume2 className="w-3 h-3 text-[#00B074]" />
+                                                            {file.audio_codec} {file.audio_channels ? `• ${file.audio_channels}` : ''}
                                                         </span>
                                                     )}
                                                     {file.extension && (
-                                                        <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-gray-400 font-mono text-[10px] uppercase">
+                                                        <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-gray-400 font-mono text-[10px] font-bold uppercase">
                                                             {file.extension}
                                                         </span>
                                                     )}
@@ -790,16 +796,16 @@ export default function MovieDetail({ movie, similarMovies, reviews, universe, n
 
                                         {/* Right Action: Size + Download Button */}
                                         <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-200 dark:border-white/10">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-gray-300 font-semibold px-3 py-2 rounded-xl bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10">
+                                            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-800 dark:text-gray-200 font-bold px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 shadow-inner">
                                                 <HardDrive className="w-4 h-4 text-[#00B074]" />
                                                 <span>{file.formatted_size}</span>
                                             </div>
 
                                             <a
                                                 href={file.download_url}
-                                                className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-[#00B074]/30 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                                                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00B074] to-[#009663] hover:from-[#00c985] hover:to-[#00A36C] text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-[#00B074]/25 hover:shadow-lg hover:shadow-[#00B074]/40 flex items-center gap-2 group/btn hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                                             >
-                                                <Download className="w-4 h-4" />
+                                                <Download className="w-4 h-4 group-hover/btn:translate-y-0.5 transition-transform" />
                                                 <span>İndir</span>
                                             </a>
                                         </div>

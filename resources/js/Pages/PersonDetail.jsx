@@ -140,7 +140,7 @@ export default function PersonDetail({ person }) {
                 </nav>
 
                 {/* Hero Profile Header */}
-                <div className="relative bg-gradient-to-br from-[#131722] via-[#0F131D] to-[#0A0D14] rounded-3xl p-6 sm:p-10 border border-gray-800/80 shadow-2xl overflow-hidden">
+                <div className="relative bg-[gradient]-to-br from-[#0c0e14] via-[#0c0e14] to-[#0c0e14] rounded-3xl p-6 sm:p-10 border border-gray-800/80 shadow-2xl overflow-hidden">
                     {/* Background accent glow */}
                     <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full filter blur-3xl pointer-events-none -mr-20 -mt-20" />
                     <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-blue-500/5 rounded-full filter blur-3xl pointer-events-none" />
@@ -323,7 +323,7 @@ export default function PersonDetail({ person }) {
                                 <div key={item.id} className="flex flex-col">
                                     <MovieCard item={item} />
                                     {item.character && (
-                                        <div className="mt-1 px-2 py-1 bg-[#131722] border border-gray-800 rounded-lg text-center">
+                                        <div className="mt-1 px-2 py-1 bg-[#0c0e14] border border-gray-800 rounded-lg text-center">
                                             <span className="text-[11px] text-[#00B074] font-semibold line-clamp-1">
                                                 {item.character}
                                             </span>
@@ -357,7 +357,7 @@ export default function PersonDetail({ person }) {
                                     <CardWrapper
                                         key={idx}
                                         {...cardProps}
-                                        className="group bg-[#131722] rounded-xl overflow-hidden border border-gray-800/80 hover:border-[#00B074]/60 transition-all flex flex-col cursor-pointer"
+                                        className="group bg-[#0c0e14] rounded-xl overflow-hidden border border-gray-800/80 hover:border-[#00B074]/60 transition-all flex flex-col cursor-pointer"
                                     >
                                         <div className="relative aspect-[2/3] overflow-hidden bg-[#0A0D14]">
                                             <img
@@ -394,7 +394,7 @@ export default function PersonDetail({ person }) {
                 )}
 
                 {/* Section 3: Full Filmography */}
-                <section id="filmography-section" className="bg-[#131722] rounded-3xl p-6 sm:p-8 border border-gray-800/80 shadow-2xl space-y-6 scroll-mt-24">
+                <section id="filmography-section" className="bg-[#0c0e14] rounded-3xl p-6 sm:p-8 border border-gray-800/80 shadow-2xl space-y-6 scroll-mt-24">
                     {/* Top Row: Title, Subtitle, View Switcher & PerPage */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                         <div>

@@ -795,11 +795,16 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
                                     return (
                                         <div
                                             key={ep.id || epIdx}
-                                            className={`group relative bg-white dark:bg-[#131722]/80 hover:bg-slate-50 dark:hover:bg-[#181D2A] border rounded-2xl p-3.5 sm:p-4 transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-lg backdrop-blur-sm ${isAvail
+                                            className={`group relative bg-white dark:bg-[#131722]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5 ${isAvail
                                                 ? 'border-slate-200 dark:border-white/10 hover:border-[#00B074]/50'
                                                 : 'border-slate-200/60 dark:border-white/5 opacity-60 hover:opacity-85'
                                                 }`}
                                         >
+                                            {/* Subtle top accent line on hover */}
+                                            {isAvail && (
+                                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#00B074]/0 to-transparent group-hover:via-[#00B074] transition-all duration-500" />
+                                            )}
+
                                             {/* Left: Number + Thumbnail + Details */}
                                             <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
                                                 {/* Episode Number */}
@@ -808,27 +813,27 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
                                                 </div>
 
                                                 {/* Thumbnail */}
-                                                <div className="w-28 sm:w-36 aspect-[16/10] rounded-xl overflow-hidden relative shrink-0 border border-slate-200 dark:border-white/10 group-hover:border-[#00B074]/40 transition-colors bg-slate-900 dark:bg-black/40">
+                                                <div className="w-28 sm:w-36 aspect-[16/10] rounded-xl overflow-hidden relative shrink-0 border border-slate-200 dark:border-white/15 group-hover:border-[#00B074]/40 transition-colors bg-slate-900 shadow-md">
                                                     <img
                                                         src={ep.thumbnail}
                                                         alt={ep.title}
-                                                        className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${isAvail ? '' : 'grayscale-[35%]'
+                                                        className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isAvail ? '' : 'grayscale-[35%]'
                                                             }`}
                                                     />
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                                     {ep.duration && (
-                                                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] text-gray-300 font-medium">
+                                                        <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] text-gray-200 font-semibold shadow">
                                                             {ep.duration}
                                                         </span>
                                                     )}
                                                 </div>
 
                                                 {/* Episode Details */}
-                                                <div className="min-w-0 flex-1 space-y-1">
+                                                <div className="min-w-0 flex-1 space-y-1.5">
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <h3 className={`font-bold text-sm sm:text-base transition-colors truncate ${isAvail ? 'text-slate-900 dark:text-white group-hover:text-[#00B074]' : 'text-slate-500 dark:text-gray-300'
+                                                        <h3 className={`font-bold text-sm sm:text-base transition-colors truncate tracking-tight ${isAvail ? 'text-slate-900 dark:text-white group-hover:text-[#00B074]' : 'text-slate-500 dark:text-gray-300'
                                                             }`}>
-                                                            Chapter {ep.episodeNumber}{ep.title && !ep.title.startsWith(`${ep.episodeNumber}.`) ? ` · ${ep.title}` : ''}
+                                                            Bölüm {ep.episodeNumber}{ep.title && !ep.title.startsWith(`${ep.episodeNumber}.`) ? ` · ${ep.title}` : ''}
                                                         </h3>
                                                         {ep.date && (
                                                             <span className="text-[11px] text-slate-500 dark:text-gray-400 font-medium">
@@ -846,8 +851,8 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
                                             <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-200 dark:border-white/10">
                                                 {isAvail ? (
                                                     <>
-                                                        <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-gray-300 font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10">
-                                                            <HardDrive className="w-3.5 h-3.5 text-[#00B074]" />
+                                                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-800 dark:text-gray-200 font-bold px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 shadow-inner">
+                                                            <HardDrive className="w-4 h-4 text-[#00B074]" />
                                                             <span>{ep.formattedSize || 'HD'}</span>
                                                         </div>
 
@@ -857,19 +862,19 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
                                                                     <a
                                                                         key={file.id}
                                                                         href={file.download_url}
-                                                                        className="px-3.5 py-1.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold transition-all shadow-md shadow-[#00B074]/30 flex items-center gap-1.5 hover:scale-105 active:scale-95 cursor-pointer"
+                                                                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00B074] to-[#009663] hover:from-[#00c985] hover:to-[#00A36C] text-white text-xs font-bold transition-all shadow-md shadow-[#00B074]/25 hover:shadow-lg hover:shadow-[#00B074]/40 flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] cursor-pointer group/btn"
                                                                         title={`${file.quality} İndir`}
                                                                     >
-                                                                        <Download className="w-3.5 h-3.5" />
+                                                                        <Download className="w-3.5 h-3.5 group-hover/btn:translate-y-0.5 transition-transform" />
                                                                         <span>{file.quality || 'İndir'}</span>
                                                                     </a>
                                                                 ))
                                                             ) : (
                                                                 <a
                                                                     href={ep.downloadUrl || `/downloads?id=${defaultSeries.id}&season=${selectedSeason}&episode=${ep.episodeNumber}`}
-                                                                    className="px-4 py-1.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold transition-all shadow-md shadow-[#00B074]/30 flex items-center gap-1.5 hover:scale-105 active:scale-95 cursor-pointer"
+                                                                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#00B074] to-[#009663] hover:from-[#00c985] hover:to-[#00A36C] text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-[#00B074]/25 hover:shadow-lg hover:shadow-[#00B074]/40 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] cursor-pointer group/btn"
                                                                 >
-                                                                    <Download className="w-3.5 h-3.5" />
+                                                                    <Download className="w-4 h-4 group-hover/btn:translate-y-0.5 transition-transform" />
                                                                     <span>İndir</span>
                                                                 </a>
                                                             )}
