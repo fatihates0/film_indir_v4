@@ -10,11 +10,12 @@ import {
 } from 'lucide-react';
 import MovieCard from '../Components/MovieCard';
 import HeroTrailerBackground from '../Components/HeroTrailerBackground';
+import MovieComments from '../Components/MovieComments';
 import { toTrGenreList } from '../Utils/genreHelper';
 import { getCinemaVersion, cinemaConfig } from '../Config/cinemaConfig';
 import { useHeroIdleFade } from '../Utils/useHeroIdleFade';
 
-export default function SeriesDetail({ series, episodes, similarSeries, universe, news, reviews }) {
+export default function SeriesDetail({ series, episodes, similarSeries, comments = [], userRatingAvg, userRatingCount, universe, news }) {
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [downloadViewMode, setDownloadViewMode] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -182,31 +183,6 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
     const mockNews = news || [
         { id: 1, title: `${defaultSeries.title} Season 2 Production Updates and Cast News`, date: "Oct 2, 2026", author: "SineKutu Editorial", image: defaultSeries.backdrop, summary: "Filming wraps up on the highly anticipated second season with brand new characters and thrilling storyline developments." },
         { id: 2, title: `Behind The Scenes: How Visual Effects Brought The World to Life`, date: "Sep 25, 2026", author: "VFX Insider", image: defaultSeries.poster, summary: "Directors and artists describe the intricate practical effects and digital set extensions created for the show." }
-    ];
-
-    const mockReviews = reviews || [
-        {
-            id: 1,
-            user: "Alex Rivera",
-            avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80",
-            rating: 10,
-            date: "2 days ago",
-            title: "A monumental achievement in television storytelling",
-            content: "Faithful to the source material while expanding upon character arcs in ways that elevate the entire emotional weight. Absolutely flawless direction and acting.",
-            likes: 184,
-            dislikes: 6
-        },
-        {
-            id: 2,
-            user: "Sarah Jenkins",
-            avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80",
-            rating: 9,
-            date: "1 week ago",
-            title: "Gripping, emotional and visually stunning",
-            content: "Every episode feels like a cinematic masterpiece. The bond between the leads drives the narrative forward with immense humanity.",
-            likes: 122,
-            dislikes: 4
-        }
     ];
 
     const handleShare = () => {
@@ -913,7 +889,7 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
                             { id: 'similar', label: 'Benzer Diziler' },
                             { id: 'universe', label: 'Serinin Diğer Yapımları' },
                             { id: 'news', label: 'Haberler' },
-                            { id: 'reviews', label: `Yorumlar (${mockReviews.length})` }
+                            { id: 'reviews', label: `Yorumlar (${comments ? comments.length : 0})` }
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -1006,70 +982,14 @@ export default function SeriesDetail({ series, episodes, similarSeries, universe
                         </div>
                     )}
 
-                    {/* REVIEWS TAB */}
+                    {/* REVIEWS & COMMENTS TAB */}
                     {activeTab === 'reviews' && (
-                        <div className="space-y-6">
-                            {/* Write Review Box */}
-                            <div className="bg-white dark:bg-[#131722] p-6 rounded-2xl border border-slate-200 dark:border-white/5 space-y-4 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">İnceleme Yaz</h3>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-500 dark:text-gray-400 text-xs">Puanınız:</span>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                                        <button
-                                            key={star}
-                                            onClick={() => setUserRating(star)}
-                                            className={`p-1 text-sm font-bold cursor-pointer ${star <= userRating ? 'text-amber-400' : 'text-slate-300 dark:text-gray-600 hover:text-amber-400'
-                                                }`}
-                                        >
-                                            ★
-                                        </button>
-                                    ))}
-                                    <span className="text-amber-500 dark:text-amber-400 font-bold text-xs ml-2">{userRating > 0 ? `${userRating}/10` : ''}</span>
-                                </div>
-                                <textarea
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Dizi hakkındaki düşüncelerinizi paylaşın..."
-                                    className="w-full bg-slate-50 dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074] min-h-[90px]"
-                                />
-                                <button className="bg-[#00B074] text-white font-bold px-6 py-2.5 rounded-xl text-xs hover:bg-[#009663] transition-colors cursor-pointer">
-                                    İncelemeyi Gönder
-                                </button>
-                            </div>
-
-                            {/* User Reviews List */}
-                            <div className="space-y-4">
-                                {mockReviews.map((rev) => (
-                                    <div key={rev.id} className="bg-white dark:bg-[#131722] p-6 rounded-2xl border border-slate-200 dark:border-white/5 space-y-3 shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <img src={rev.avatar} alt={rev.user} className="w-10 h-10 rounded-full object-cover" />
-                                                <div>
-                                                    <h4 className="text-slate-900 dark:text-white font-bold text-sm">{rev.user}</h4>
-                                                    <p className="text-slate-500 dark:text-gray-400 text-xs">{rev.date}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 bg-amber-400/10 px-3 py-1 rounded-full text-amber-500 dark:text-amber-400 font-bold text-xs">
-                                                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                                                {rev.rating}/10
-                                            </div>
-                                        </div>
-                                        <h5 className="text-slate-900 dark:text-white font-semibold text-sm">{rev.title}</h5>
-                                        <p className="text-slate-600 dark:text-gray-300 text-xs sm:text-sm leading-relaxed">{rev.content}</p>
-                                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-gray-400 pt-1">
-                                            <button className="flex items-center gap-1.5 hover:text-[#00B074] transition-colors cursor-pointer">
-                                                <ThumbsUp className="w-3.5 h-3.5" />
-                                                <span>Faydalı ({rev.likes})</span>
-                                            </button>
-                                            <button className="flex items-center gap-1.5 hover:text-red-500 transition-colors cursor-pointer">
-                                                <ThumbsDown className="w-3.5 h-3.5" />
-                                                <span>Faydasız ({rev.dislikes})</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <MovieComments
+                            movieId={defaultSeries.id}
+                            comments={comments}
+                            userRatingAvg={userRatingAvg}
+                            userRatingCount={userRatingCount}
+                        />
                     )}
                 </div>
             </div>

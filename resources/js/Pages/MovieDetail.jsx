@@ -9,12 +9,13 @@ import {
 } from 'lucide-react';
 import MovieCard from '../Components/MovieCard';
 import HeroTrailerBackground from '../Components/HeroTrailerBackground';
+import MovieComments from '../Components/MovieComments';
 import { toTrGenreList } from '../Utils/genreHelper';
 import { getCinemaVersion, cinemaConfig } from '../Config/cinemaConfig';
 import { useHeroIdleFade } from '../Utils/useHeroIdleFade';
 
 
-export default function MovieDetail({ movie, similarMovies, reviews, universe, news, collection }) {
+export default function MovieDetail({ movie, similarMovies, comments = [], userRatingAvg, userRatingCount, universe, news, collection }) {
     const [activeTab, setActiveTab] = useState('similar');
     const [downloadViewMode, setDownloadViewMode] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -161,32 +162,6 @@ export default function MovieDetail({ movie, similarMovies, reviews, universe, n
         ];
 
     const mediaFiles = downloadList;
-
-
-    const mockReviews = reviews || [
-        {
-            id: 1,
-            user: "Alex Rivera",
-            avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80",
-            rating: 10,
-            date: "2 days ago",
-            title: "A visual and acoustic triumph",
-            content: "Christopher Nolan delivers a visual and emotional epic that pushes the boundaries of cinematic storytelling. The score elevates every scene to unimaginable heights.",
-            likes: 142,
-            dislikes: 8
-        },
-        {
-            id: 2,
-            user: "Sarah Jenkins",
-            avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80",
-            rating: 9,
-            date: "1 week ago",
-            title: "Visually breathtaking and deeply moving",
-            content: "The representation of black holes and relativity is sci-fi at its finest. McConaughey gives a career-best performance that lingers long after.",
-            likes: 98,
-            dislikes: 3
-        }
-    ];
 
     const mockUniverse = universe || [
         { id: 101, title: `${defaultMovie.title}: Prelude`, type: "Comic", year: 2014, status: "Canon", poster: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80" },
@@ -826,7 +801,7 @@ export default function MovieDetail({ movie, similarMovies, reviews, universe, n
                                 ? [{ id: 'universe', label: `Serinin Diğer Filmleri (${collection.parts.length})` }]
                                 : (universe ? [{ id: 'universe', label: 'Serinin Diğer Filmleri' }] : [])),
                             { id: 'news', label: 'Haberler' },
-                            { id: 'reviews', label: `Yorumlar (${mockReviews.length})` }
+                            { id: 'reviews', label: `Yorumlar (${comments ? comments.length : 0})` }
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -1063,70 +1038,14 @@ export default function MovieDetail({ movie, similarMovies, reviews, universe, n
                         </div>
                     )}
 
-                    {/* REVIEWS TAB */}
+                    {/* REVIEWS & COMMENTS TAB */}
                     {activeTab === 'reviews' && (
-                        <div className="space-y-6">
-                            {/* Write Review Box */}
-                            <div className="bg-white dark:bg-[#131722] p-6 rounded-2xl border border-slate-200 dark:border-white/5 space-y-4 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">İnceleme Yaz</h3>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-500 dark:text-gray-400 text-xs">Puanınız:</span>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                                        <button
-                                            key={star}
-                                            onClick={() => setUserRating(star)}
-                                            className={`p-1 text-sm font-bold cursor-pointer ${star <= userRating ? 'text-amber-400' : 'text-slate-300 dark:text-gray-600 hover:text-amber-400'
-                                                }`}
-                                        >
-                                            ★
-                                        </button>
-                                    ))}
-                                    <span className="text-amber-500 dark:text-amber-400 font-bold text-xs ml-2">{userRating > 0 ? `${userRating}/10` : ''}</span>
-                                </div>
-                                <textarea
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    placeholder="Film hakkındaki düşüncelerinizi paylaşın..."
-                                    className="w-full bg-slate-50 dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074] min-h-[90px]"
-                                />
-                                <button className="bg-[#00B074] text-white font-bold px-6 py-2.5 rounded-xl text-xs hover:bg-[#009663] transition-colors cursor-pointer">
-                                    İncelemeyi Gönder
-                                </button>
-                            </div>
-
-                            {/* User Reviews List */}
-                            <div className="space-y-4">
-                                {mockReviews.map((rev) => (
-                                    <div key={rev.id} className="bg-white dark:bg-[#131722] p-6 rounded-2xl border border-slate-200 dark:border-white/5 space-y-3 shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <img src={rev.avatar} alt={rev.user} className="w-10 h-10 rounded-full object-cover" />
-                                                <div>
-                                                    <h4 className="text-slate-900 dark:text-white font-bold text-sm">{rev.user}</h4>
-                                                    <p className="text-slate-500 dark:text-gray-400 text-xs">{rev.date}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 bg-amber-400/10 px-3 py-1 rounded-full text-amber-500 dark:text-amber-400 font-bold text-xs">
-                                                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                                                {rev.rating}/10
-                                            </div>
-                                        </div>
-                                        <h5 className="text-slate-900 dark:text-white font-semibold text-sm">{rev.title}</h5>
-                                        <p className="text-slate-600 dark:text-gray-300 text-xs sm:text-sm leading-relaxed">{rev.content}</p>
-                                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-gray-400 pt-1">
-                                            <button className="flex items-center gap-1.5 hover:text-[#00B074] transition-colors cursor-pointer">
-                                                <ThumbsUp className="w-3.5 h-3.5" />
-                                                <span>Faydalı ({rev.likes})</span>
-                                            </button>
-                                            <button className="flex items-center gap-1.5 hover:text-red-500 transition-colors cursor-pointer">
-                                                <ThumbsDown className="w-3.5 h-3.5" />
-                                                <span>Faydasız ({rev.dislikes})</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <MovieComments
+                            movieId={defaultMovie.id}
+                            comments={comments}
+                            userRatingAvg={userRatingAvg}
+                            userRatingCount={userRatingCount}
+                        />
                     )}
                 </div>
             </div>

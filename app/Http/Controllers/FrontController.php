@@ -8,6 +8,7 @@ use App\Helpers\QualityHelper;
 use App\Http\Resources\MovieDetailResource;
 use App\Http\Resources\SeriesDetailResource;
 use App\Http\Resources\TmdbTitleListResource;
+use App\Models\Comment;
 use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\Setting;
@@ -1043,10 +1044,38 @@ class FrontController extends Controller
             }
         }
 
+        $comments = collect();
+        $userRatingAvg = null;
+        $userRatingCount = 0;
+
+        if ($movieItem) {
+            $comments = Comment::where('tmdb_title_id', $movieItem->id)
+                ->whereNull('parent_id')
+                ->where('is_approved', true)
+                ->with(['replies' => function ($q) {
+                    $q->where('is_approved', true)->orderBy('created_at', 'asc');
+                }, 'user'])
+                ->orderByDesc('created_at')
+                ->get();
+
+            $userRatingAvg = Comment::where('tmdb_title_id', $movieItem->id)
+                ->whereNotNull('rating')
+                ->where('rating', '>', 0)
+                ->avg('rating');
+
+            $userRatingCount = Comment::where('tmdb_title_id', $movieItem->id)
+                ->whereNotNull('rating')
+                ->where('rating', '>', 0)
+                ->count();
+        }
+
         return Inertia::render('MovieDetail', array_merge($this->getCommonData(), [
             'movie' => $movieData,
             'similarMovies' => TmdbTitleListResource::collection($similarMovies)->resolve(),
             'collection' => $collection,
+            'comments' => $comments,
+            'userRatingAvg' => $userRatingAvg ? round((float) $userRatingAvg, 1) : null,
+            'userRatingCount' => $userRatingCount,
         ]));
     }
 
@@ -1082,9 +1111,37 @@ class FrontController extends Controller
             ? TitleRecommendationService::getSimilar($seriesItem, 6)
             : collect();
 
+        $comments = collect();
+        $userRatingAvg = null;
+        $userRatingCount = 0;
+
+        if ($seriesItem) {
+            $comments = Comment::where('tmdb_title_id', $seriesItem->id)
+                ->whereNull('parent_id')
+                ->where('is_approved', true)
+                ->with(['replies' => function ($q) {
+                    $q->where('is_approved', true)->orderBy('created_at', 'asc');
+                }, 'user'])
+                ->orderByDesc('created_at')
+                ->get();
+
+            $userRatingAvg = Comment::where('tmdb_title_id', $seriesItem->id)
+                ->whereNotNull('rating')
+                ->where('rating', '>', 0)
+                ->avg('rating');
+
+            $userRatingCount = Comment::where('tmdb_title_id', $seriesItem->id)
+                ->whereNotNull('rating')
+                ->where('rating', '>', 0)
+                ->count();
+        }
+
         return Inertia::render('SeriesDetail', array_merge($this->getCommonData(), [
             'series' => $seriesData,
             'similarSeries' => TmdbTitleListResource::collection($similarSeries)->resolve(),
+            'comments' => $comments,
+            'userRatingAvg' => $userRatingAvg ? round((float) $userRatingAvg, 1) : null,
+            'userRatingCount' => $userRatingCount,
         ]));
     }
 

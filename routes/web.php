@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\StorageBoxController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\FrontController;
 use App\Http\Controllers\PaymentNotificationController;
@@ -28,6 +29,11 @@ Route::post('/payment-notifications', [PaymentNotificationController::class, 'st
 
 Route::get('/movie/{id?}', [FrontController::class, 'movieDetail'])->name('movie.detail');
 Route::get('/series/{id}', [FrontController::class, 'seriesDetail'])->name('series.detail');
+
+// Comments & Reviews Routes
+Route::post('/comments', [CommentController::class, 'store'])->name('comments.store');
+Route::post('/comments/{comment}/react', [CommentController::class, 'react'])->name('comments.react');
+Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy');
 Route::get('/person/{id}', [FrontController::class, 'personDetail'])->name('person.detail');
 Route::get('/actor/{id}', function ($id) {
     return redirect()->route('person.detail', ['id' => $id]);
