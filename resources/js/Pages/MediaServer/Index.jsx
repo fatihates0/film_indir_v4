@@ -37,6 +37,7 @@ export default function MediaServerIndex({
     active_servers_count = 0,
     has_available_servers = false,
     is_guest = false,
+    has_active_subscription = false,
     featured_titles = []
 }) {
     const { flash } = usePage().props;
@@ -395,6 +396,29 @@ export default function MediaServerIndex({
                                 <AlertTriangle className="w-6 h-6 mx-auto text-amber-500" />
                                 <p className="font-bold text-sm">Şu anda aktif medya sunucusu bulunmuyor.</p>
                                 <p className="text-slate-500 dark:text-gray-400">Yöneticiler sunucu altyapısını güncelliyor. Lütfen kısa bir süre sonra tekrar deneyin.</p>
+                            </div>
+                        ) : !has_active_subscription ? (
+                            <div className="p-6 sm:p-8 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 text-center space-y-4">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto">
+                                    <Lock className="w-6 h-6" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-slate-900 dark:text-white text-base sm:text-lg">
+                                        Aktif Abonelik Paketi Gereklidir
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">
+                                        Jellyfin medya sunucumuzda hesap oluşturabilmek ve yüksek hızlı yayın akışını kullanabilmek için aktif bir abonelik paketinizin olması gerekir. Paketinizin süresi dolmuş veya henüz bir paket tanımlanmamış olabilir.
+                                    </p>
+                                </div>
+                                <div className="pt-2">
+                                    <Link
+                                        href="/pricing"
+                                        className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold transition-all shadow-lg shadow-[#00B074]/20"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        <span>Paketleri ve Abonelikleri İncele</span>
+                                    </Link>
+                                </div>
                             </div>
                         ) : (
                             <form onSubmit={handleCreateAccount} className="relative z-10 space-y-6">

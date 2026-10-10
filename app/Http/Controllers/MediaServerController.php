@@ -22,10 +22,17 @@ class MediaServerController extends Controller
     public function index(Request $request): Response
     {
         $user = Auth::user();
+        $hasActiveSub = $user ? ($user->isAdmin() || $user->hasActiveSubscription()) : false;
         $activeServersCount = JellyfinServer::where('is_active', true)->count();
 
+        // Eğer kullanıcı giriş yapmış ancak aktif aboneliği bitmişse ve admin değilse:
+        // Sunuculardaki ve DB'deki hesabı anında temizle
+        if ($user && ! $hasActiveSub) {
+            $this->loadBalancer->purgeUserAccount($user);
+        }
+
         $accountData = null;
-        if ($user) {
+        if ($user && $hasActiveSub) {
             // Kullanıcının e-posta adresiyle (veya önceden açılmışsa adıyla) aktif sunucularda hesabı var mı ara
             $found = $this->loadBalancer->findUserAcrossServers($user->email);
 
@@ -62,6 +69,7 @@ class MediaServerController extends Controller
             'active_servers_count' => $activeServersCount,
             'has_available_servers' => $activeServersCount > 0,
             'is_guest' => $user === null,
+            'has_active_subscription' => $hasActiveSub,
             'featured_titles' => $featuredTitles,
         ]);
     }
@@ -76,6 +84,10 @@ class MediaServerController extends Controller
             return redirect()->route('home')->with('error', 'Lütfen önce giriş yapın.');
         }
 
+        if (! $user->isAdmin() && ! $user->hasActiveSubscription()) {
+            return redirect()->back()->with('error', 'Jellyfin hesabı oluşturmak için aktif bir abonelik paketinizin olması gerekir.');
+        }
+
         $validated = $request->validate([
             'password' => 'required|string|min:4|max:100',
         ]);
@@ -83,7 +95,7 @@ class MediaServerController extends Controller
         // Kullanıcı adı her zaman kullanıcının e-posta adresidir
         $username = $user->email;
 
-        $result = $this->loadBalancer->createBalancedUser($username, $validated['password']);
+        $result = $this->loadBalancer->createBalancedUser($username, $validated['password'], $user->id);
 
         if (! empty($result['success'])) {
             return redirect()->back()->with('success', $result['message']);
@@ -100,6 +112,10 @@ class MediaServerController extends Controller
         $user = Auth::user();
         if (! $user) {
             return redirect()->route('home')->with('error', 'Lütfen önce giriş yapın.');
+        }
+
+        if (! $user->isAdmin() && ! $user->hasActiveSubscription()) {
+            return redirect()->back()->with('error', 'Aktif bir aboneliğiniz bulunmadığı için bu işlem yapılamaz.');
         }
 
         $validated = $request->validate([
@@ -132,19 +148,8 @@ class MediaServerController extends Controller
             return redirect()->route('home')->with('error', 'Lütfen önce giriş yapın.');
         }
 
-        // Kullanıcı adı her zaman e-posta adresidir (eski hesaplar için name fallback)
-        $username = $user->email;
-        $found = $this->loadBalancer->findUserAcrossServers($username);
-        if ($found === null && ! empty($user->name)) {
-            $username = $user->name;
-        }
+        $this->loadBalancer->purgeUserAccount($user);
 
-        $result = $this->loadBalancer->deleteUserAccount($username);
-
-        if (! empty($result['success'])) {
-            return redirect()->back()->with('success', $result['message']);
-        }
-
-        return redirect()->back()->with('error', $result['message']);
+        return redirect()->back()->with('success', 'Jellyfin hesabınız sunuculardan ve veritabanından başarıyla silindi.');
     }
 }

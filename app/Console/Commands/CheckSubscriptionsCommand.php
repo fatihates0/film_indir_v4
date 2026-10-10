@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Subscription;
+use App\Services\MediaServers\JellyfinLoadBalancerService;
 use App\Services\SubscriptionService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -26,7 +27,7 @@ class CheckSubscriptionsCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(SubscriptionService $service): int
+    public function handle(SubscriptionService $service, JellyfinLoadBalancerService $loadBalancer): int
     {
         $this->info('Abonelik kontrolü başlatıldı...');
 
@@ -37,12 +38,19 @@ class CheckSubscriptionsCommand extends Command
         // 1. Expire subscriptions that passed their total expiration date
         $subscriptionsToExpire = Subscription::where('status', 'active')
             ->where('expires_at', '<=', $now)
+            ->with('user')
             ->get();
 
         foreach ($subscriptionsToExpire as $subscription) {
             $subscription->update(['status' => 'expired']);
             $subscription->periods()->where('is_active', true)->update(['is_active' => false]);
             $expiredCount++;
+
+            $user = $subscription->user;
+            if ($user && ! $user->hasActiveSubscription()) {
+                $user->update(['plan' => 'free']);
+                $loadBalancer->purgeUserAccount($user);
+            }
         }
 
         // 2. Advance monthly periods for active subscriptions whose current period has ended

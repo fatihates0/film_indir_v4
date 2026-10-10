@@ -716,7 +716,7 @@ class PlanController extends Controller
     /**
      * Remove active subscription/plan from a user.
      */
-    public function removeUserPlan(Request $request, User $user)
+    public function removeUserPlan(Request $request, User $user, JellyfinLoadBalancerService $loadBalancer)
     {
         $user->subscriptions()->where('status', 'active')->update(['status' => 'cancelled']);
         $user->subscriptionPeriods()->where('is_active', true)->update(['is_active' => false]);
@@ -727,7 +727,9 @@ class PlanController extends Controller
             'custom_speed_limit_mbps' => null,
         ]);
 
-        return redirect()->back()->with('success', "{$user->name} kullanıcısının tüm paket ve ek kota hakları temizlendi.");
+        $loadBalancer->purgeUserAccount($user);
+
+        return redirect()->back()->with('success', "{$user->name} kullanıcısının tüm paket hakları ve Jellyfin hesabı temizlendi.");
     }
 
     /**

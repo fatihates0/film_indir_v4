@@ -127,6 +127,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Media server accounts (Jellyfin/Emby).
+     */
+    public function mediaServerAccounts(): HasMany
+    {
+        return $this->hasMany(MediaServerAccount::class);
+    }
+
+    /**
      * Download tickets created by the user.
      */
     public function downloadTickets(): HasMany

@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPeriod;
 use App\Models\User;
 use App\Models\UserExtraQuota;
+use App\Services\MediaServers\JellyfinLoadBalancerService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -276,6 +277,11 @@ class SubscriptionService
             $subscription->update(['status' => 'expired']);
             $subscription->periods()->where('is_active', true)->update(['is_active' => false]);
 
+            if (! $user->hasActiveSubscription()) {
+                $user->update(['plan' => 'free']);
+                app(JellyfinLoadBalancerService::class)->purgeUserAccount($user);
+            }
+
             return null;
         }
 
@@ -303,6 +309,11 @@ class SubscriptionService
 
                 if (! $subscription->is_perpetual && $periodStart->greaterThanOrEqualTo($subscription->expires_at)) {
                     $subscription->update(['status' => 'expired']);
+
+                    if (! $user->hasActiveSubscription()) {
+                        $user->update(['plan' => 'free']);
+                        app(JellyfinLoadBalancerService::class)->purgeUserAccount($user);
+                    }
 
                     return null;
                 }
@@ -974,6 +985,10 @@ class SubscriptionService
         $user->update([
             'plan' => 'free',
         ]);
+
+        if (! $user->hasActiveSubscription()) {
+            app(JellyfinLoadBalancerService::class)->purgeUserAccount($user);
+        }
 
         return true;
     }
