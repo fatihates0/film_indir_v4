@@ -11,7 +11,11 @@ import {
 
 export default function Pricing({ plans = [], paymentMethods = [], faqs = [], upgrades = {} }) {
     const { auth, flash } = usePage().props;
-    const [selectedDuration, setSelectedDuration] = useState(1); // 1, 3, 6, 12
+    const user = auth?.user;
+    const quota = auth?.quota;
+    const userSubDuration = quota?.has_active_main_sub && quota?.duration_months ? quota.duration_months : 1;
+
+    const [selectedDuration, setSelectedDuration] = useState(userSubDuration); // 1, 3, 6, 12
     const [openFaqIndex, setOpenFaqIndex] = useState(0); // Default open first FAQ item
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authModalMode, setAuthModalMode] = useState('login');
@@ -26,9 +30,6 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
     const [copiedField, setCopiedField] = useState(null);
     const [isSubmittingNotice, setIsSubmittingNotice] = useState(false);
     const [isCancellingPerpetual, setIsCancellingPerpetual] = useState(false);
-
-    const user = auth?.user;
-    const quota = auth?.quota;
 
     const handleCancelPerpetual = () => {
         if (!window.confirm("Süresiz özel kotanızı sonlandırmak istediğinize emin misiniz?\n\nKalan kotanız kapatılacak ve dilediğiniz yeni indirme paketini hemen satın alabileceksiniz.")) {
@@ -154,11 +155,13 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
         const isBusinessPlan = plan.type === 'business';
 
         const upgradeInfo = upgrades && upgrades[plan.id];
-        const isUpgradeAvailable = Boolean(upgradeInfo && upgradeInfo.can_upgrade);
-        const isCurrentPlan = Boolean(user && quota?.has_active_main_sub && quota?.plan_id === plan.id);
+        const isMatchingUserDuration = Boolean(user && quota?.has_active_main_sub && selectedDuration === userSubDuration);
+        const isUpgradeAvailable = Boolean(isMatchingUserDuration && upgradeInfo && upgradeInfo.can_upgrade);
+        const isCurrentPlan = Boolean(user && quota?.has_active_main_sub && quota?.plan_id === plan.id && isMatchingUserDuration);
         const isDowngrade = Boolean(
             user &&
             quota?.has_active_main_sub &&
+            isMatchingUserDuration &&
             !isExtraPlan &&
             !isCurrentPlan &&
             !isUpgradeAvailable &&
@@ -326,7 +329,9 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                             <div className="p-2.5 rounded-xl bg-purple-500/10 dark:bg-purple-950/40 border border-purple-500/30 flex items-center justify-between text-[11px] text-purple-700 dark:text-purple-300">
                                 <span className="font-semibold flex items-center gap-1.5">
                                     <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                                    Kalan {upgradeInfo.remaining_days} gün farkı:
+                                    {upgradeInfo?.duration_months === 1
+                                        ? `Kalan ${upgradeInfo.current_period_remaining_days} gün farkı:`
+                                        : `${upgradeInfo.duration_months} Aylık Kalan Süre Farkı (${upgradeInfo.total_remaining_days} Gün):`}
                                 </span>
                                 <span className="font-black text-xs font-mono text-purple-900 dark:text-purple-200">
                                     {upgradeInfo.formatted_upgrade_amount}
@@ -493,26 +498,43 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                         {/* GLOBAL DURATION TOGGLE (FOR INDIVIDUAL & BUSINESS) */}
                         <div className="pt-6 flex justify-center">
                             <div className="bg-slate-200/80 dark:bg-[#121620] p-1.5 rounded-2xl border border-slate-300/80 dark:border-white/10 flex items-center gap-1 max-w-md w-full">
-                                {durationOptions.map((opt) => (
-                                    <button
-                                        key={opt.months}
-                                        type="button"
-                                        onClick={() => setSelectedDuration(opt.months)}
-                                        className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${selectedDuration === opt.months
-                                                ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
-                                                : 'text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/60 dark:hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {opt.label}
-                                        {opt.badge && (
-                                            <span className="absolute -top-2.5 right-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-black shadow-sm">
-                                                {opt.badge}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
+                                {durationOptions.map((opt) => {
+                                    const isUserActiveDuration = Boolean(user && quota?.has_active_main_sub && opt.months === userSubDuration);
+                                    return (
+                                        <button
+                                            key={opt.months}
+                                            type="button"
+                                            onClick={() => setSelectedDuration(opt.months)}
+                                            className={`flex-1 py-2 px-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${selectedDuration === opt.months
+                                                    ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
+                                                    : 'text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/60 dark:hover:bg-white/5'
+                                                }`}
+                                        >
+                                            <span>{opt.label}</span>
+                                            {isUserActiveDuration && (
+                                                <span className="block text-[8px] sm:text-[9px] font-bold opacity-80 leading-none mt-0.5">
+                                                    (Aktif Süre)
+                                                </span>
+                                            )}
+                                            {opt.badge && (
+                                                <span className="absolute -top-2.5 right-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-black shadow-sm">
+                                                    {opt.badge}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
+
+                        {user && quota?.has_active_main_sub && selectedDuration !== userSubDuration && (
+                            <div className="pt-3 max-w-2xl mx-auto text-center text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 animate-in fade-in">
+                                <Info className="w-4 h-4 text-amber-500 shrink-0" />
+                                <span>
+                                    Mevcut aboneliğiniz <strong>{quota.plan_name} ({userSubDuration} Aylık)</strong>'tır. Paket yükseltme farkı <strong>{userSubDuration} Aylık</strong> sekmesinde geçerlidir. Bu sekmede seçeceğiniz paket <strong>yeni bir {selectedDuration} aylık dönem</strong> olarak başlatılır.
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* SECTION 1: BİREYSEL PAKETLER */}
@@ -761,7 +783,11 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
                                         <div>
                                             <span className="text-xs text-slate-500 dark:text-gray-400 block">
-                                                {isUpgradeCheckout ? `Ödenecek Fark (${currentUpgrade?.remaining_days || 0} Gün)` : 'Ödenecek Tutar'}
+                                                {isUpgradeCheckout
+                                                    ? (currentUpgrade?.duration_months === 1
+                                                        ? `Ödenecek Fark (${currentUpgrade?.current_period_remaining_days || 0} Gün)`
+                                                        : `Ödenecek Fark (${currentUpgrade?.duration_months || 0} Aylık / Toplam ${currentUpgrade?.total_remaining_days || 0} Gün)`)
+                                                    : 'Ödenecek Tutar'}
                                             </span>
                                             <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
                                                 {isUpgradeCheckout && currentUpgrade
@@ -774,19 +800,58 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                                 {isUpgradeCheckout ? 'Yeni Kota Tavanı' : checkoutPlan.type === 'extra' ? 'Ek İndirme Kotası' : 'Aylık İndirme Kotası'}
                                             </span>
                                             <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                                                {checkoutPlan.monthly_quota_gb} GB {isUpgradeCheckout ? '(Mevcut Dönem)' : checkoutPlan.type === 'extra' ? '(30 Gün)' : '/ Ay'}
+                                                {checkoutPlan.monthly_quota_gb} GB {isUpgradeCheckout ? '(Aylık)' : checkoutPlan.type === 'extra' ? '(30 Gün)' : '/ Ay'}
                                             </span>
                                         </div>
                                     </div>
 
                                     {isUpgradeCheckout && currentUpgrade && (
-                                        <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-500/30 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2.5">
-                                            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                                            <div className="space-y-0.5">
-                                                <strong className="block text-slate-900 dark:text-white font-bold">Paket Yükseltme Bilgisi:</strong>
-                                                <p className="leading-relaxed text-[11px] text-slate-600 dark:text-purple-200">
-                                                    Mevcut döneminizin bitiş tarihi (<strong>{currentUpgrade.period_end_formatted}</strong>) değişmez. İndirme kotanız anında <strong>{checkoutPlan.monthly_quota_gb} GB</strong> tavanına yükseltilir, şu ana kadarki harcamanız korunur.
-                                                </p>
+                                        <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-500/30 text-xs space-y-3">
+                                            <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white border-b border-purple-200 dark:border-purple-500/20 pb-2">
+                                                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                                                <span>Fark Hesaplama Detayları</span>
+                                            </div>
+
+                                            {currentUpgrade.duration_months === 1 ? (
+                                                <div className="space-y-1.5 text-slate-700 dark:text-gray-300">
+                                                    <div className="flex justify-between items-center">
+                                                        <span>Mevcut Dönem Kalan Süresi:</span>
+                                                        <strong className="text-slate-900 dark:text-white font-mono">{currentUpgrade.current_period_remaining_days} Gün</strong>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span>Abonelik Bitiş Tarihi:</span>
+                                                        <strong className="text-slate-900 dark:text-white">{currentUpgrade.period_end_formatted}</strong>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-purple-200/50 dark:border-white/5 font-bold">
+                                                        <span>Kalan Gün Fiyat Farkı:</span>
+                                                        <span className="text-purple-600 dark:text-purple-400 font-mono text-sm">{currentUpgrade.formatted_upgrade_amount}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2 text-slate-700 dark:text-gray-300">
+                                                    <div className="flex justify-between items-center text-[11px]">
+                                                        <span>1. Mevcut Ayın Kalan Süresi ({currentUpgrade.current_period_remaining_days} Gün):</span>
+                                                        <strong className="text-slate-900 dark:text-white font-mono">{currentUpgrade.formatted_current_cycle_diff}</strong>
+                                                    </div>
+                                                    {currentUpgrade.remaining_future_months > 0 && (
+                                                        <div className="flex justify-between items-center text-[11px]">
+                                                            <span>Kalan {currentUpgrade.remaining_future_months} Tam Ay Farkı ({currentUpgrade.remaining_future_months} × ₺{currentUpgrade.future_monthly_diff}):</span>
+                                                            <strong className="text-slate-900 dark:text-white font-mono">{currentUpgrade.formatted_future_months_diff}</strong>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between items-center pt-1.5 border-t border-purple-200/60 dark:border-white/10 text-xs">
+                                                        <span>Abonelik Bitiş Tarihi:</span>
+                                                        <strong className="text-slate-900 dark:text-white">{currentUpgrade.subscription_expires_at_formatted} ({currentUpgrade.total_remaining_days} Gün Kaldı)</strong>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-purple-200/60 dark:border-white/10 font-bold text-xs">
+                                                        <span className="text-slate-900 dark:text-white">Toplam Ödenecek Fark:</span>
+                                                        <span className="text-purple-600 dark:text-purple-400 font-mono text-base">{currentUpgrade.formatted_upgrade_amount}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="pt-2 border-t border-purple-200 dark:border-purple-500/20 text-[11px] text-slate-600 dark:text-gray-400 leading-relaxed">
+                                                ℹ️ Abonelik süreniz değişmez. İndirme kotanız anında <strong>{checkoutPlan.monthly_quota_gb} GB</strong> tavanına çıkarılır, mevcut kullanımınız korunur ve kalan tüm aylarda kotanız <strong>{checkoutPlan.monthly_quota_gb} GB</strong> olarak yenilenir.
                                             </div>
                                         </div>
                                     )}

@@ -52,7 +52,7 @@ class PaymentNotificationController extends Controller
 
             $amount = (float) $calc['upgrade_amount'];
             $oldPlanId = (int) $calc['current_plan']['id'];
-            $durationMonths = 1;
+            $durationMonths = (int) ($calc['duration_months'] ?? 1);
         } elseif ($plan->isExtra()) {
             // Extra Quota validation: User MUST have an active main subscription to buy extra quota!
             if (! $subscriptionService->canBuyExtraQuota($user)) {

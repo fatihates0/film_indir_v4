@@ -777,6 +777,8 @@ class SubscriptionService
             'is_perpetual' => (bool) ($subscription?->is_perpetual),
             'can_cancel_perpetual' => $canCancelPerpetual,
             'plan_id' => $plan?->id,
+            'duration_months' => $subscription?->is_perpetual ? 0 : (int) ($subscription?->duration_months ?? 1),
+            'subscription_expires_at_formatted' => $subscription?->is_perpetual ? 'Süresiz' : ($subscription?->expires_at ? $subscription->expires_at->format('d.m.Y H:i') : null),
             'can_upgrade' => (bool) ($hasMainSub && $plan && ! $subscription?->is_perpetual),
             'subscription_id' => $subscription?->id,
             'can_download' => $totalRemaining > 0,
@@ -821,35 +823,42 @@ class SubscriptionService
         $now = Carbon::now();
         $periodStart = $period->period_start;
         $periodEnd = $period->period_end;
+        $subExpiresAt = $subscription->expires_at;
 
         $currentPeriodDays = max(1, (int) round($periodStart->diffInDays($periodEnd)));
         $remainingDays = max(0, (int) ceil($now->diffInDays($periodEnd, false)));
 
-        if ($remainingDays <= 0) {
+        if ($remainingDays <= 0 && $subExpiresAt->isPast()) {
             return null;
         }
+
+        $totalMonths = max(1, (int) $subscription->duration_months);
+        $currentPeriodNumber = (int) $period->period_number;
+        $remainingFutureMonths = max(0, $totalMonths - $currentPeriodNumber);
 
         $currentPrice1m = (float) $currentPlan->price_1m;
         $targetPrice1m = (float) $targetPlan->price_1m;
 
         // Daily rate difference for current cycle
         $dailyDiff = max(0.0, ($targetPrice1m - $currentPrice1m) / $currentPeriodDays);
-        $currentCycleDiff = $dailyDiff * $remainingDays;
+        $currentCycleDiff = round($dailyDiff * $remainingDays, 2);
 
         // Check future months if multi-month subscription
-        $totalMonths = max(1, $subscription->duration_months);
-        $remainingFutureMonths = max(0, $totalMonths - $period->period_number);
         $futureMonthsDiff = 0.0;
+        $futureMonthlyDiff = 0.0;
         if ($remainingFutureMonths > 0) {
             $futureMonthlyCurrent = $currentPlan->getPriceForDuration($totalMonths) / $totalMonths;
             $futureMonthlyTarget = $targetPlan->getPriceForDuration($totalMonths) / $totalMonths;
-            $futureMonthsDiff = max(0.0, ($futureMonthlyTarget - $futureMonthlyCurrent) * $remainingFutureMonths);
+            $futureMonthlyDiff = round(max(0.0, $futureMonthlyTarget - $futureMonthlyCurrent), 2);
+            $futureMonthsDiff = round($futureMonthlyDiff * $remainingFutureMonths, 2);
         }
 
         $totalUpgradeAmount = round(max(5.0, $currentCycleDiff + $futureMonthsDiff), 2);
+        $totalDaysLeft = max(0, (int) ceil($now->diffInDays($subExpiresAt, false)));
 
         return [
             'can_upgrade' => true,
+            'duration_months' => $totalMonths,
             'current_plan' => [
                 'id' => $currentPlan->id,
                 'name' => $currentPlan->name,
@@ -862,8 +871,17 @@ class SubscriptionService
                 'monthly_quota_gb' => $targetPlan->monthly_quota_gb,
                 'formatted_quota' => $targetPlan->formatted_quota,
             ],
-            'remaining_days' => $remainingDays,
+            'current_period_number' => $currentPeriodNumber,
+            'current_period_remaining_days' => $remainingDays,
+            'current_cycle_diff' => $currentCycleDiff,
+            'formatted_current_cycle_diff' => '₺'.number_format($currentCycleDiff, 2, ',', '.'),
+            'remaining_future_months' => $remainingFutureMonths,
+            'future_monthly_diff' => $futureMonthlyDiff,
+            'future_months_diff' => $futureMonthsDiff,
+            'formatted_future_months_diff' => '₺'.number_format($futureMonthsDiff, 2, ',', '.'),
+            'total_remaining_days' => $totalDaysLeft,
             'period_end_formatted' => $periodEnd->format('d.m.Y H:i'),
+            'subscription_expires_at_formatted' => $subExpiresAt->format('d.m.Y H:i'),
             'upgrade_amount' => $totalUpgradeAmount,
             'formatted_upgrade_amount' => '₺'.number_format($totalUpgradeAmount, 2, ',', '.'),
             'quota_ceiling_gb' => $targetPlan->monthly_quota_gb,
