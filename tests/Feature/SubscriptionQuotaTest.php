@@ -902,4 +902,26 @@ class SubscriptionQuotaTest extends TestCase
         $individualPlan->update(['allow_vps_access' => true]);
         $this->assertTrue($service->allowsVpsAccess($user));
     }
+
+    public function test_can_assign_perpetual_plan_to_user(): void
+    {
+        $user = User::factory()->create();
+        $service = app(SubscriptionService::class);
+
+        $subscription = $service->subscribe(
+            $user,
+            null, // custom quota
+            1,
+            0,
+            'Yönetici tarafından özel kota tanımlandı',
+            100, // 100 GB
+            true // isPerpetual
+        );
+
+        $this->assertNotNull($subscription);
+        $this->assertTrue($subscription->is_perpetual);
+        $this->assertEquals(0, $subscription->duration_months);
+        $this->assertEquals('active', $subscription->status);
+        $this->assertTrue($subscription->expires_at->isAfter(now()->addYears(90)));
+    }
 }

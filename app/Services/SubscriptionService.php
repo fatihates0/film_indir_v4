@@ -62,7 +62,7 @@ class SubscriptionService
             $subscription = Subscription::create([
                 'user_id' => $user->id,
                 'plan_id' => $plan?->id,
-                'duration_months' => $isPerpetual ? 999 : $durationMonths,
+                'duration_months' => $isPerpetual ? 0 : $durationMonths,
                 'starts_at' => $now,
                 'expires_at' => $expiresAt,
                 'is_perpetual' => $isPerpetual,
