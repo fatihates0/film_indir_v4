@@ -90,6 +90,12 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
             return;
         }
 
+        // If user has an active main subscription, block buying another main plan (only upgrade or extra quota allowed)
+        if (!isUpgrade && plan.type !== 'extra' && quota?.has_active_main_sub) {
+            alert('Aktif bir aboneliğiniz bulunmaktadır. Yeni bir paket satın alamazsınız, yalnızca mevcut paketinizi yükseltebilir veya ek kota alabilirsiniz.');
+            return;
+        }
+
         // Check Extra Quota eligibility
         if (plan.type === 'extra' && (!quota || !quota.can_buy_extra_quota)) {
             alert('Ek kota alabilmek için aktif bir bireysel veya business paketinizin bulunması gerekmektedir.');
@@ -367,6 +373,16 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                             <Lock className="w-4 h-4 text-slate-400 dark:text-gray-500" />
                             <span>Aktif Paket Gerekli</span>
                         </button>
+                    ) : !isExtraPlan && user && quota?.has_active_main_sub ? (
+                        <button
+                            type="button"
+                            disabled
+                            className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-slate-400 dark:text-gray-500 flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                            title="Aktif bir aboneliğiniz bulunduğu için yeni ana paket satın alamazsınız. Yalnızca paket yükseltme yapabilirsiniz."
+                        >
+                            <Lock className="w-4 h-4 text-slate-400 dark:text-gray-500" />
+                            <span>Aktif Paketiniz Bulunuyor</span>
+                        </button>
                     ) : (
                         <button
                             type="button"
@@ -500,6 +516,8 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                             <div className="bg-slate-200/80 dark:bg-[#121620] p-1.5 rounded-2xl border border-slate-300/80 dark:border-white/10 flex items-center gap-1 max-w-md w-full">
                                 {durationOptions.map((opt) => {
                                     const isUserActiveDuration = Boolean(user && quota?.has_active_main_sub && opt.months === userSubDuration);
+                                    const isOtherDurationWhenActive = Boolean(user && quota?.has_active_main_sub && opt.months !== userSubDuration);
+
                                     return (
                                         <button
                                             key={opt.months}
@@ -510,7 +528,12 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                                     : 'text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/60 dark:hover:bg-white/5'
                                                 }`}
                                         >
-                                            <span>{opt.label}</span>
+                                            <span className="flex items-center justify-center gap-1">
+                                                {isOtherDurationWhenActive && (
+                                                    <Lock className="w-3 h-3 opacity-60 shrink-0" />
+                                                )}
+                                                {opt.label}
+                                            </span>
                                             {isUserActiveDuration && (
                                                 <span className="block text-[8px] sm:text-[9px] font-bold opacity-80 leading-none mt-0.5">
                                                     (Aktif Süre)
@@ -527,13 +550,22 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                             </div>
                         </div>
 
-                        {user && quota?.has_active_main_sub && selectedDuration !== userSubDuration && (
-                            <div className="pt-3 max-w-2xl mx-auto text-center text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 animate-in fade-in">
-                                <Info className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span>
-                                    Mevcut aboneliğiniz <strong>{quota.plan_name} ({userSubDuration} Aylık)</strong>'tır. Paket yükseltme farkı <strong>{userSubDuration} Aylık</strong> sekmesinde geçerlidir. Bu sekmede seçeceğiniz paket <strong>yeni bir {selectedDuration} aylık dönem</strong> olarak başlatılır.
-                                </span>
-                            </div>
+                        {user && quota?.has_active_main_sub && (
+                            selectedDuration !== userSubDuration ? (
+                                <div className="pt-3 max-w-2xl mx-auto text-center text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 animate-in fade-in">
+                                    <Lock className="w-4 h-4 text-amber-500 shrink-0" />
+                                    <span>
+                                        Mevcut aboneliğiniz <strong>{quota.plan_name} ({userSubDuration} Aylık)</strong> devam ettiği için bu periyottan yeni paket satın alamazsınız. Paket yükseltme işlemi yalnızca <strong>{userSubDuration} Aylık</strong> sekmesinde geçerlidir.
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="pt-3 max-w-2xl mx-auto text-center text-xs text-purple-700 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 animate-in fade-in">
+                                    <Sparkles className="w-4 h-4 text-purple-500 shrink-0" />
+                                    <span>
+                                        Aktif bir aboneliğiniz bulunduğu için yalnızca üst paketlere yükseltme yapabilirsiniz veya ek kota alabilirsiniz.
+                                    </span>
+                                </div>
+                            )
                         )}
                     </div>
 

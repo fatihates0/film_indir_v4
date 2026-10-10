@@ -61,6 +61,11 @@ class PaymentNotificationController extends Controller
             $durationMonths = 1;
             $amount = $plan->getPriceForDuration(1);
         } else {
+            // Normal main plan purchase: User must NOT have an active main subscription!
+            if ($subscriptionService->hasActiveMainSubscription($user)) {
+                return redirect()->back()->with('error', 'Aktif bir aboneliğiniz bulunmaktadır. Yeni bir paket satın alamazsınız, yalnızca mevcut paketinizi yükseltebilir veya ek kota alabilirsiniz.');
+            }
+
             $durationMonths = (int) $validated['duration_months'];
             if (! $plan->isDurationAllowed($durationMonths)) {
                 return redirect()->back()->with('error', "{$plan->name} paketi için seçilen {$durationMonths} aylık abonelik döngüsü geçerli değildir.");

@@ -319,8 +319,16 @@ class AdminController extends Controller
                 'answer' => 'Alamazsınız. Üyelik satın alındığı anda içeriklerin tamamı size açıldığı için dijital üyeliklerde iade yok. Mantık şuna benzer: Marketten bisküvi alıp paketi açıyor, birini de yiyorsunuz. Sonra aynı paketi geri götürüp para istemek olmaz.',
             ],
             [
-                'question' => 'Şu anki paketimden daha yüksek bir pakete geçmek mümkün mü?',
-                'answer' => 'Mümkün. Geçiş sırasında ekranda bir bilgilendirme görürsünüz. Ödemeyi tamamladığınızda yeni paketiniz hesabınıza tanımlanır.',
+                'question' => 'Şu anki paketimden daha yüksek bir pakete geçmek mümkün mü? Fiyat farkı nasıl hesaplanır?',
+                'answer' => 'Mümkün. Mevcut abonelik süreniz bozulmadan dilediğiniz an üst pakete geçebilirsiniz. Tam paket ücreti yerine yalnızca kalan sürenizin fiyat farkını ödersiniz: 1 aylık paketlerde kalan günlerin farkı hesaplanır. 3 ve 6 aylık paketlerde ise içinde bulunduğunuz ayın kalan günleri ile gelecek tam ayların farkı toplanarak adil bir tutar çıkarılır.',
+            ],
+            [
+                'question' => 'Paket yükselttiğimde indirme kotama ve kalan süreye ne olur?',
+                'answer' => "Kotanız anında yeni üst paketin tavanına çıkarılır. O ay yapmış olduğunuz harcamalar silinmez, korunur; yeni kotanızdan düşülür. Örneğin 1.500 GB'lık pakette 1.000 GB kullandıktan sonra 2.500 GB'lık pakete geçerseniz, kalan kullanım hakkınız hemen 1.500 GB olur. Kalan tüm aylarda da kotanız yeni üst paket kotası üzerinden yenilenir. Abonelik bitiş tarihiniz kesinlikle kısalmaz.",
+            ],
+            [
+                'question' => '1 aylık paketimi 3 veya 6 aylık bir üst pakete yükseltebilir miyim?',
+                'answer' => 'Yükseltemezsiniz. Paket yükseltme (fark ödeyerek geçiş) işlemi yalnızca mevcut aboneliğinizin süresi dahilinde geçerlidir (1 aylıktan 1 aylığa, 3 aylıktan 3 aylığa gibi). Farklı bir periyot seçtiğinizde işlem yükseltme değil, yeni bir abonelik paketi satın alımı olarak işleme alınır.',
             ],
             [
                 'question' => 'Aylık kotamı tamamen kullanırsam ne olur?',
