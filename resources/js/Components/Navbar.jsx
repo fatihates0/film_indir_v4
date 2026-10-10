@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, usePage, router } from '@inertiajs/react';
-import { Search, Bell, ChevronDown, User, Bookmark, Heart, Download, Settings as SettingsIcon, LogOut, X, Shield, Sun, Moon, HardDrive, Menu } from 'lucide-react';
+import { Search, Bell, ChevronDown, User, Bookmark, Heart, Download, Settings as SettingsIcon, LogOut, X, Shield, Sun, Moon, HardDrive, Menu, Tv } from 'lucide-react';
 import { useTheme } from '../Context/ThemeContext';
 
 export default function Navbar({ onOpenAuth, transparent = false }) {
@@ -297,6 +297,15 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                                             )}
 
                                             <Link
+                                                href="/media-server"
+                                                onClick={() => setIsDropdownOpen(false)}
+                                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-emerald-500 hover:text-emerald-400 transition-colors font-semibold"
+                                            >
+                                                <Tv className="w-4 h-4 text-emerald-500" />
+                                                <span>Medya Sunucum</span>
+                                            </Link>
+
+                                            <Link
                                                 href="/pricing"
                                                 onClick={() => setIsDropdownOpen(false)}
                                                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-[#00B074] hover:text-[#009663] transition-colors font-semibold"
@@ -553,6 +562,14 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                                             <span>Admin Paneli</span>
                                         </Link>
                                     )}
+                                    <Link
+                                        href="/media-server"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20 font-bold"
+                                    >
+                                        <Tv className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Medya Sunucum</span>
+                                    </Link>
                                     <Link
                                         href="/settings"
                                         onClick={() => setIsMobileMenuOpen(false)}

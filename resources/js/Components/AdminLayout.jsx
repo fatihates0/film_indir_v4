@@ -16,7 +16,8 @@ import {
     Menu,
     X,
     Activity,
-    User
+    User,
+    Tv
 } from 'lucide-react';
 
 export default function AdminLayout({ 
@@ -62,6 +63,13 @@ export default function AdminLayout({
             href: '/admin/plans',
             icon: Package,
             badge: statsSummary?.total_plans !== undefined ? statsSummary.total_plans : null
+        },
+        {
+            id: 'jellyfin-servers',
+            label: 'Jellyfin Sunucuları',
+            href: '/admin/jellyfin-servers',
+            icon: Tv,
+            badge: null
         },
     ];
 

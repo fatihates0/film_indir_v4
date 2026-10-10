@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminUploadController;
+use App\Http\Controllers\Admin\JellyfinServerController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\PaymentMethodController;
 use App\Http\Controllers\Admin\PlanController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\FrontController;
+use App\Http\Controllers\MediaServerController;
 use App\Http\Controllers\PaymentNotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +48,12 @@ Route::get('/forum/topic/{id?}', [FrontController::class, 'movieTopic'])->name('
 Route::get('/search', [FrontController::class, 'search'])->name('search');
 Route::get('/watchlist', [FrontController::class, 'watchlist'])->name('watchlist');
 Route::get('/downloads', [FrontController::class, 'downloads'])->name('downloads');
+
+// User Media Server Management
+Route::get('/media-server', [MediaServerController::class, 'index'])->name('media-server.index');
+Route::post('/media-server/account', [MediaServerController::class, 'createAccount'])->name('media-server.create');
+Route::post('/media-server/password', [MediaServerController::class, 'resetPassword'])->name('media-server.reset-password');
+Route::delete('/media-server/account', [MediaServerController::class, 'deleteAccount'])->name('media-server.delete');
 
 // Secure Download Routes
 Route::match(['get', 'post'], '/downloads/prepare/{mediaFile}', [DownloadController::class, 'prepare'])->name('downloads.prepare');
@@ -119,4 +127,13 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::put('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
     Route::post('/payment-notifications/{notification}/approve', [PaymentNotificationController::class, 'approve'])->name('payment-notifications.approve');
     Route::post('/payment-notifications/{notification}/reject', [PaymentNotificationController::class, 'reject'])->name('payment-notifications.reject');
+
+    // Jellyfin Media Server Nodes Management Routes
+    Route::get('/jellyfin-servers', [JellyfinServerController::class, 'index'])->name('jellyfin-servers.index');
+    Route::post('/jellyfin-servers', [JellyfinServerController::class, 'store'])->name('jellyfin-servers.store');
+    Route::put('/jellyfin-servers/{jellyfinServer}', [JellyfinServerController::class, 'update'])->name('jellyfin-servers.update');
+    Route::delete('/jellyfin-servers/{jellyfinServer}', [JellyfinServerController::class, 'destroy'])->name('jellyfin-servers.destroy');
+    Route::post('/jellyfin-servers/{jellyfinServer}/toggle', [JellyfinServerController::class, 'toggle'])->name('jellyfin-servers.toggle');
+    Route::post('/jellyfin-servers/{jellyfinServer}/test', [JellyfinServerController::class, 'test'])->name('jellyfin-servers.test');
+    Route::post('/jellyfin-servers/test-all', [JellyfinServerController::class, 'testAll'])->name('jellyfin-servers.test-all');
 });

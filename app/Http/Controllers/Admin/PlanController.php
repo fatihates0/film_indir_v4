@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
-use App\Jobs\ProvisionMediaAccount;
 use App\Models\PaymentMethod;
 use App\Models\PaymentNotification;
 use App\Models\Plan;
@@ -12,6 +11,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPeriod;
 use App\Models\User;
 use App\Models\UserExtraQuota;
+use App\Services\MediaServers\JellyfinLoadBalancerService;
 use App\Services\SubscriptionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -691,13 +691,26 @@ class PlanController extends Controller
     }
 
     /**
-     * Trigger manual Jellyfin/Emby synchronization for user.
+     * Trigger manual Jellyfin synchronization for user using load balancer.
      */
-    public function syncMediaAccount(User $user)
+    public function syncMediaAccount(User $user, JellyfinLoadBalancerService $loadBalancer)
     {
-        ProvisionMediaAccount::dispatch($user);
+        $username = $user->email;
+        $existing = $loadBalancer->findUserAcrossServers($username);
+        if (! $existing && ! empty($user->name)) {
+            $existing = $loadBalancer->findUserAcrossServers($user->name);
+        }
 
-        return redirect()->back()->with('success', "{$user->name} kullanıcısı için medya sunucusu (Jellyfin/Emby) senkronizasyon görevi kuyruğa eklendi.");
+        if ($existing) {
+            return redirect()->back()->with('success', "{$user->name} ({$username}) kullanıcısının '{$existing['server']->name}' sunucusunda aktif Jellyfin hesabı bulunmaktadır.");
+        }
+
+        $result = $loadBalancer->createBalancedUser($username, bin2hex(random_bytes(6)));
+        if (! empty($result['success'])) {
+            return redirect()->back()->with('success', "{$user->name} ({$username}) kullanıcısı için '{$result['server']->name}' sunucusunda dengeli hesap oluşturuldu.");
+        }
+
+        return redirect()->back()->with('error', $result['message']);
     }
 
     /**
