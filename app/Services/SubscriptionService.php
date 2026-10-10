@@ -435,6 +435,68 @@ class SubscriptionService
     }
 
     /**
+     * Deduct streaming bytes from user's active extra quotas and main subscription period.
+     */
+    public function deductUserQuota(User $user, int $bytes): bool
+    {
+        if ($user->isAdmin() || $bytes <= 0) {
+            return true;
+        }
+
+        $this->expireStaleExtraQuotas($user);
+
+        $activeExtraIds = DB::table('user_extra_quotas')
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where('expires_at', '>', now())
+            ->whereColumn('used_bytes', '<', 'allocated_bytes')
+            ->orderBy('expires_at', 'asc')
+            ->pluck('id')
+            ->toArray();
+
+        $currentPeriod = $this->getCurrentPeriod($user);
+
+        DB::transaction(function () use ($bytes, $activeExtraIds, $currentPeriod) {
+            $bytesLeftToDeduct = $bytes;
+
+            // 1. Deduct from extra quotas first
+            foreach ($activeExtraIds as $extraId) {
+                if ($bytesLeftToDeduct <= 0) {
+                    break;
+                }
+
+                $extra = DB::table('user_extra_quotas')->where('id', $extraId)->lockForUpdate()->first();
+                if (! $extra) {
+                    continue;
+                }
+
+                $rem = max(0, $extra->allocated_bytes - $extra->used_bytes);
+                if ($rem <= 0) {
+                    continue;
+                }
+
+                $deduct = min($bytesLeftToDeduct, $rem);
+                DB::table('user_extra_quotas')->where('id', $extraId)->increment('used_bytes', $deduct);
+                $bytesLeftToDeduct -= $deduct;
+
+                if (($extra->used_bytes + $deduct) >= $extra->allocated_bytes) {
+                    DB::table('user_extra_quotas')->where('id', $extraId)->update(['status' => 'exhausted']);
+                }
+            }
+
+            // 2. Charge main subscription period for remainder
+            if ($bytesLeftToDeduct > 0 && $currentPeriod) {
+                DB::table('subscription_periods')
+                    ->where('id', $currentPeriod->id)
+                    ->increment('used_bytes', $bytesLeftToDeduct);
+            }
+        });
+
+        return true;
+    }
+
+    /**
      * Get maximum allowed parallel (concurrent different files) downloads for a user.
      */
     public function getMaxParallelDownloads(User $user): int

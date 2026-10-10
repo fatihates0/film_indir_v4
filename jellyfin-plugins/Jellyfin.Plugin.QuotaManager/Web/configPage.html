@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <title>Quota Manager</title>
+</head>
+<body>
+    <div id="QuotaManagerConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="QuotaManagerConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Jellyfin Bant Genişliği & Traffic Kota Yöneticisi</h2>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="DefaultQuotaGB">Varsayılan Aylık Kota (GB):</label>
+                        <input is="emby-input" type="number" id="DefaultQuotaGB" name="DefaultQuotaGB" min="1" step="1" required />
+                        <div class="fieldDescription">Kullanıcılara özel kota atanmamışsa geçerli olan varsayılan bant genişliği.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableAutoDisable" name="EnableAutoDisable" />
+                            <span>Kota Dolduğunda Hesabı Otomatik Pasife Al (IsDisabled)</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableSessionTermination" name="EnableSessionTermination" />
+                            <span>Kota Dolduğunda Aktif Oynatma Oturumlarını Kapat (Close Session)</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="LaravelApiUrl">Laravel API Base URL:</label>
+                        <input is="emby-input" type="url" id="LaravelApiUrl" name="LaravelApiUrl" placeholder="http://localhost:8000/api/jellyfin" />
+                        <div class="fieldDescription">Laravel uygulamasındaki Jellyfin entegrasyon API adresi.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="LaravelApiKey">Laravel API Anahtarı (X-Api-Key):</label>
+                        <input is="emby-input" type="text" id="LaravelApiKey" name="LaravelApiKey" />
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="SyncIntervalMinutes">Senkronizasyon Sıklığı (Dakika):</label>
+                        <input is="emby-input" type="number" id="SyncIntervalMinutes" name="SyncIntervalMinutes" min="5" step="5" />
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block"><span>Kaydet</span></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var QuotaManagerConfig = {
+                pluginUniqueId: 'd7e8f9a0-1234-4567-89ab-cdef01234567'
+            };
+
+            define(['loading', 'ApiClient'], function (loading, ApiClient) {
+                return function (view, params) {
+                    view.addEventListener('viewshow', function () {
+                        loading.show();
+                        ApiClient.getPluginConfiguration(QuotaManagerConfig.pluginUniqueId).then(function (config) {
+                            view.querySelector('#DefaultQuotaGB').value = config.DefaultQuotaGB || 50;
+                            view.querySelector('#EnableAutoDisable').checked = !!config.EnableAutoDisable;
+                            view.querySelector('#EnableSessionTermination').checked = !!config.EnableSessionTermination;
+                            view.querySelector('#LaravelApiUrl').value = config.LaravelApiUrl || '';
+                            view.querySelector('#LaravelApiKey').value = config.LaravelApiKey || '';
+                            view.querySelector('#SyncIntervalMinutes').value = config.SyncIntervalMinutes || 30;
+                            loading.hide();
+                        });
+                    });
+
+                    view.querySelector('#QuotaManagerConfigForm').addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        loading.show();
+                        ApiClient.getPluginConfiguration(QuotaManagerConfig.pluginUniqueId).then(function (config) {
+                            config.DefaultQuotaGB = parseInt(view.querySelector('#DefaultQuotaGB').value, 10);
+                            config.EnableAutoDisable = view.querySelector('#EnableAutoDisable').checked;
+                            config.EnableSessionTermination = view.querySelector('#EnableSessionTermination').checked;
+                            config.LaravelApiUrl = view.querySelector('#LaravelApiUrl').value;
+                            config.LaravelApiKey = view.querySelector('#LaravelApiKey').value;
+                            config.SyncIntervalMinutes = parseInt(view.querySelector('#SyncIntervalMinutes').value, 10);
+
+                            ApiClient.updatePluginConfiguration(QuotaManagerConfig.pluginUniqueId, config).then(function (result) {
+                                Dashboard.processPluginConfigurationUpdateResult(result);
+                            });
+                        });
+                        return false;
+                    });
+                };
+            });
+        </script>
+    </div>
+</body>
+</html>

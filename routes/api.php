@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\CatalogApiController;
+use App\Http\Controllers\Api\JellyfinQuotaController;
 use App\Http\Controllers\Api\MovieApiController;
 use App\Http\Controllers\Api\SeriesApiController;
 use Illuminate\Http\Request;
@@ -23,4 +24,12 @@ Route::prefix('v1')->group(function () {
     // Catalog & Search API
     Route::get('/home', [CatalogApiController::class, 'home'])->name('api.v1.home');
     Route::get('/search', [CatalogApiController::class, 'search'])->name('api.v1.search');
+});
+
+// Jellyfin Quota Sync Endpoints
+Route::prefix('jellyfin')->group(function () {
+    Route::get('/quotas', [JellyfinQuotaController::class, 'index'])->name('api.jellyfin.quotas');
+    Route::get('/check-access', [JellyfinQuotaController::class, 'checkAccess'])->name('api.jellyfin.check_access');
+    Route::post('/deduct-quota', [JellyfinQuotaController::class, 'deductQuota'])->name('api.jellyfin.deduct_quota');
+    Route::post('/quota-exceeded', [JellyfinQuotaController::class, 'quotaExceeded'])->name('api.jellyfin.quota_exceeded');
 });

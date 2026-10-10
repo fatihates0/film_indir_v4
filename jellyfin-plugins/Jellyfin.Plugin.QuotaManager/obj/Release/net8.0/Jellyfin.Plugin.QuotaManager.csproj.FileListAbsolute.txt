@@ -1,0 +1,13 @@
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.csproj.AssemblyReference.cache
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.GeneratedMSBuildEditorConfig.editorconfig
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.AssemblyInfoInputs.cache
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.AssemblyInfo.cs
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.csproj.CoreCompileInputs.cache
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.sourcelink.json
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\bin\Release\net8.0\Jellyfin.Plugin.QuotaManager.deps.json
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\bin\Release\net8.0\Jellyfin.Plugin.QuotaManager.dll
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\bin\Release\net8.0\Jellyfin.Plugin.QuotaManager.pdb
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.dll
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\refint\Jellyfin.Plugin.QuotaManager.dll
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\Jellyfin.Plugin.QuotaManager.pdb
+C:\film_indir\film_indir_v4\jellyfin-plugins\Jellyfin.Plugin.QuotaManager\obj\Release\net8.0\ref\Jellyfin.Plugin.QuotaManager.dll
