@@ -746,6 +746,11 @@ class SubscriptionService
             'expires_at_formatted' => $eq->expires_at->format('d.m.Y H:i'),
         ])->toArray();
 
+        $canCancelPerpetual = (bool) (
+            $subscription?->is_perpetual
+            && $totalRemaining < (5 * 1024 * 1024 * 1024)
+        );
+
         return [
             'has_subscription' => true,
             'is_admin' => false,
@@ -770,11 +775,52 @@ class SubscriptionService
             'period_end_formatted' => $periodEndFormatted,
             'subscription_expires_at' => $subscription?->is_perpetual ? null : $subscription?->expires_at->toIso8601String(),
             'is_perpetual' => (bool) ($subscription?->is_perpetual),
+            'can_cancel_perpetual' => $canCancelPerpetual,
+            'subscription_id' => $subscription?->id,
             'can_download' => $totalRemaining > 0,
             'max_parallel_downloads' => $maxParallel,
             'active_parallel_downloads' => $activeParallel,
             'speed_limit_mbps' => $speedLimit,
             'allows_vps_access' => $allowsVps,
         ];
+    }
+
+    /**
+     * Cancel/close a perpetual subscription if remaining quota is less than 5 GB.
+     */
+    public function cancelPerpetualSubscription(User $user): bool
+    {
+        $subscription = $user->subscriptions()
+            ->where('status', 'active')
+            ->where('is_perpetual', true)
+            ->latest()
+            ->first();
+
+        if (! $subscription) {
+            throw new \InvalidArgumentException('Aktif bir süresiz paketiniz bulunmuyor.');
+        }
+
+        $remainingBytes = $this->getTotalRemainingBytes($user);
+        $thresholdBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+
+        if ($remainingBytes >= $thresholdBytes) {
+            $formattedLimit = SubscriptionPeriod::formatBytes($thresholdBytes);
+            throw new \InvalidArgumentException("Kalan kotanız {$formattedLimit} ve üzerinde olduğu için paketi kapatamazsınız.");
+        }
+
+        $subscription->update([
+            'status' => 'cancelled',
+            'notes' => trim(($subscription->notes ? $subscription->notes.' | ' : '').'Kullanıcı tarafından kota bittiği için sonlandırıldı ('.now()->format('d.m.Y H:i').')'),
+        ]);
+
+        $user->subscriptionPeriods()
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
+
+        $user->update([
+            'plan' => 'free',
+        ]);
+
+        return true;
     }
 }

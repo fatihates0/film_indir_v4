@@ -24,9 +24,22 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
     const [userNotes, setUserNotes] = useState('');
     const [copiedField, setCopiedField] = useState(null);
     const [isSubmittingNotice, setIsSubmittingNotice] = useState(false);
+    const [isCancellingPerpetual, setIsCancellingPerpetual] = useState(false);
 
     const user = auth?.user;
     const quota = auth?.quota;
+
+    const handleCancelPerpetual = () => {
+        if (!window.confirm("Süresiz özel kotanızı sonlandırmak istediğinize emin misiniz?\n\nKalan kotanız kapatılacak ve dilediğiniz yeni indirme paketini hemen satın alabileceksiniz.")) {
+            return;
+        }
+
+        setIsCancellingPerpetual(true);
+        router.post('/subscription/cancel-perpetual', {}, {
+            preserveScroll: true,
+            onFinish: () => setIsCancellingPerpetual(false),
+        });
+    };
 
     const durationOptions = [
         { months: 1, label: '1 Aylık', badge: null },
@@ -376,6 +389,27 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {/* Low Quota Perpetual Cancellation Action */}
+                            {quota.can_cancel_perpetual && (
+                                <div className="pt-3 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-rose-500/10 border border-rose-500/20 p-3.5 rounded-xl">
+                                    <div className="flex items-center gap-2.5 text-xs text-rose-700 dark:text-rose-300">
+                                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                                        <span>
+                                            Süresiz özel kotanız <strong>5 GB</strong>'ın altına düşmüştür (Kalan: {quota.formatted_remaining}). Yeni bir paket satın alabilmek için bu paketi sonlandırabilirsiniz.
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelPerpetual}
+                                        disabled={isCancellingPerpetual}
+                                        className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-rose-500/20 shrink-0 flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                        <span>{isCancellingPerpetual ? 'Kapatılıyor...' : 'Süresiz Paketi Kapat'}</span>
+                                    </button>
                                 </div>
                             )}
                         </div>

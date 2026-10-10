@@ -1685,4 +1685,23 @@ class FrontController extends Controller
 
         return redirect()->back()->with('success', "Tebrikler! {$plan->name} ({$duration} Ay) paketiniz aktif edildi.");
     }
+
+    /**
+     * Cancel/close perpetual subscription when remaining quota is low (< 5GB).
+     */
+    public function cancelPerpetualSubscription(Request $request, SubscriptionService $subscriptionService)
+    {
+        $user = $request->user();
+        if (! $user) {
+            return redirect()->route('home')->with('error', 'Lütfen önce giriş yapınız.');
+        }
+
+        try {
+            $subscriptionService->cancelPerpetualSubscription($user);
+
+            return redirect()->back()->with('success', 'Süresiz özel kotanız başarıyla kapatıldı. Artık yeni bir indirme paketi seçip satın alabilirsiniz.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
 }

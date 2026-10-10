@@ -25,6 +25,7 @@ Route::get('/about', [FrontController::class, 'about'])->name('about');
 Route::get('/settings', [FrontController::class, 'settings'])->name('settings');
 Route::get('/pricing', [FrontController::class, 'pricing'])->name('pricing');
 Route::post('/subscribe/{plan}', [FrontController::class, 'subscribePlan'])->name('subscribe.plan');
+Route::post('/subscription/cancel-perpetual', [FrontController::class, 'cancelPerpetualSubscription'])->name('subscription.cancel-perpetual');
 Route::post('/payment-notifications', [PaymentNotificationController::class, 'store'])->name('payment-notifications.store');
 
 Route::get('/movie/{id?}', [FrontController::class, 'movieDetail'])->name('movie.detail');

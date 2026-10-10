@@ -924,4 +924,52 @@ class SubscriptionQuotaTest extends TestCase
         $this->assertEquals('active', $subscription->status);
         $this->assertTrue($subscription->expires_at->isAfter(now()->addYears(90)));
     }
+
+    public function test_user_cannot_cancel_perpetual_subscription_if_remaining_quota_is_5gb_or_more(): void
+    {
+        $user = User::factory()->create();
+        $service = app(SubscriptionService::class);
+
+        // 10 GB perpetual quota, 0 GB used -> 10 GB remaining (>= 5 GB)
+        $service->subscribe($user, null, 1, 0, 'Süresiz 10 GB', 10, true);
+
+        $quota = $service->getQuotaSummary($user);
+        $this->assertFalse($quota['can_cancel_perpetual']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $service->cancelPerpetualSubscription($user);
+    }
+
+    public function test_user_can_cancel_perpetual_subscription_when_remaining_quota_is_under_5gb(): void
+    {
+        $user = User::factory()->create();
+        $service = app(SubscriptionService::class);
+
+        // 10 GB perpetual quota
+        $sub = $service->subscribe($user, null, 1, 0, 'Süresiz 10 GB', 10, true);
+        $period = $service->getCurrentPeriod($user);
+
+        // Use 9 GB -> 1 GB remaining (< 5 GB)
+        $period->update([
+            'used_bytes' => 9 * 1024 * 1024 * 1024,
+        ]);
+
+        $quota = $service->getQuotaSummary($user);
+        $this->assertTrue($quota['can_cancel_perpetual']);
+
+        // Cancel via web endpoint
+        $response = $this->actingAs($user)->post(route('subscription.cancel-perpetual'));
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        // Check subscription is cancelled
+        $sub->refresh();
+        $this->assertEquals('cancelled', $sub->status);
+        $period->refresh();
+        $this->assertFalse($period->is_active);
+
+        // Quota summary should reflect no subscription
+        $newQuota = $service->getQuotaSummary($user);
+        $this->assertFalse($newQuota['has_subscription']);
+    }
 }
