@@ -739,4 +739,70 @@ class SubscriptionQuotaTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function test_user_with_exhausted_main_quota_can_download_using_extra_quota(): void
+    {
+        $user = User::factory()->create();
+        $individualPlan = Plan::where('type', Plan::TYPE_INDIVIDUAL)->firstOrFail();
+        $extraPlan = Plan::where('type', Plan::TYPE_EXTRA)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $individualPlan, 1);
+
+        // Exhaust main subscription period (0 remaining bytes)
+        $period = $service->getCurrentPeriod($user);
+        $period->update(['used_bytes' => $period->allocated_bytes]);
+        $this->assertEquals(0, $period->fresh()->remaining_bytes);
+
+        // Purchase extra quota
+        $extraQuota = $service->purchaseExtraQuota($user, $extraPlan);
+        $this->assertGreaterThan(0, $extraQuota->remaining_bytes);
+
+        $box = StorageBox::create([
+            'name' => 'Box Extra Quota Test',
+            'host' => 'extra2.storagebox.de',
+            'protocol' => StorageBoxProtocol::CustomGateway,
+            'port' => 443,
+            'username' => 'u999',
+            'password' => 'secret_key_12345',
+            'total_capacity_gb' => 5000,
+            'free_capacity_gb' => 4000,
+            'used_capacity_gb' => 1000,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        // 18 GB file
+        $eighteenGb = 18 * 1024 * 1024 * 1024;
+        $file = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'LargeMovie.mkv',
+            'path' => '/movies/LargeMovie.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => $eighteenGb,
+        ]);
+
+        // User should be able to prepare download successfully
+        $response = $this->actingAs($user)->postJson(route('downloads.prepare', ['mediaFile' => $file->id]));
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'file_name' => 'LargeMovie.mkv',
+        ]);
+
+        $token = $response->json('token');
+        $this->assertNotEmpty($token);
+
+        // User should also be able to stream download successfully
+        $streamResponse = $this->actingAs($user)->get(route('downloads.stream', ['token' => $token]));
+        $streamResponse->assertRedirect();
+
+        // Verify downloading deducts directly from extra quota
+        $fiveGb = 5 * 1024 * 1024 * 1024;
+        $service->recordBytes($token, $fiveGb, false);
+
+        $extraQuota->refresh();
+        $this->assertEquals($fiveGb, $extraQuota->used_bytes);
+    }
 }

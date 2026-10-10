@@ -61,18 +61,19 @@ class DownloadController extends Controller
         }
 
         $activePeriod = $this->subscriptionService->getCurrentPeriod($user);
+        $totalRemaining = $this->subscriptionService->getTotalRemainingBytes($user);
 
-        // Check if remaining quota is sufficient for this specific media file size
-        if (! $user->isAdmin() && $mediaFile->size_bytes > 0 && $activePeriod) {
-            if ($activePeriod->remaining_bytes < $mediaFile->size_bytes) {
-                $remFormatted = SubscriptionPeriod::formatBytes($activePeriod->remaining_bytes);
+        // Check if total remaining quota (main period + active extra quotas) is sufficient for this specific media file size
+        if (! $user->isAdmin() && $mediaFile->size_bytes > 0) {
+            if ($totalRemaining < $mediaFile->size_bytes) {
+                $remFormatted = SubscriptionPeriod::formatBytes($totalRemaining);
                 $fileSizeFormatted = SubscriptionPeriod::formatBytes($mediaFile->size_bytes);
 
                 return response()->json([
                     'success' => false,
                     'code' => 'INSUFFICIENT_QUOTA',
                     'message' => "Kalan indirme kotanız ({$remFormatted}), indirmek istediğiniz içerik boyutu ({$fileSizeFormatted}) için yeterli değildir. Lütfen paketinizi yükseltin.",
-                    'remaining_bytes' => $activePeriod->remaining_bytes,
+                    'remaining_bytes' => $totalRemaining,
                     'formatted_remaining' => $remFormatted,
                     'file_size_bytes' => $mediaFile->size_bytes,
                     'formatted_file_size' => $fileSizeFormatted,
@@ -149,9 +150,9 @@ class DownloadController extends Controller
 
         // Extra safety: Check remaining quota for new tickets
         if (! $user->isAdmin() && $ticket->bytes_downloaded == 0 && $mediaFile->size_bytes > 0) {
-            $period = $this->subscriptionService->getCurrentPeriod($user);
-            if ($period && $period->remaining_bytes < $mediaFile->size_bytes) {
-                $remFormatted = SubscriptionPeriod::formatBytes($period->remaining_bytes);
+            $totalRemaining = $this->subscriptionService->getTotalRemainingBytes($user);
+            if ($totalRemaining < $mediaFile->size_bytes) {
+                $remFormatted = SubscriptionPeriod::formatBytes($totalRemaining);
                 $fileSizeFormatted = SubscriptionPeriod::formatBytes($mediaFile->size_bytes);
                 abort(403, "Kalan indirme kotanız ({$remFormatted}), indirmek istediğiniz içerik boyutu ({$fileSizeFormatted}) için yeterli değildir.");
             }
