@@ -110,6 +110,8 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::post('/plans/users/{user}/reset-usage', [PlanController::class, 'resetUsage'])->name('plans.users.reset-usage');
     Route::post('/plans/users/{user}/extend-duration', [PlanController::class, 'extendDuration'])->name('plans.users.extend-duration');
     Route::post('/plans/users/{user}/extra-quota', [PlanController::class, 'addExtraQuotaDirect'])->name('plans.users.extra-quota');
+    Route::put('/plans/users/{user}/extra-quota/{extraQuota}', [PlanController::class, 'updateUserExtraQuota'])->name('plans.users.extra-quota.update');
+    Route::delete('/plans/users/{user}/extra-quota/{extraQuota}', [PlanController::class, 'removeUserExtraQuota'])->name('plans.users.extra-quota.destroy');
     Route::post('/plans/users/{user}/sync-media-account', [PlanController::class, 'syncMediaAccount'])->name('plans.users.sync-media-account');
 
     // Payment Method & Notification Management Routes

@@ -13,6 +13,7 @@ use App\Models\SubscriptionPeriod;
 use App\Models\User;
 use App\Models\UserExtraQuota;
 use App\Services\SubscriptionService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -123,11 +124,15 @@ class PlanController extends Controller
 
             $mainAllocated = $period ? $period->allocated_bytes : 0;
             $mainUsed = $period ? $period->used_bytes : 0;
+            $mainRemaining = $period ? $period->remaining_bytes : 0;
+
             $extraAllocated = (int) $activeExtras->sum('allocated_bytes');
             $extraUsed = (int) $activeExtras->sum('used_bytes');
+            $extraRemaining = (int) $activeExtras->sum(fn ($e) => $e->remaining_bytes);
 
             $totalAllocated = $mainAllocated + $extraAllocated;
             $totalUsed = $mainUsed + $extraUsed;
+            $totalRemaining = $mainRemaining + $extraRemaining;
             $totalPercentage = $totalAllocated > 0 ? round(min(100.0, max(0.0, ($totalUsed / $totalAllocated) * 100)), 1) : 0;
 
             $extrasList = $activeExtras->map(function ($extra) {
@@ -140,8 +145,13 @@ class PlanController extends Controller
                     'allocated_bytes' => $extra->allocated_bytes,
                     'used_bytes' => $extra->used_bytes,
                     'remaining_bytes' => $extra->remaining_bytes,
+                    'allocated_gb' => round($extra->allocated_bytes / (1024 * 1024 * 1024)),
+                    'used_gb' => round($extra->used_bytes / (1024 * 1024 * 1024), 2),
+                    'starts_at' => $extra->starts_at ? $extra->starts_at->format('d.m.Y H:i') : null,
                     'expires_at' => $extra->expires_at ? $extra->expires_at->format('d.m.Y H:i') : null,
+                    'raw_expires_at' => $extra->expires_at ? $extra->expires_at->format('Y-m-d') : null,
                     'days_left' => $extra->expires_at ? max(0, (int) now()->diffInDays($extra->expires_at, false)) : null,
+                    'notes' => $extra->notes,
                 ];
             })->values()->all();
 
@@ -157,6 +167,7 @@ class PlanController extends Controller
                 'plan_name' => $mainPlanName ?? ($activeExtras->isNotEmpty() ? 'Ek Kota Paketi' : $u->plan->label()),
                 'main_plan_name' => $mainPlanName,
                 'plan_id' => $period?->subscription?->plan_id,
+                'subscription_id' => $activeSub?->id,
                 'plan_type' => $period?->subscription?->plan?->type ?? 'individual',
                 'has_active_sub' => $activeSub !== null,
                 'has_extras' => ! empty($extrasList),
@@ -164,20 +175,28 @@ class PlanController extends Controller
                 'is_perpetual' => (bool) ($activeSub?->is_perpetual),
                 'quota_used' => SubscriptionPeriod::formatBytes($totalUsed),
                 'quota_total' => SubscriptionPeriod::formatBytes($totalAllocated),
+                'quota_remaining' => SubscriptionPeriod::formatBytes($totalRemaining),
                 'quota_used_bytes' => $totalUsed,
                 'quota_allocated_bytes' => $totalAllocated,
+                'quota_remaining_bytes' => $totalRemaining,
                 'quota_percentage' => $totalPercentage,
                 'main_quota_used' => SubscriptionPeriod::formatBytes($mainUsed),
                 'main_quota_total' => SubscriptionPeriod::formatBytes($mainAllocated),
+                'main_remaining_formatted' => SubscriptionPeriod::formatBytes($mainRemaining),
                 'main_allocated_bytes' => $mainAllocated,
                 'main_used_bytes' => $mainUsed,
+                'main_remaining_bytes' => $mainRemaining,
                 'extra_quota_used' => SubscriptionPeriod::formatBytes($extraUsed),
                 'extra_quota_total' => SubscriptionPeriod::formatBytes($extraAllocated),
+                'extra_quota_remaining' => SubscriptionPeriod::formatBytes($extraRemaining),
                 'active_extras_count' => count($extrasList),
                 'extra_quota_formatted' => SubscriptionPeriod::formatBytes($activeExtras->sum(fn ($e) => $e->remaining_bytes)),
                 'extras' => $extrasList,
                 'custom_speed_limit_mbps' => $u->custom_speed_limit_mbps,
+                'starts_at' => $activeSub?->starts_at ? $activeSub->starts_at->format('d.m.Y H:i') : null,
                 'expires_at' => $activeSub ? ($activeSub->is_perpetual ? 'Süresiz' : $activeSub->expires_at->format('d.m.Y H:i')) : null,
+                'duration_months' => $activeSub?->duration_months,
+                'subscription_notes' => $activeSub?->notes,
                 'created_at' => $u->created_at->format('d.m.Y H:i'),
             ];
         });
@@ -696,5 +715,69 @@ class PlanController extends Controller
         ]);
 
         return redirect()->back()->with('success', "{$user->name} kullanıcısının tüm paket ve ek kota hakları temizlendi.");
+    }
+
+    /**
+     * Delete / Cancel a specific user extra quota pool.
+     */
+    public function removeUserExtraQuota(Request $request, User $user, UserExtraQuota $extraQuota)
+    {
+        if ($extraQuota->user_id !== $user->id) {
+            abort(403, 'Geçersiz kullanıcı ek kotası.');
+        }
+
+        $name = $extraQuota->name;
+        $extraQuota->delete();
+
+        return redirect()->back()->with('success', "{$user->name} kullanıcısının '{$name}' ek kota havuzu başarıyla silindi.");
+    }
+
+    /**
+     * Update an existing user extra quota pool.
+     */
+    public function updateUserExtraQuota(Request $request, User $user, UserExtraQuota $extraQuota)
+    {
+        if ($extraQuota->user_id !== $user->id) {
+            abort(403, 'Geçersiz kullanıcı ek kotası.');
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'allocated_gb' => 'required|integer|min:1|max:50000',
+            'used_gb' => 'nullable|numeric|min:0',
+            'expires_at' => 'nullable|date',
+            'days_to_add' => 'nullable|integer|min:0|max:3650',
+            'notes' => 'nullable|string|max:255',
+            'reset_usage' => 'nullable|boolean',
+        ]);
+
+        $allocatedBytes = (int) $validated['allocated_gb'] * 1024 * 1024 * 1024;
+
+        $newExpiresAt = $extraQuota->expires_at;
+        if (! empty($validated['days_to_add']) && (int) $validated['days_to_add'] > 0) {
+            $base = ($newExpiresAt && $newExpiresAt->isFuture()) ? $newExpiresAt : now();
+            $newExpiresAt = $base->copy()->addDays((int) $validated['days_to_add']);
+        } elseif (! empty($validated['expires_at'])) {
+            $newExpiresAt = Carbon::parse($validated['expires_at'])->endOfDay();
+        }
+
+        $usedBytes = $extraQuota->used_bytes;
+        if (! empty($validated['reset_usage'])) {
+            $usedBytes = 0;
+        } elseif (isset($validated['used_gb']) && is_numeric($validated['used_gb'])) {
+            $usedBytes = (int) round((float) $validated['used_gb'] * 1024 * 1024 * 1024);
+        }
+
+        $usedBytes = min($usedBytes, $allocatedBytes);
+
+        $extraQuota->update([
+            'name' => $validated['name'],
+            'allocated_bytes' => $allocatedBytes,
+            'used_bytes' => $usedBytes,
+            'expires_at' => $newExpiresAt,
+            'notes' => $validated['notes'] ?? $extraQuota->notes,
+        ]);
+
+        return redirect()->back()->with('success', "{$user->name} kullanıcısının '{$extraQuota->name}' ek kota havuzu güncellendi.");
     }
 }
