@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { Head, router, usePage } from '@inertiajs/react';
+import React, { useState } from 'react';
+import { Head, router, usePage, Link } from '@inertiajs/react';
 import AdminLayout from '../../../Components/AdminLayout';
+import Pagination from '../../../Components/Pagination';
 import {
     Package,
     Plus,
@@ -24,33 +25,43 @@ import {
     DollarSign,
     Building2,
     Coins,
-    ToggleLeft,
-    ToggleRight,
     Check,
     XCircle,
     BellRing,
-    Gauge
+    Gauge,
+    Copy,
+    RefreshCw,
+    TrendingUp,
+    Calendar,
+    ChevronRight,
+    ArrowUpRight,
+    Tv,
+    ShieldCheck,
+    RotateCcw,
+    Zap,
+    Sliders,
+    Filter
 } from 'lucide-react';
 
 export default function PlansIndex({ 
+    stats = {},
+    activeSection = 'plans',
     plans = [], 
-    users = [], 
-    subscriptionsHistory = [],
+    users = { data: [] }, 
+    subscriptionsHistory = { data: [] },
     paymentMethods = [],
-    paymentNotifications = []
+    paymentNotifications = { data: [] },
+    filters = {}
 }) {
     const { flash } = usePage().props;
 
-    // Main section tabs: 'plans' | 'users' | 'history' | 'methods' | 'notifications'
-    const [activeSection, setActiveSection] = useState('plans');
+    // Active Section State: 'plans' | 'users' | 'notifications' | 'methods' | 'history'
+    const [currentSection, setCurrentSection] = useState(filters?.tab || activeSection || 'plans');
 
-    // Search and filters
-    const [planSearch, setPlanSearch] = useState('');
-    const [userSearch, setUserSearch] = useState('');
-    const [userPlanFilter, setUserPlanFilter] = useState('all');
-    const [historySearch, setHistorySearch] = useState('');
-    const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
-    const [notificationStatusFilter, setNotificationStatusFilter] = useState('pending');
+    // Filter states
+    const [userSearchInput, setUserSearchInput] = useState(filters?.user_search || '');
+    const [notifSearchInput, setNotifSearchInput] = useState(filters?.notif_search || '');
+    const [historySearchInput, setHistorySearchInput] = useState(filters?.history_search || '');
 
     // Modals state
     const [isCreatePlanOpen, setIsCreatePlanOpen] = useState(false);
@@ -73,6 +84,22 @@ export default function PlansIndex({
     const [assignModalUser, setAssignModalUser] = useState(null);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
+    // Direct Extra Quota Modal State
+    const [extraQuotaModalUser, setExtraQuotaModalUser] = useState(null);
+    const [extraQuotaForm, setExtraQuotaForm] = useState({
+        quota_gb: 200,
+        days: 30,
+        name: '',
+        notes: '',
+    });
+    const [isSubmittingExtraQuota, setIsSubmittingExtraQuota] = useState(false);
+
+    // Extend Duration Modal State
+    const [extendDurationUser, setExtendDurationUser] = useState(null);
+    const [extendDurationDays, setExtendDurationDays] = useState(30);
+    const [extendDurationNotes, setExtendDurationNotes] = useState('');
+    const [isSubmittingExtend, setIsSubmittingExtend] = useState(false);
+
     // Initial plan form state
     const initialPlanForm = {
         name: '',
@@ -94,24 +121,13 @@ export default function PlansIndex({
     const [planForm, setPlanForm] = useState(initialPlanForm);
     const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
 
-    // Helper to toggle allowed duration in plan form
-    const toggleAllowedDuration = (months) => {
-        const current = planForm.allowed_durations || [1, 3, 6, 12];
-        if (current.includes(months)) {
-            if (current.length <= 1) return; // Prevent unchecking all
-            setPlanForm({ ...planForm, allowed_durations: current.filter(m => m !== months) });
-        } else {
-            setPlanForm({ ...planForm, allowed_durations: [...current, months].sort((a, b) => a - b) });
-        }
-    };
-
     // Initial user assignment form state
     const initialAssignForm = {
         user_id: '',
-        plan_id: 'custom', // plan ID or 'custom' or 'none'
+        plan_id: 'custom',
         custom_quota_gb: 500,
         custom_speed_limit_mbps: '',
-        duration_type: '1', // '1', '3', '6', '12', 'custom', 'perpetual'
+        duration_type: '1',
         custom_months: 1,
         price_paid: '',
         notes: '',
@@ -119,76 +135,82 @@ export default function PlansIndex({
     const [assignForm, setAssignForm] = useState(initialAssignForm);
     const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
 
-    // Statistics calculation
-    const stats = useMemo(() => {
-        const activePlansCount = plans.filter(p => p.is_active).length;
-        const totalSubscribedUsers = users.filter(u => u.has_active_sub).length;
-        const perpetualUsersCount = users.filter(u => u.is_perpetual).length;
-
-        let totalAllocatedGb = 0;
-        users.forEach(u => {
-            if (u.has_active_sub && u.quota_allocated_bytes) {
-                totalAllocatedGb += Math.round(u.quota_allocated_bytes / (1024 * 1024 * 1024));
-            }
+    // Navigate Tab
+    const handleSwitchSection = (sectionKey) => {
+        setCurrentSection(sectionKey);
+        router.get('/admin/plans', {
+            tab: sectionKey,
+            per_page: filters?.per_page || 15
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
         });
+    };
 
-        return {
-            activePlansCount,
-            totalSubscribedUsers,
-            perpetualUsersCount,
-            totalAllocatedGb,
-        };
-    }, [plans, users]);
-
-    // Filtered plans
-    const filteredPlans = useMemo(() => {
-        return plans.filter(p =>
-            p.name.toLowerCase().includes(planSearch.toLowerCase()) ||
-            p.slug.toLowerCase().includes(planSearch.toLowerCase())
-        );
-    }, [plans, planSearch]);
-
-    // Filtered users
-    const filteredUsers = useMemo(() => {
-        return users.filter(u => {
-            const matchesSearch =
-                u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-                u.email.toLowerCase().includes(userSearch.toLowerCase());
-
-            let matchesPlan = true;
-            if (userPlanFilter === 'active_sub') {
-                matchesPlan = u.has_active_sub;
-            } else if (userPlanFilter === 'no_sub') {
-                matchesPlan = !u.has_active_sub;
-            } else if (userPlanFilter === 'perpetual') {
-                matchesPlan = u.is_perpetual;
-            } else if (userPlanFilter !== 'all') {
-                matchesPlan = String(u.plan_id) === String(userPlanFilter);
-            }
-
-            return matchesSearch && matchesPlan;
+    // User Search submit
+    const handleUserSearchSubmit = (e) => {
+        e?.preventDefault();
+        router.get('/admin/plans', {
+            ...filters,
+            tab: 'users',
+            user_search: userSearchInput,
+            users_page: 1,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
         });
-    }, [users, userSearch, userPlanFilter]);
+    };
 
-    // Filtered subscription transaction history
-    const filteredHistory = useMemo(() => {
-        return subscriptionsHistory.filter(h => {
-            const matchesSearch =
-                (h.user_name && h.user_name.toLowerCase().includes(historySearch.toLowerCase())) ||
-                (h.user_email && h.user_email.toLowerCase().includes(historySearch.toLowerCase())) ||
-                (h.plan_name && h.plan_name.toLowerCase().includes(historySearch.toLowerCase())) ||
-                (h.notes && h.notes.toLowerCase().includes(historySearch.toLowerCase()));
-
-            const matchesStatus = historyStatusFilter === 'all' || h.status === historyStatusFilter;
-
-            return matchesSearch && matchesStatus;
+    // User Filter change
+    const handleUserFilterChange = (key, value) => {
+        router.get('/admin/plans', {
+            ...filters,
+            tab: 'users',
+            [key]: value,
+            users_page: 1,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
         });
-    }, [subscriptionsHistory, historySearch, historyStatusFilter]);
+    };
 
-    // Total revenue calculation
-    const totalRevenue = useMemo(() => {
-        return subscriptionsHistory.reduce((sum, item) => sum + (item.price_paid || 0), 0);
-    }, [subscriptionsHistory]);
+    // Notification filter change
+    const handleNotifFilterChange = (status) => {
+        router.get('/admin/plans', {
+            ...filters,
+            tab: 'notifications',
+            notif_status: status,
+            notifs_page: 1,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    // History filter change
+    const handleHistoryFilterChange = (status) => {
+        router.get('/admin/plans', {
+            ...filters,
+            tab: 'history',
+            history_status: status,
+            history_page: 1,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    // Toggle Allowed Duration in plan form
+    const toggleAllowedDuration = (months) => {
+        const current = planForm.allowed_durations || [1, 3, 6, 12];
+        if (current.includes(months)) {
+            if (current.length <= 1) return;
+            setPlanForm({ ...planForm, allowed_durations: current.filter(m => m !== months) });
+        } else {
+            setPlanForm({ ...planForm, allowed_durations: [...current, months].sort((a, b) => a - b) });
+        }
+    };
 
     // Open create plan modal
     const handleOpenCreatePlan = () => {
@@ -224,13 +246,14 @@ export default function PlansIndex({
         setIsCreatePlanOpen(true);
     };
 
-    // Submit Plan Form (Create / Edit)
+    // Submit Plan Form
     const handleSavePlan = (e) => {
         e.preventDefault();
         setIsSubmittingPlan(true);
 
         if (editingPlan) {
             router.put(`/admin/plans/${editingPlan.id}`, planForm, {
+                preserveScroll: true,
                 onSuccess: () => {
                     setIsCreatePlanOpen(false);
                     setEditingPlan(null);
@@ -239,6 +262,7 @@ export default function PlansIndex({
             });
         } else {
             router.post('/admin/plans', planForm, {
+                preserveScroll: true,
                 onSuccess: () => {
                     setIsCreatePlanOpen(false);
                 },
@@ -247,79 +271,28 @@ export default function PlansIndex({
         }
     };
 
-    // Pending payment notifications count
-    const pendingNotificationsCount = useMemo(() => {
-        return paymentNotifications.filter(n => n.status === 'pending').length;
-    }, [paymentNotifications]);
-
-    // Filtered payment notifications
-    const filteredNotifications = useMemo(() => {
-        return paymentNotifications.filter(n => {
-            if (notificationStatusFilter === 'all') return true;
-            return n.status === notificationStatusFilter;
-        });
-    }, [paymentNotifications, notificationStatusFilter]);
-
-    // Toggle Payment Method Active State
-    const handleToggleMethod = (method) => {
-        router.post(`/admin/payment-methods/${method.id}/toggle`, {}, {
+    // Quick toggle plan active/passive
+    const handleTogglePlan = (plan) => {
+        router.post(`/admin/plans/${plan.id}/toggle`, {}, {
             preserveScroll: true,
         });
     };
 
-    // Open Payment Method Edit Modal
-    const handleOpenEditMethod = (method) => {
-        setEditingMethod(method);
-        setMethodForm({
-            name: method.name || '',
-            description: method.description || '',
-            instructions: method.instructions || '',
-            is_active: Boolean(method.is_active),
-            settings: method.settings ? { ...method.settings } : {},
-        });
-    };
-
-    // Save Payment Method Edit Form
-    const handleSaveMethod = (e) => {
-        e.preventDefault();
-        if (!editingMethod) return;
-
-        setIsSubmittingMethod(true);
-        router.put(`/admin/payment-methods/${editingMethod.id}`, methodForm, {
+    // Quick Clone plan
+    const handleClonePlan = (plan) => {
+        router.post(`/admin/plans/${plan.id}/clone`, {}, {
             preserveScroll: true,
-            onSuccess: () => setEditingMethod(null),
-            onFinish: () => setIsSubmittingMethod(false),
         });
     };
 
-    // Approve Payment Notification
-    const handleApproveNotification = (notification) => {
-        if (window.confirm(`#${notification.reference_code} referanslı ödemeyi onaylamak ve kullanıcının paketini tanımlamak istediğinize emin misiniz?`)) {
-            router.post(`/admin/payment-notifications/${notification.id}/approve`, {}, {
-                preserveScroll: true,
-            });
-        }
-    };
-
-    // Reject Payment Notification
-    const handleRejectNotification = (notification) => {
-        const reason = window.prompt("Reddetme nedeni (Opsiyonel):", "Ödeme doğrulanamadı.");
-        if (reason !== null) {
-            router.post(`/admin/payment-notifications/${notification.id}/reject`, {
-                admin_notes: reason,
-            }, {
-                preserveScroll: true,
-            });
-        }
-    };
-
-    // Confirm Plan Delete
+    // Delete Plan
     const handleConfirmDeletePlan = () => {
         if (!deletingPlan) return;
         setIsSubmittingPlan(true);
 
         router.delete(`/admin/plans/${deletingPlan.id}`, {
             data: { target_plan_id: targetPlanForDelete },
+            preserveScroll: true,
             onSuccess: () => {
                 setDeletingPlan(null);
                 setTargetPlanForDelete('none');
@@ -328,7 +301,7 @@ export default function PlansIndex({
         });
     };
 
-    // Open Assign Modal for specific user or generic
+    // Open Assign Modal
     const handleOpenAssignModal = (user = null) => {
         if (user) {
             setAssignModalUser(user);
@@ -344,46 +317,158 @@ export default function PlansIndex({
             });
         } else {
             setAssignModalUser(null);
-            setAssignForm({
-                ...initialAssignForm,
-                user_id: users.length > 0 ? users[0].id : '',
-                plan_id: plans.length > 0 ? String(plans[0].id) : 'custom',
-            });
+            setAssignForm(initialAssignForm);
         }
         setIsAssignModalOpen(true);
     };
 
-    // Submit User Plan / Quota Assignment
-    const handleSaveAssignment = (e) => {
+    // Submit Assign Plan
+    const handleSaveAssign = (e) => {
         e.preventDefault();
         setIsSubmittingAssign(true);
 
         router.post('/admin/plans/users/assign', assignForm, {
+            preserveScroll: true,
             onSuccess: () => {
                 setIsAssignModalOpen(false);
+                setAssignModalUser(null);
             },
             onFinish: () => setIsSubmittingAssign(false),
         });
     };
 
-    // Remove plan from user directly
+    // Reset User Usage
+    const handleResetUserUsage = (user) => {
+        if (!window.confirm(`${user.name} kullanıcısının mevcut dönemde harcadığı kotayı sıfırlamak istediğinize emin misiniz?`)) return;
+
+        router.post(`/admin/plans/users/${user.id}/reset-usage`, {}, {
+            preserveScroll: true,
+        });
+    };
+
+    // Submit Extend Duration
+    const handleSaveExtendDuration = (e) => {
+        e?.preventDefault();
+        if (!extendDurationUser) return;
+        setIsSubmittingExtend(true);
+
+        router.post(`/admin/plans/users/${extendDurationUser.id}/extend-duration`, {
+            days: extendDurationDays,
+            notes: extendDurationNotes,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setExtendDurationUser(null);
+                setExtendDurationNotes('');
+            },
+            onFinish: () => setIsSubmittingExtend(false),
+        });
+    };
+
+    // Submit Direct Extra Quota
+    const handleSaveExtraQuota = (e) => {
+        e?.preventDefault();
+        if (!extraQuotaModalUser) return;
+        setIsSubmittingExtraQuota(true);
+
+        router.post(`/admin/plans/users/${extraQuotaModalUser.id}/extra-quota`, extraQuotaForm, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setExtraQuotaModalUser(null);
+            },
+            onFinish: () => setIsSubmittingExtraQuota(false),
+        });
+    };
+
+    // Sync Jellyfin/Emby
+    const handleSyncMediaAccount = (user) => {
+        router.post(`/admin/plans/users/${user.id}/sync-media-account`, {}, {
+            preserveScroll: true,
+        });
+    };
+
+    // Remove User Plan
     const handleRemoveUserPlan = (user) => {
-        if (window.confirm(`${user.name} kullanıcısının paket ve kotasını kaldırmak istediğinize emin misiniz?`)) {
-            router.post(`/admin/plans/users/${user.id}/remove`);
+        if (!window.confirm(`${user.name} kullanıcısının tüm paket haklarını ve ek kotalarını iptal etmek istediğinize emin misiniz?`)) return;
+
+        router.post(`/admin/plans/users/${user.id}/remove`, {}, {
+            preserveScroll: true,
+        });
+    };
+
+    // Approve Payment Notification
+    const handleApproveNotification = (notification) => {
+        if (!window.confirm(`"${notification.user_name}" tarafından yapılan ${notification.formatted_amount} tutarındaki ödemeyi onaylayıp paketi aktif etmek istiyor musunuz?`)) return;
+
+        router.post(`/admin/payment-notifications/${notification.id}/approve`, {}, {
+            preserveScroll: true,
+        });
+    };
+
+    // Reject Payment Notification
+    const handleRejectNotification = (notification) => {
+        const reason = window.prompt("Reddetme nedeni (Opsiyonel):", "Ödeme doğrulanamadı.");
+        if (reason !== null) {
+            router.post(`/admin/payment-notifications/${notification.id}/reject`, {
+                admin_notes: reason,
+            }, {
+                preserveScroll: true,
+            });
         }
     };
+
+    // Toggle Payment Method
+    const handleTogglePaymentMethod = (method) => {
+        router.post(`/admin/payment-methods/${method.id}/toggle`, {}, {
+            preserveScroll: true,
+        });
+    };
+
+    // Open Edit Payment Method
+    const handleOpenEditMethod = (method) => {
+        setEditingMethod(method);
+        setMethodForm({
+            name: method.name || '',
+            description: method.description || '',
+            instructions: method.instructions || '',
+            is_active: Boolean(method.is_active),
+            settings: method.settings || {},
+        });
+    };
+
+    // Submit Payment Method Update
+    const handleSavePaymentMethod = (e) => {
+        e.preventDefault();
+        if (!editingMethod) return;
+        setIsSubmittingMethod(true);
+
+        router.put(`/admin/payment-methods/${editingMethod.id}`, methodForm, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingMethod(null);
+            },
+            onFinish: () => setIsSubmittingMethod(false),
+        });
+    };
+
+    // User list data & pagination helper
+    const usersList = Array.isArray(users) ? users : (users?.data || []);
+    const notifsList = Array.isArray(paymentNotifications) ? paymentNotifications : (paymentNotifications?.data || []);
+    const historyList = Array.isArray(subscriptionsHistory) ? subscriptionsHistory : (subscriptionsHistory?.data || []);
 
     return (
         <AdminLayout
             title="Paket & Kota Yönetimi"
-            subtitle="Sistem abonelik paketlerini tanımlayın, indirme kotası limitlerini yapılandırın ve kullanıcılara süreli/süresiz özel kotalar atayın."
+            subtitle="İndirme paketleri, kullanıcı kota tahsisleri, ödeme bildirimleri ve gateway hız limitleri."
             activeTab="plans"
-            statsSummary={{ total_plans: plans.length }}
+            statsSummary={{ 
+                total_plans: stats?.totalPlansCount ?? plans.length,
+            }}
             headerActions={
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                     <button
                         onClick={handleOpenCreatePlan}
-                        className="px-4 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white font-semibold text-xs transition-all shadow-lg shadow-[#00B074]/20 flex items-center gap-2"
+                        className="px-4 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white font-bold text-xs transition-all shadow-lg shadow-[#00B074]/20 flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
                         <span>Yeni Paket Ekle</span>
@@ -393,763 +478,348 @@ export default function PlansIndex({
                         className="px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-white font-semibold text-xs transition-all flex items-center gap-2"
                     >
                         <UserCheck className="w-4 h-4 text-[#00B074]" />
-                        <span>Kullanıcıya Kota Tanımla</span>
+                        <span>Kota Tanımla</span>
                     </button>
                 </div>
             }
         >
             <div className="space-y-6">
 
-                {/* Flash Notification */}
+                {/* Flash Messages */}
                 {flash?.success && (
-                    <div className="p-4 rounded-2xl bg-[#00B074]/15 border border-[#00B074]/30 text-emerald-300 text-xs font-semibold flex items-center justify-between shadow-lg">
+                    <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between shadow-lg animate-in fade-in">
                         <div className="flex items-center gap-2.5">
                             <CheckCircle2 className="w-5 h-5 text-[#00B074] shrink-0" />
                             <span>{flash.success}</span>
                         </div>
                     </div>
                 )}
+                {flash?.error && (
+                    <div className="p-4 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center justify-between shadow-lg animate-in fade-in">
+                        <div className="flex items-center gap-2.5">
+                            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                            <span>{flash.error}</span>
+                        </div>
+                    </div>
+                )}
 
-                {/* Quick Stats Grid */}
+                {/* AGGREGATED HIGH-IMPACT KPI CARDS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-[#0D111A] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between group hover:border-[#00B074]/40 transition-all">
+                    
+                    {/* KPI 1: Plans */}
+                    <div className="bg-[#0A0D15] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between hover:border-[#00B074]/40 transition-all shadow-xl shadow-black/20">
                         <div>
-                            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Aktif Paketler</p>
-                            <h3 className="text-2xl font-black text-white">{stats.activePlansCount} <span className="text-xs font-normal text-gray-500">/ {plans.length} Toplam</span></h3>
+                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">Aktif Paketler</p>
+                            <h3 className="text-2xl font-black text-white font-mono">
+                                {stats?.activePlansCount ?? plans.filter(p => p.is_active).length}{' '}
+                                <span className="text-xs font-normal text-gray-500">/ {stats?.totalPlansCount ?? plans.length} Toplam</span>
+                            </h3>
+                            <p className="text-[11px] text-gray-400 mt-1">Bireysel, VIP ve Ek Kotalar</p>
                         </div>
                         <div className="p-3 rounded-xl bg-[#00B074]/10 text-[#00B074] border border-[#00B074]/20">
                             <Layers className="w-5 h-5" />
                         </div>
                     </div>
 
-                    <div className="bg-[#0D111A] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between group hover:border-blue-500/40 transition-all">
+                    {/* KPI 2: Subscribers */}
+                    <div className="bg-[#0A0D15] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between hover:border-blue-500/40 transition-all shadow-xl shadow-black/20">
                         <div>
-                            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Aktif Aboneler</p>
-                            <h3 className="text-2xl font-black text-white">{stats.totalSubscribedUsers} Kullanıcı</h3>
+                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">Aktif Aboneler</p>
+                            <h3 className="text-2xl font-black text-white font-mono">
+                                {stats?.totalSubscribedUsers ?? 0}{' '}
+                                <span className="text-xs font-normal text-gray-500">Kullanıcı</span>
+                            </h3>
+                            <p className="text-[11px] text-emerald-400 mt-1 font-mono">
+                                {stats?.perpetualUsersCount ?? 0} Süresiz Kota
+                            </p>
                         </div>
                         <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
                             <Users className="w-5 h-5" />
                         </div>
                     </div>
 
-                    <div className="bg-[#0D111A] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between group hover:border-emerald-500/40 transition-all">
+                    {/* KPI 3: Quota Allocated */}
+                    <div className="bg-[#0A0D15] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between hover:border-amber-500/40 transition-all shadow-xl shadow-black/20">
                         <div>
-                            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Süresiz Kotalar</p>
-                            <h3 className="text-2xl font-black text-emerald-400">{stats.perpetualUsersCount} <span className="text-xs font-normal text-gray-500">Kullanıcı</span></h3>
-                        </div>
-                        <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            <Infinity className="w-5 h-5" />
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0D111A] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between group hover:border-amber-500/40 transition-all">
-                        <div>
-                            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Tanımlı İndirme Kotası</p>
-                            <h3 className="text-2xl font-black text-amber-400">{stats.totalAllocatedGb.toLocaleString('tr-TR')} <span className="text-xs font-normal text-gray-500">GB</span></h3>
+                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">Tahsis Edilen Kota</p>
+                            <h3 className="text-2xl font-black text-amber-400 font-mono">
+                                {(stats?.totalAllocatedGb ?? 0).toLocaleString('tr-TR')}{' '}
+                                <span className="text-xs font-normal text-gray-500">GB</span>
+                            </h3>
+                            <p className="text-[11px] text-gray-400 mt-1 font-mono">
+                                Kullanılan: {(stats?.totalUsedGb ?? 0).toLocaleString('tr-TR')} GB
+                            </p>
                         </div>
                         <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                             <HardDrive className="w-5 h-5" />
                         </div>
                     </div>
+
+                    {/* KPI 4: Pending Notifications & Revenue */}
+                    <div className="bg-[#0A0D15] border border-white/[0.08] p-5 rounded-2xl flex items-center justify-between hover:border-emerald-500/40 transition-all shadow-xl shadow-black/20">
+                        <div>
+                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">Ödeme Bekleyenler</p>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-2xl font-black text-white font-mono">
+                                    {stats?.pendingNotificationsCount ?? 0}
+                                </h3>
+                                {(stats?.pendingNotificationsCount ?? 0) > 0 && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
+                                        İnceleme Bekliyor
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-1 font-mono">
+                                Toplam Ciro: {stats?.formattedRevenue || '₺0,00'}
+                            </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <DollarSign className="w-5 h-5" />
+                        </div>
+                    </div>
+
                 </div>
 
-                {/* Section Selector Controls */}
-                <div className="flex items-center justify-between bg-[#0D111A] p-2 rounded-2xl border border-white/[0.08]">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                {/* MODULAR SUB-NAVIGATION SECTIONS BAR */}
+                <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] pb-4 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-2">
+                        
                         <button
-                            onClick={() => setActiveSection('plans')}
-                            className={`px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
-                                activeSection === 'plans'
-                                    ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                            onClick={() => handleSwitchSection('plans')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                currentSection === 'plans'
+                                    ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
+                                    : 'bg-[#0A0D15] text-gray-400 hover:text-white border border-white/[0.08] hover:bg-white/[0.04]'
                             }`}
                         >
-                            <Package className="w-4 h-4" />
-                            <span>Paket Listesi ({plans.length})</span>
+                            <Layers className="w-4 h-4" />
+                            <span>Paket Kataloğu</span>
+                            <span className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono">
+                                {plans.length}
+                            </span>
                         </button>
+
                         <button
-                            onClick={() => setActiveSection('users')}
-                            className={`px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
-                                activeSection === 'users'
-                                    ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                            onClick={() => handleSwitchSection('users')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                currentSection === 'users'
+                                    ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
+                                    : 'bg-[#0A0D15] text-gray-400 hover:text-white border border-white/[0.08] hover:bg-white/[0.04]'
                             }`}
                         >
                             <Users className="w-4 h-4" />
-                            <span>Kullanıcı Kota Listesi ({users.length})</span>
-                        </button>
-                        <button
-                            onClick={() => setActiveSection('history')}
-                            className={`px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
-                                activeSection === 'history'
-                                    ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                            }`}
-                        >
-                            <History className="w-4 h-4" />
-                            <span>Satın Alım & İşlem Geçmişi ({subscriptionsHistory.length})</span>
+                            <span>Kullanıcı Kotaları</span>
+                            <span className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono">
+                                {stats?.totalSubscribedUsers ?? 0}
+                            </span>
                         </button>
 
                         <button
-                            onClick={() => setActiveSection('methods')}
-                            className={`px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
-                                activeSection === 'methods'
-                                    ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                            onClick={() => handleSwitchSection('notifications')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                currentSection === 'notifications'
+                                    ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
+                                    : 'bg-[#0A0D15] text-gray-400 hover:text-white border border-white/[0.08] hover:bg-white/[0.04]'
                             }`}
                         >
-                            <Building2 className="w-4 h-4" />
-                            <span>Ödeme Yöntemleri ({paymentMethods.length})</span>
-                        </button>
-
-                        <button
-                            onClick={() => setActiveSection('notifications')}
-                            className={`px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
-                                activeSection === 'notifications'
-                                    ? 'bg-[#00B074] text-white shadow-md shadow-[#00B074]/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
-                            }`}
-                        >
-                            <BellRing className="w-4 h-4" />
-                            <span>Ödeme Bildirimleri ({paymentNotifications.length})</span>
-                            {pendingNotificationsCount > 0 && (
-                                <span className="px-2 py-0.5 text-[10px] rounded-full bg-rose-500 text-white font-bold animate-pulse">
-                                    {pendingNotificationsCount} Bekliyor
+                            <Receipt className="w-4 h-4" />
+                            <span>Ödeme Bildirimleri</span>
+                            {(stats?.pendingNotificationsCount ?? 0) > 0 ? (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500 text-black font-black text-[10px] font-mono animate-pulse">
+                                    {stats.pendingNotificationsCount}
+                                </span>
+                            ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono">
+                                    {paymentNotifications?.total ?? notifsList.length}
                                 </span>
                             )}
                         </button>
+
+                        <button
+                            onClick={() => handleSwitchSection('methods')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                currentSection === 'methods'
+                                    ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
+                                    : 'bg-[#0A0D15] text-gray-400 hover:text-white border border-white/[0.08] hover:bg-white/[0.04]'
+                            }`}
+                        >
+                            <Coins className="w-4 h-4" />
+                            <span>Ödeme Yöntemleri</span>
+                            <span className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono">
+                                {paymentMethods.length}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => handleSwitchSection('history')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                                currentSection === 'history'
+                                    ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
+                                    : 'bg-[#0A0D15] text-gray-400 hover:text-white border border-white/[0.08] hover:bg-white/[0.04]'
+                            }`}
+                        >
+                            <History className="w-4 h-4" />
+                            <span>İşlem Günlüğü</span>
+                        </button>
+
                     </div>
                 </div>
 
-                {/* SECTION 1: ABONELİK PAKETLERİ (PLAN CARDS & MANAGEMENT) */}
-                {activeSection === 'plans' && (
-                    <div className="space-y-6">
-                        {/* Search Toolbar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0D111A] p-4 rounded-2xl border border-white/[0.08]">
-                            <div className="relative flex-1 max-w-md">
-                                <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Paket adına veya slug'a göre ara..."
-                                    value={planSearch}
-                                    onChange={(e) => setPlanSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-colors"
-                                />
-                            </div>
-                            <div className="text-xs text-gray-400 font-medium">
-                                Toplam <strong className="text-white font-mono">{filteredPlans.length}</strong> paket gösteriliyor
-                            </div>
-                        </div>
+                {/* ========================================================= */}
+                {/* SECTION 1: PAKET KATALOĞU (PLANS) */}
+                {/* ========================================================= */}
+                {currentSection === 'plans' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {plans.map((plan) => {
+                                const isBusiness = plan.type === 'business';
+                                const isExtra = plan.type === 'extra';
 
-                        {/* Plan Cards Grid */}
-                        {filteredPlans.length === 0 ? (
-                            <div className="p-12 text-center bg-[#0D111A] rounded-2xl border border-white/[0.08]">
-                                <Package className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                                <h3 className="text-base font-bold text-white mb-1">Henüz Paket Bulunmuyor</h3>
-                                <p className="text-xs text-gray-400 mb-4">Sisteme henüz paket eklenmemiş veya aramanıza uygun paket bulunamadı.</p>
-                                <button
-                                    onClick={handleOpenCreatePlan}
-                                    className="px-4 py-2 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold"
-                                >
-                                    + Yeni Paket Oluştur
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filteredPlans.map((plan) => (
-                                    <div
-                                        key={plan.id}
-                                        className={`relative bg-[#0D111A] rounded-2xl border transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:border-white/20 shadow-xl ${
-                                            plan.is_active ? 'border-white/[0.08]' : 'border-white/[0.04] opacity-75'
-                                        }`}
-                                    >
-                                        {/* Card Top Info */}
-                                        <div className="p-6 border-b border-white/[0.06] relative bg-[#0A0D14]/40">
-                                            <div className="flex items-start justify-between gap-3 mb-3">
-                                                <div>
-                                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/5 text-gray-400 border border-white/5 uppercase">
-                                                        {plan.slug}
-                                                    </span>
-                                                    <h3 className="text-xl font-bold text-white mt-1.5 flex items-center gap-2 tracking-tight">
-                                                        {plan.name}
-                                                    </h3>
-                                                </div>
-                                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
-                                                    plan.is_active
-                                                        ? 'bg-[#00B074]/15 border-[#00B074]/30 text-[#00B074]'
-                                                        : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                                                }`}>
-                                                    {plan.is_active ? 'Aktif Paket' : 'Pasif'}
-                                                </span>
-                                            </div>
-
-                                            <p className="text-xs text-gray-400 line-clamp-2 min-h-[32px]">
-                                                {plan.description || 'Bu paket için açıklama belirtilmedi.'}
-                                            </p>
-
-                                            {/* Quota Feature Banner */}
-                                            <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-[#00B074]/15 to-emerald-950/20 border border-[#00B074]/30 flex items-center justify-between">
-                                                <span className="text-xs text-gray-300 font-semibold">Aylık İndirme Kotası</span>
-                                                <span className="text-base font-black text-emerald-400 font-mono">
-                                                    {plan.monthly_quota_gb.toLocaleString('tr-TR')} GB
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Pricing & Limits Body */}
-                                        <div className="p-6 space-y-4 flex-1">
-                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                {(() => {
-                                                    const allowed = plan.allowed_durations || [1, 3, 6, 12];
-                                                    return [
-                                                        { months: 1, label: '1 Aylık', price: plan.price_1m },
-                                                        { months: 3, label: '3 Aylık', price: plan.price_3m },
-                                                        { months: 6, label: '6 Aylık', price: plan.price_6m },
-                                                        { months: 12, label: '12 Aylık', price: plan.price_12m },
-                                                    ].map((item) => {
-                                                        const isAllowed = allowed.includes(item.months);
-                                                        return (
-                                                            <div
-                                                                key={item.months}
-                                                                className={`p-2.5 rounded-xl border ${
-                                                                    isAllowed
-                                                                        ? 'bg-[#07090E] border-white/[0.06]'
-                                                                        : 'bg-rose-950/10 border-rose-500/20 opacity-50'
-                                                                }`}
-                                                            >
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-gray-500 text-[10px] uppercase tracking-wider font-semibold">
-                                                                        {item.label}
-                                                                    </span>
-                                                                    {!isAllowed && (
-                                                                        <span className="text-[9px] font-bold text-rose-400">Kapalı</span>
-                                                                    )}
-                                                                </div>
-                                                                <span className={`text-sm font-bold ${isAllowed ? 'text-white' : 'text-gray-500 line-through'}`}>
-                                                                    ₺{parseFloat(item.price || 0).toFixed(2)}
-                                                                </span>
-                                                            </div>
-                                                        );
-                                                    });
-                                                })()}
-                                            </div>
-
-                                            <div className="pt-2 border-t border-white/[0.06] space-y-2 text-xs text-gray-400">
-                                                <div className="flex justify-between items-center">
-                                                    <span>Eşzamanlı İndirme Limiti:</span>
-                                                    <span className="text-white font-semibold font-mono">{plan.max_parallel_downloads} Bağlantı</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span>Hız Sınırı:</span>
-                                                    <span className="text-white font-semibold">
-                                                        {plan.speed_limit_mbps ? `${plan.speed_limit_mbps} Mbps` : 'Sınırsız / Tam Hız'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span>VPS / Sunucu IP İzni:</span>
-                                                    <span className={`font-semibold px-2 py-0.5 rounded text-[11px] ${
-                                                        plan.allow_vps_access
-                                                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                                                    }`}>
-                                                        {plan.allow_vps_access ? 'İzin Verildi' : 'Engellendi'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span>Kayıtlı Aktif Abone:</span>
-                                                    <span className="text-[#00B074] font-bold font-mono">
-                                                        {plan.subscriptions_count || 0} Kullanıcı
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Card Actions Footer */}
-                                        <div className="p-4 bg-[#07090E] border-t border-white/[0.06] flex items-center justify-between gap-3">
-                                            <button
-                                                onClick={() => handleOpenEditPlan(plan)}
-                                                className="flex-1 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-                                            >
-                                                <Edit3 className="w-3.5 h-3.5 text-blue-400" />
-                                                <span>Düzenle</span>
-                                            </button>
-
-                                            <button
-                                                onClick={() => {
-                                                    setDeletingPlan(plan);
-                                                    setTargetPlanForDelete('none');
-                                                }}
-                                                className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-                                                title="Paketi Sil"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                <span>Sil</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* SECTION 2: KULLANICI PAKET & KOTA LİSTESİ */}
-                {activeSection === 'users' && (
-                    <div className="space-y-6">
-                        {/* Search & Filter Header */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0D111A] p-4 rounded-2xl border border-white/[0.08]">
-                            <div className="relative flex-1 max-w-md">
-                                <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Kullanıcı adı veya e-posta ile ara..."
-                                    value={userSearch}
-                                    onChange={(e) => setUserSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-colors"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <select
-                                    value={userPlanFilter}
-                                    onChange={(e) => setUserPlanFilter(e.target.value)}
-                                    className="bg-[#07090E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00B074] transition-colors"
-                                >
-                                    <option value="all">Tüm Kullanıcılar ({users.length})</option>
-                                    <option value="active_sub">Aktif Paketi Olanlar</option>
-                                    <option value="perpetual">Süresiz Kotası Olanlar</option>
-                                    <option value="no_sub">Paketi / Kotası Olmayanlar</option>
-                                    {plans.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name} Paketi</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Users Table */}
-                        <div className="bg-[#0D111A] rounded-2xl border border-white/[0.08] overflow-hidden shadow-xl">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-[#0A0D14] text-gray-400 border-b border-white/[0.06] uppercase text-[10px] tracking-wider font-bold">
-                                        <tr>
-                                            <th className="px-6 py-4">Kullanıcı</th>
-                                            <th className="px-6 py-4">Aktif Paket / Kota</th>
-                                            <th className="px-6 py-4">Kota Kullanımı</th>
-                                            <th className="px-6 py-4">Hız Limiti</th>
-                                            <th className="px-6 py-4">Bitiş Tarihi</th>
-                                            <th className="px-6 py-4 text-right">İşlemler</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/[0.04]">
-                                        {filteredUsers.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                                                    Aramanıza veya filtrenize uygun kullanıcı bulunamadı.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            filteredUsers.map((user) => (
-                                                <tr key={user.id} className="hover:bg-white/[0.02] transition-colors">
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#00B074] to-emerald-600 flex items-center justify-center text-white font-black text-xs uppercase shadow-md shadow-[#00B074]/10">
-                                                                {user.name.charAt(0)}
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-bold text-white flex items-center gap-2">
-                                                                    <span>{user.name}</span>
-                                                                    {user.role === 'admin' && (
-                                                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 font-mono font-bold">ADMIN</span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-[11px] text-gray-400">{user.email}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        {user.has_any_package ? (
-                                                            <div className="flex flex-col gap-1.5 items-start">
-                                                                {user.has_active_sub && (
-                                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                                        <span className="px-3 py-1 rounded-xl bg-[#00B074]/15 border border-[#00B074]/30 text-[#00B074] font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-[#00B074]/5">
-                                                                            <Sparkles className="w-3.5 h-3.5" />
-                                                                            {user.main_plan_name || user.plan_name}
-                                                                        </span>
-                                                                        {user.is_perpetual && (
-                                                                            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
-                                                                                <Infinity className="w-3.5 h-3.5" /> Süresiz
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                                {user.has_extras && user.extras.map((extra) => (
-                                                                    <div key={extra.id} className="flex items-center gap-1.5 flex-wrap">
-                                                                        <span className="px-2.5 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-purple-500/5">
-                                                                            <Plus className="w-3 h-3 text-purple-400" />
-                                                                            <span>{extra.name}</span>
-                                                                            <span className="text-[10px] text-purple-400/80 font-mono">({extra.allocated_formatted})</span>
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="px-3 py-1 rounded-xl bg-gray-800 text-gray-400 text-xs font-semibold">
-                                                                Paket Yok / Ücretsiz
-                                                            </span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        {user.has_any_package ? (
-                                                            <div className="w-48 space-y-1.5">
-                                                                <div className="flex justify-between text-[11px]">
-                                                                    <span className="text-gray-200 font-mono font-bold">{user.quota_used} / {user.quota_total}</span>
-                                                                    <span className="text-gray-400 font-bold">{Math.round(user.quota_percentage)}%</span>
-                                                                </div>
-                                                                <div className="w-full h-2 bg-[#07090E] rounded-full overflow-hidden border border-white/[0.04]">
-                                                                    <div
-                                                                        className={`h-full transition-all duration-500 rounded-full ${
-                                                                            user.quota_percentage > 90 ? 'bg-rose-500' : 'bg-[#00B074]'
-                                                                        }`}
-                                                                        style={{ width: `${Math.min(100, user.quota_percentage)}%` }}
-                                                                    />
-                                                                </div>
-                                                                {user.has_active_sub && user.has_extras && (
-                                                                    <div className="pt-1 border-t border-white/[0.04] flex flex-col gap-0.5 text-[10px] font-mono">
-                                                                        <div className="flex justify-between text-gray-400">
-                                                                            <span>Ana Paket:</span>
-                                                                            <span className="text-gray-300">{user.main_quota_used} / {user.main_quota_total}</span>
-                                                                        </div>
-                                                                        <div className="flex justify-between text-purple-400">
-                                                                            <span>Ek Paket:</span>
-                                                                            <span className="text-purple-300">{user.extra_quota_used} / {user.extra_quota_total}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-gray-500 text-xs">Kota Tanımlanmamış</span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        {user.custom_speed_limit_mbps !== null && user.custom_speed_limit_mbps !== undefined ? (
-                                                            user.custom_speed_limit_mbps === 0 ? (
-                                                                <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold text-[11px] flex items-center gap-1 w-fit">
-                                                                    ⚡ Sınırsız (Özel)
-                                                                </span>
-                                                            ) : (
-                                                                <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold font-mono text-[11px] flex items-center gap-1 w-fit">
-                                                                    <Gauge className="w-3.5 h-3.5" />
-                                                                    {user.custom_speed_limit_mbps} Mbps (Özel)
-                                                                </span>
-                                                            )
-                                                        ) : (
-                                                            <span className="text-gray-400 text-xs flex items-center gap-1">
-                                                                <Gauge className="w-3.5 h-3.5 text-gray-500" />
-                                                                Paket Varsayılanı
-                                                            </span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        {user.has_any_package ? (
-                                                            <div className="flex flex-col gap-1 text-xs font-mono">
-                                                                {user.has_active_sub && (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[10px] text-gray-500 uppercase font-sans font-semibold">Ana:</span>
-                                                                        <span className={user.is_perpetual ? 'text-emerald-400 font-bold' : 'text-gray-300'}>
-                                                                            {user.expires_at}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                                {user.has_extras && user.extras.map((extra) => (
-                                                                    <div key={extra.id} className="flex items-center gap-1.5 text-[11px]">
-                                                                        <span className="text-[10px] text-purple-400 uppercase font-sans font-semibold">Ek:</span>
-                                                                        <span className="text-purple-300" title={`Kalan: ${extra.days_left ?? 0} gün`}>
-                                                                            {extra.expires_at}
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-gray-500 text-xs">-</span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button
-                                                                onClick={() => handleOpenAssignModal(user)}
-                                                                className="px-3 py-1.5 rounded-xl bg-[#00B074]/10 hover:bg-[#00B074]/20 border border-[#00B074]/30 text-[#00B074] text-xs font-semibold transition-colors flex items-center gap-1"
-                                                            >
-                                                                <Edit3 className="w-3.5 h-3.5" />
-                                                                <span>{user.has_active_sub ? 'Kota Düzenle' : 'Kota Ata'}</span>
-                                                            </button>
-
-                                                            {user.has_active_sub && (
-                                                                <button
-                                                                    onClick={() => handleRemoveUserPlan(user)}
-                                                                    className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold transition-colors"
-                                                                    title="Paketi Kaldır"
-                                                                >
-                                                                    <UserX className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* SECTION 3: SATIN ALIM & İŞLEM GEÇMİŞİ */}
-                {activeSection === 'history' && (
-                    <div className="space-y-6">
-                        {/* History Statistics Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="bg-[#0D111A] border border-white/[0.08] p-4 rounded-2xl flex items-center justify-between">
-                                <div>
-                                    <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">Toplam İşlem Kaydı</p>
-                                    <h4 className="text-xl font-black text-white mt-1">{subscriptionsHistory.length} Kayıt</h4>
-                                </div>
-                                <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                    <Receipt className="w-5 h-5" />
-                                </div>
-                            </div>
-
-                            <div className="bg-[#0D111A] border border-white/[0.08] p-4 rounded-2xl flex items-center justify-between">
-                                <div>
-                                    <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">Toplam Ciro / Hasılat</p>
-                                    <h4 className="text-xl font-black text-emerald-400 mt-1">₺{totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</h4>
-                                </div>
-                                <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    <DollarSign className="w-5 h-5" />
-                                </div>
-                            </div>
-
-                            <div className="bg-[#0D111A] border border-white/[0.08] p-4 rounded-2xl flex items-center justify-between">
-                                <div>
-                                    <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">Şu An Aktif Abonelikler</p>
-                                    <h4 className="text-xl font-black text-blue-400 mt-1">{subscriptionsHistory.filter(h => h.status === 'active').length} İşlem</h4>
-                                </div>
-                                <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                    <CheckCircle2 className="w-5 h-5" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Search & Filter Header */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0D111A] p-4 rounded-2xl border border-white/[0.08]">
-                            <div className="relative flex-1 max-w-md">
-                                <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Kullanıcı adı, e-posta, paket adı veya notlarda ara..."
-                                    value={historySearch}
-                                    onChange={(e) => setHistorySearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-colors"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <select
-                                    value={historyStatusFilter}
-                                    onChange={(e) => setHistoryStatusFilter(e.target.value)}
-                                    className="bg-[#07090E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00B074] transition-colors"
-                                >
-                                    <option value="all">Tüm Durumlar ({subscriptionsHistory.length})</option>
-                                    <option value="active">Aktif Abonelikler</option>
-                                    <option value="cancelled">İptal Edilenler</option>
-                                    <option value="expired">Süresi Dolanlar</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* History Table */}
-                        <div className="bg-[#0D111A] rounded-2xl border border-white/[0.08] overflow-hidden shadow-xl">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-[#0A0D14] text-gray-400 border-b border-white/[0.06] uppercase text-[10px] tracking-wider font-bold">
-                                        <tr>
-                                            <th className="px-6 py-4">İşlem ID / Tarih</th>
-                                            <th className="px-6 py-4">Kullanıcı</th>
-                                            <th className="px-6 py-4">Paket / Kota</th>
-                                            <th className="px-6 py-4">Süre</th>
-                                            <th className="px-6 py-4">Tutar</th>
-                                            <th className="px-6 py-4">Durum</th>
-                                            <th className="px-6 py-4">Notlar</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/[0.04]">
-                                        {filteredHistory.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                                                    Aramanıza veya filtrelerinize uygun satın alım kaydı bulunamadı.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            filteredHistory.map((item) => (
-                                                <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
-                                                    <td className="px-6 py-4">
-                                                        <div className="font-mono text-white font-bold">#{item.id}</div>
-                                                        <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                            <Clock className="w-3 h-3" />
-                                                            <span>{item.created_at}</span>
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        <div className="font-bold text-white">{item.user_name}</div>
-                                                        <div className="text-[11px] text-gray-400">{item.user_email}</div>
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        <span className="font-bold text-emerald-400">
-                                                            {item.plan_name}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        {item.is_perpetual ? (
-                                                            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 text-[10px] font-bold inline-flex items-center gap-1">
-                                                                <Infinity className="w-3 h-3" /> Süresiz
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300 font-medium">
-                                                                {item.duration_months} Ay
-                                                            </span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        <span className="font-mono font-bold text-white">
-                                                            {item.formatted_price}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                                            item.status === 'active'
-                                                                ? 'bg-[#00B074]/15 border-[#00B074]/30 text-[#00B074]'
-                                                                : item.status === 'cancelled'
-                                                                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                                                                : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                                                        }`}>
-                                                            {item.status_label}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-6 py-4 max-w-xs">
-                                                        <span className="text-gray-400 text-[11px] truncate block" title={item.notes}>
-                                                            {item.notes || '-'}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* SECTION 4: ÖDEME YÖNTEMLERİ (MODÜLER AKTİF/PASİF & YÖNETİM) */}
-                {activeSection === 'methods' && (
-                    <div className="space-y-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0D111A] p-4 rounded-2xl border border-white/[0.08]">
-                            <div>
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-[#00B074]" />
-                                    <span>Modüler Ödeme Yöntemleri Yönetimi</span>
-                                </h3>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    Sistemde aktif/pasif olmasını istediğiniz ödeme yöntemlerini kolayca açıp kapatabilir, IBAN ve Cüzdan adresi ayarlarını yapılandırabilirsiniz.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {paymentMethods.map((method) => {
-                                const settings = method.settings || {};
                                 return (
                                     <div
-                                        key={method.id}
-                                        className={`bg-[#0D111A] rounded-2xl border transition-all duration-300 p-6 space-y-4 shadow-xl flex flex-col justify-between ${
-                                            method.is_active ? 'border-white/[0.08]' : 'border-rose-500/20 opacity-75'
+                                        key={plan.id}
+                                        className={`bg-[#0A0D15] border rounded-2xl p-6 transition-all relative flex flex-col justify-between group shadow-xl shadow-black/20 ${
+                                            plan.is_active
+                                                ? isBusiness
+                                                    ? 'border-indigo-500/30 hover:border-indigo-500/60'
+                                                    : isExtra
+                                                    ? 'border-amber-500/30 hover:border-amber-500/60'
+                                                    : 'border-white/[0.08] hover:border-[#00B074]/50'
+                                                : 'border-white/[0.05] opacity-60'
                                         }`}
                                     >
                                         <div className="space-y-4">
-                                            {/* Card Top / Toggle Header */}
+                                            {/* Header */}
                                             <div className="flex items-start justify-between gap-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                                        method.is_active ? 'bg-[#00B074]/15 text-[#00B074] border border-[#00B074]/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                                    }`}>
-                                                        {method.driver === 'bank' ? <Building2 className="w-5 h-5" /> : <Coins className="w-5 h-5" />}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="text-base font-bold text-white">{method.name}</h4>
-                                                        <span className="text-[10px] font-mono text-gray-400 uppercase">
-                                                            Sürücü: {method.driver}
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                            isBusiness
+                                                                ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+                                                                : isExtra
+                                                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                                                : 'bg-[#00B074]/15 text-[#00B074] border border-[#00B074]/30'
+                                                        }`}>
+                                                            {plan.type_label}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-gray-500">
+                                                            Sıra: {plan.sort_order}
                                                         </span>
                                                     </div>
+                                                    <h3 className="text-lg font-bold text-white mt-1 group-hover:text-emerald-400 transition-colors">
+                                                        {plan.name}
+                                                    </h3>
+                                                    <p className="text-[11px] text-gray-500 font-mono">
+                                                        /{plan.slug}
+                                                    </p>
                                                 </div>
 
-                                                {/* Active/Passive Toggle Button */}
+                                                {/* Active Toggle Switch */}
                                                 <button
-                                                    onClick={() => handleToggleMethod(method)}
-                                                    className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                                                        method.is_active
-                                                            ? 'bg-[#00B074]/20 border border-[#00B074]/40 text-[#00B074] hover:bg-[#00B074]/30'
-                                                            : 'bg-gray-800 border border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-white'
+                                                    type="button"
+                                                    onClick={() => handleTogglePlan(plan)}
+                                                    className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${
+                                                        plan.is_active ? 'bg-emerald-500' : 'bg-white/[0.12]'
                                                     }`}
-                                                    title={method.is_active ? 'Pasife Al' : 'Aktif Et'}
+                                                    title={plan.is_active ? 'Satışta (Tıklayarak Pasif Yap)' : 'Pasif (Tıklayarak Aktif Yap)'}
                                                 >
-                                                    {method.is_active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                                                    <span>{method.is_active ? 'AKTİF' : 'PASİF'}</span>
+                                                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                                        plan.is_active ? 'translate-x-5' : 'translate-x-0'
+                                                    }`} />
                                                 </button>
                                             </div>
 
-                                            <p className="text-xs text-gray-400">
-                                                {method.description || 'Açıklama belirtilmedi.'}
-                                            </p>
+                                            {/* Quota Highlights */}
+                                            <div className="p-4 rounded-xl bg-[#06080E] border border-white/[0.04] space-y-1">
+                                                <div className="text-xs text-gray-400">Tahsis Edilen Kota</div>
+                                                <div className="text-2xl font-black text-white font-mono flex items-baseline gap-1.5">
+                                                    <span>{plan.monthly_quota_gb.toLocaleString('tr-TR')}</span>
+                                                    <span className="text-xs font-semibold text-gray-400">GB {isExtra ? 'Tek Seferlik' : '/ Ay'}</span>
+                                                </div>
+                                            </div>
 
-                                            {/* Settings Preview */}
-                                            <div className="p-3.5 rounded-xl bg-[#07090E] border border-white/[0.06] space-y-2 text-xs">
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
-                                                    Mevcut Yapılandırma Bilgileri
+                                            {/* Pricing Matrix */}
+                                            <div className="space-y-1.5">
+                                                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Fiyatlandırma Döngüsü</div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                                                    <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.04] flex justify-between">
+                                                        <span className="text-gray-400">1 Ay:</span>
+                                                        <span className="text-white font-bold">₺{Number(plan.price_1m).toFixed(2)}</span>
+                                                    </div>
+                                                    {!isExtra && (
+                                                        <>
+                                                            <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.04] flex justify-between">
+                                                                <span className="text-gray-400">3 Ay:</span>
+                                                                <span className="text-white font-bold">₺{Number(plan.price_3m).toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.04] flex justify-between">
+                                                                <span className="text-gray-400">6 Ay:</span>
+                                                                <span className="text-white font-bold">₺{Number(plan.price_6m).toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.04] flex justify-between">
+                                                                <span className="text-gray-400">12 Ay:</span>
+                                                                <span className="text-white font-bold">₺{Number(plan.price_12m).toFixed(2)}</span>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Feature Badges */}
+                                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                                <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.06] text-[10px] text-gray-300 font-mono">
+                                                    {plan.max_parallel_downloads === 0 ? '⚡ Limitsiz İndirme' : `${plan.max_parallel_downloads} Eşzamanlı İndirme`}
                                                 </span>
-                                                {method.driver === 'bank' ? (
-                                                    <div className="space-y-1 font-mono text-[11px]">
-                                                        <div><span className="text-gray-500">Banka:</span> <span className="text-white">{settings.bank_name || '-'}</span></div>
-                                                        <div><span className="text-gray-500">Alıcı:</span> <span className="text-white">{settings.account_holder || '-'}</span></div>
-                                                        <div><span className="text-gray-500">IBAN:</span> <span className="text-emerald-400">{settings.iban || '-'}</span></div>
-                                                    </div>
+                                                <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.06] text-[10px] text-gray-300 font-mono">
+                                                    {plan.speed_limit_mbps ? `${plan.speed_limit_mbps} Mbps Limit` : '🚀 Limitsiz Hat'}
+                                                </span>
+                                                {plan.allow_vps_access ? (
+                                                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-semibold">
+                                                        ✓ VPS/Datacenter İzni
+                                                    </span>
                                                 ) : (
-                                                    <div className="space-y-1 font-mono text-[11px]">
-                                                        <div><span className="text-gray-500">Ağ:</span> <span className="text-white">{settings.network || '-'}</span></div>
-                                                        <div className="truncate"><span className="text-gray-500">Adres:</span> <span className="text-emerald-400">{settings.wallet_address || '-'}</span></div>
-                                                    </div>
+                                                    <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.06] text-[10px] text-gray-400">
+                                                        Yalnızca Ev/Mobil IP
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
 
-                                        <div className="pt-4 border-t border-white/[0.06] flex items-center justify-end">
-                                            <button
-                                                onClick={() => handleOpenEditMethod(method)}
-                                                className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-white text-xs font-semibold transition-all flex items-center gap-1.5"
-                                            >
-                                                <Edit3 className="w-3.5 h-3.5 text-[#00B074]" />
-                                                <span>Ayarları Düzenle</span>
-                                            </button>
+                                        {/* Footer Actions */}
+                                        <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between">
+                                            <span className="text-xs text-gray-400 font-mono">
+                                                <strong className="text-white">{plan.subscriptions_count || 0}</strong> aktif abone
+                                            </span>
+
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleClonePlan(plan)}
+                                                    className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white transition-colors"
+                                                    title="Paketi Klonla / Kopyala"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEditPlan(plan)}
+                                                    className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white transition-colors"
+                                                    title="Paketi Düzenle"
+                                                >
+                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDeletingPlan(plan);
+                                                        setTargetPlanForDelete('none');
+                                                    }}
+                                                    className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                                                    title="Paketi Sil"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -1158,753 +828,1332 @@ export default function PlansIndex({
                     </div>
                 )}
 
-                {/* SECTION 5: ÖDEME BİLDİRİMLERİ (ONAYLA / REDDET) */}
-                {activeSection === 'notifications' && (
-                    <div className="space-y-6">
-                        {/* Search & Filter Bar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0D111A] p-4 rounded-2xl border border-white/[0.08]">
-                            <div className="flex items-center gap-3">
-                                <select
-                                    value={notificationStatusFilter}
-                                    onChange={(e) => setNotificationStatusFilter(e.target.value)}
-                                    className="bg-[#07090E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00B074] transition-colors"
+                {/* ========================================================= */}
+                {/* SECTION 2: KULLANICI KOTALARI (USERS) */}
+                {/* ========================================================= */}
+                {currentSection === 'users' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                        
+                        {/* Search & Server-Side Filter Controls */}
+                        <div className="bg-[#0A0D15] border border-white/[0.08] rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-xl shadow-black/20">
+                            
+                            {/* Search bar */}
+                            <form onSubmit={handleUserSearchSubmit} className="relative flex-1 max-w-md">
+                                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                                <input
+                                    type="text"
+                                    placeholder="Kullanıcı adı veya e-posta ile ara..."
+                                    value={userSearchInput}
+                                    onChange={(e) => setUserSearchInput(e.target.value)}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl pl-10 pr-20 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none transition-colors"
+                                />
+                                <button
+                                    type="submit"
+                                    className="absolute right-2 top-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-xs font-semibold text-gray-300 hover:text-white transition-colors"
                                 >
-                                    <option value="pending">Bekleyen Ödeme Bildirimleri ({paymentNotifications.filter(n => n.status === 'pending').length})</option>
-                                    <option value="approved">Onaylanan Bildirimler ({paymentNotifications.filter(n => n.status === 'approved').length})</option>
-                                    <option value="rejected">Reddedilen Bildirimler ({paymentNotifications.filter(n => n.status === 'rejected').length})</option>
-                                    <option value="all">Tüm Bildirimler ({paymentNotifications.length})</option>
-                                </select>
-                            </div>
+                                    Ara
+                                </button>
+                            </form>
 
-                            <div className="text-xs text-gray-400 font-medium">
-                                Gösterilen: <strong className="text-white font-mono">{filteredNotifications.length}</strong> bildirim
+                            {/* Dropdown Filters */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <select
+                                    value={filters?.user_plan || 'all'}
+                                    onChange={(e) => handleUserFilterChange('user_plan', e.target.value)}
+                                    className="bg-[#06080E] border border-white/[0.08] text-xs text-gray-300 rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+                                >
+                                    <option value="all">Tüm Paketler</option>
+                                    <option value="active_sub">Aktif Aboneler</option>
+                                    <option value="no_sub">Aboneliği Olmayanlar</option>
+                                    <option value="perpetual">Süresiz Kotalar</option>
+                                    {plans.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <select
+                                    value={filters?.user_quota || 'all'}
+                                    onChange={(e) => handleUserFilterChange('user_quota', e.target.value)}
+                                    className="bg-[#06080E] border border-white/[0.08] text-xs text-gray-300 rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+                                >
+                                    <option value="all">Kota Doluluk: Tümü</option>
+                                    <option value="over_80">%80+ Dolu</option>
+                                    <option value="exhausted">Kotası Bitmiş (%100)</option>
+                                </select>
                             </div>
                         </div>
 
-                        {/* Notifications Table */}
-                        <div className="bg-[#0D111A] rounded-2xl border border-white/[0.08] overflow-hidden shadow-xl">
+                        {/* Users Table */}
+                        <div className="bg-[#0A0D15] border border-white/[0.08] rounded-2xl overflow-hidden shadow-xl shadow-black/20">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs">
-                                    <thead className="bg-[#0A0D14] text-gray-400 border-b border-white/[0.06] uppercase text-[10px] tracking-wider font-bold">
+                                    <thead className="text-[11px] uppercase tracking-wider text-gray-400 bg-white/[0.02] border-b border-white/[0.04]">
                                         <tr>
-                                            <th className="px-6 py-4">Ref Kodu / Tarih</th>
-                                            <th className="px-6 py-4">Kullanıcı</th>
-                                            <th className="px-6 py-4">Paket & Tutar</th>
-                                            <th className="px-6 py-4">Ödeme Yöntemi</th>
-                                            <th className="px-6 py-4">Gönderen / TxID</th>
-                                            <th className="px-6 py-4">Durum</th>
-                                            <th className="px-6 py-4 text-right">İşlemler</th>
+                                            <th className="px-6 py-3.5 font-semibold">Kullanıcı</th>
+                                            <th className="px-6 py-3.5 font-semibold">Aktif Paket & Ekstra</th>
+                                            <th className="px-6 py-3.5 font-semibold">Kota Kullanımı</th>
+                                            <th className="px-6 py-3.5 font-semibold">Hız Limiti</th>
+                                            <th className="px-6 py-3.5 font-semibold">Bitiş Tarihi</th>
+                                            <th className="px-6 py-3.5 font-semibold text-right">Yönetim</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/[0.04]">
-                                        {filteredNotifications.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                                                    Seçilen filtreye uygun ödeme bildirimi bulunamadı.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            filteredNotifications.map((item) => (
-                                                <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
-                                                    <td className="px-6 py-4 font-mono">
-                                                        <div className="font-bold text-white">{item.reference_code}</div>
-                                                        <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                            <Clock className="w-3 h-3" />
-                                                            <span>{item.created_at}</span>
+                                        {usersList.map((u) => {
+                                            const pct = u.quota_percentage || 0;
+                                            const progressColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-400';
+
+                                            return (
+                                                <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
+                                                    
+                                                    {/* User */}
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-xs flex items-center justify-center font-bold shrink-0">
+                                                                {u.name?.charAt(0).toUpperCase() || 'U'}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-bold text-white">{u.name}</div>
+                                                                <div className="text-[11px] text-gray-400 font-mono">{u.email}</div>
+                                                            </div>
                                                         </div>
                                                     </td>
 
+                                                    {/* Plan */}
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-white">{item.user_name}</div>
-                                                        <div className="text-[11px] text-gray-400">{item.user_email}</div>
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        {item.is_upgrade ? (
-                                                            <div>
-                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 inline-block mb-1">
-                                                                    Paket Yükseltme
-                                                                </span>
-                                                                <div className="font-bold text-white flex items-center gap-1.5 text-xs">
-                                                                    <span className="text-gray-400 line-through">{item.old_plan_name || 'Eski Paket'}</span>
-                                                                    <span>➔</span>
-                                                                    <span className="text-purple-300">{item.plan_name}</span>
-                                                                </div>
-                                                                <div className="text-emerald-400 font-mono font-bold text-xs mt-0.5">Fark: {item.formatted_amount}</div>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <div className="font-bold text-white">{item.plan_name} ({item.duration_months} Ay)</div>
-                                                                <div className="text-emerald-400 font-mono font-bold">{item.formatted_amount}</div>
-                                                            </>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        <span className="px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-gray-200 font-medium inline-flex items-center gap-1.5">
-                                                            {item.method_driver === 'bank' ? <Building2 className="w-3.5 h-3.5 text-[#00B074]" /> : <Coins className="w-3.5 h-3.5 text-amber-400" />}
-                                                            {item.method_name}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-6 py-4 max-w-xs">
-                                                        {item.sender_name && <div className="text-gray-200 font-semibold">{item.sender_name}</div>}
-                                                        {item.tx_hash && <div className="text-[10px] font-mono text-gray-400 truncate" title={item.tx_hash}>Tx: {item.tx_hash}</div>}
-                                                        {item.user_notes && <div className="text-[10px] text-gray-400 italic truncate" title={item.user_notes}>Not: {item.user_notes}</div>}
-                                                        {!item.sender_name && !item.tx_hash && !item.user_notes && <span className="text-gray-500">-</span>}
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                                            item.status === 'approved'
-                                                                ? 'bg-[#00B074]/15 border-[#00B074]/30 text-[#00B074]'
-                                                                : item.status === 'rejected'
-                                                                ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                                                                : 'bg-amber-500/15 border-amber-500/30 text-amber-400 animate-pulse'
-                                                        }`}>
-                                                            {item.status_label}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-6 py-4 text-right">
-                                                        {item.status === 'pending' ? (
-                                                            <div className="flex items-center justify-end gap-2">
-                                                                <button
-                                                                    onClick={() => handleApproveNotification(item)}
-                                                                    className="px-3 py-1.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold transition-all shadow-md shadow-[#00B074]/20 flex items-center gap-1"
-                                                                >
-                                                                    <Check className="w-3.5 h-3.5" />
-                                                                    <span>Onayla</span>
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleRejectNotification(item)}
-                                                                    className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold transition-colors flex items-center gap-1"
-                                                                >
-                                                                    <XCircle className="w-3.5 h-3.5" />
-                                                                    <span>Reddet</span>
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-[10px] text-gray-500 block">
-                                                                {item.processed_at}
+                                                        <div className="space-y-1">
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                u.has_active_sub 
+                                                                    ? u.is_perpetual 
+                                                                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
+                                                                        : 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
+                                                                    : 'bg-white/[0.04] text-gray-400'
+                                                            }`}>
+                                                                {u.is_perpetual && <Infinity className="w-3 h-3" />}
+                                                                <span>{u.plan_name}</span>
                                                             </span>
+
+                                                            {u.has_extras && (
+                                                                <div className="flex items-center gap-1 text-[10px] text-amber-400 font-mono">
+                                                                    <Sparkles className="w-3 h-3 shrink-0" />
+                                                                    <span>+{u.extra_quota_formatted} Ek Kota ({u.active_extras_count})</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Quota Progress */}
+                                                    <td className="px-6 py-4 min-w-[200px]">
+                                                        {u.has_any_package ? (
+                                                            <div className="space-y-1.5">
+                                                                <div className="flex justify-between text-[11px] font-mono">
+                                                                    <span className="text-gray-300 font-medium">{u.quota_used} / {u.quota_total}</span>
+                                                                    <span className="font-bold text-gray-200">%{pct}</span>
+                                                                </div>
+                                                                <div className="w-full h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
+                                                                    <div className={`h-full ${progressColor} rounded-full`} style={{ width: `${Math.min(100, pct)}%` }} />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-500 font-mono text-[11px]">- Paket Tanımsız -</span>
                                                         )}
                                                     </td>
+
+                                                    {/* Speed Limit */}
+                                                    <td className="px-6 py-4">
+                                                        {u.custom_speed_limit_mbps ? (
+                                                            <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">
+                                                                {u.custom_speed_limit_mbps} Mbps (Özel)
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-[11px] font-mono">Standart Hat</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Expiration */}
+                                                    <td className="px-6 py-4 font-mono text-[11px] text-gray-300">
+                                                        {u.expires_at || '-'}
+                                                    </td>
+
+                                                    {/* Operations */}
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            
+                                                            {/* Assign / Change Plan */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenAssignModal(u)}
+                                                                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold transition-all flex items-center gap-1"
+                                                                title="Kota / Paket Değiştir"
+                                                            >
+                                                                <Sliders className="w-3 h-3" />
+                                                                <span>Kota Ata</span>
+                                                            </button>
+
+                                                            {/* Direct Extra Quota */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setExtraQuotaModalUser(u);
+                                                                    setExtraQuotaForm({
+                                                                        quota_gb: 200,
+                                                                        days: 30,
+                                                                        name: `${u.name} Özel Ek Kota`,
+                                                                        notes: '',
+                                                                    });
+                                                                }}
+                                                                className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-amber-400 transition-colors"
+                                                                title="Anlık Ek Kota Tanımla (+GB)"
+                                                            >
+                                                                <Zap className="w-3.5 h-3.5" />
+                                                            </button>
+
+                                                            {/* Extend Duration */}
+                                                            {u.has_active_sub && !u.is_perpetual && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setExtendDurationUser(u);
+                                                                        setExtendDurationDays(30);
+                                                                    }}
+                                                                    className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-indigo-400 transition-colors"
+                                                                    title="Süre Uzat (+Gün)"
+                                                                >
+                                                                    <Clock className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+
+                                                            {/* Reset Usage */}
+                                                            {u.has_active_sub && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleResetUserUsage(u)}
+                                                                    className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white transition-colors"
+                                                                    title="Harcanan Kotayı Sıfırla"
+                                                                >
+                                                                    <RotateCcw className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+
+                                                            {/* Jellyfin Sync */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleSyncMediaAccount(u)}
+                                                                className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-sky-400 transition-colors"
+                                                                title="Jellyfin/Emby Hesabını Eşitle"
+                                                            >
+                                                                <Tv className="w-3.5 h-3.5" />
+                                                            </button>
+
+                                                            {/* Cancel / Remove Plan */}
+                                                            {u.has_any_package && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveUserPlan(u)}
+                                                                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                                                                    title="Paketi ve Kotaları Kaldır"
+                                                                >
+                                                                    <UserX className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+
+                                                        </div>
+                                                    </td>
+
                                                 </tr>
-                                            ))
+                                            );
+                                        })}
+
+                                        {usersList.length === 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                                                    Kriterlere uygun kullanıcı hesabı bulunamadı.
+                                                </td>
+                                            </tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pagination Controls */}
+                            {users?.last_page > 1 && (
+                                <div className="px-6 py-4 border-t border-white/[0.06]">
+                                    <Pagination
+                                        pagination={users}
+                                        onPageChange={(page) => {
+                                            router.get('/admin/plans', {
+                                                ...filters,
+                                                tab: 'users',
+                                                users_page: page,
+                                            }, {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            });
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </div>
+
                     </div>
                 )}
 
-                {/* MODAL 1: CREATE / EDIT PLAN */}
-                {isCreatePlanOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                        <div className="bg-[#0D111A] border border-white/10 rounded-3xl max-w-2xl w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-6">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                    <Package className="w-5 h-5 text-[#00B074]" />
-                                    <span>{editingPlan ? `'${editingPlan.name}' Paketini Düzenle` : 'Yeni Abonelik Paketi Oluştur'}</span>
-                                </h3>
+                {/* ========================================================= */}
+                {/* SECTION 3: ÖDEME BİLDİRİMLERİ (NOTIFICATIONS) */}
+                {/* ========================================================= */}
+                {currentSection === 'notifications' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                        
+                        {/* Status Filters */}
+                        <div className="flex items-center justify-between gap-4 flex-wrap bg-[#0A0D15] border border-white/[0.08] rounded-2xl p-4 shadow-xl shadow-black/20">
+                            <div className="flex items-center gap-1 bg-[#06080E] p-1 rounded-xl border border-white/[0.08] text-xs">
                                 <button
-                                    onClick={() => setIsCreatePlanOpen(false)}
-                                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10"
+                                    onClick={() => handleNotifFilterChange('all')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        (filters?.notif_status || 'all') === 'all'
+                                            ? 'bg-[#00B074] text-white shadow-sm'
+                                            : 'text-gray-400 hover:text-white'
+                                    }`}
                                 >
-                                    <X className="w-5 h-5" />
+                                    Tümü
+                                </button>
+                                <button
+                                    onClick={() => handleNotifFilterChange('pending')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                                        filters?.notif_status === 'pending'
+                                            ? 'bg-amber-500 text-black font-black shadow-sm'
+                                            : 'text-amber-400 hover:text-amber-300'
+                                    }`}
+                                >
+                                    <span>Bekleyenler</span>
+                                    {(stats?.pendingNotificationsCount ?? 0) > 0 && (
+                                        <span className="px-1.5 py-0.2 rounded-full bg-black/20 text-[10px] font-mono">
+                                            {stats.pendingNotificationsCount}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => handleNotifFilterChange('approved')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        filters?.notif_status === 'approved'
+                                            ? 'bg-[#00B074] text-white shadow-sm'
+                                            : 'text-emerald-400 hover:text-white'
+                                    }`}
+                                >
+                                    Onaylananlar
+                                </button>
+                                <button
+                                    onClick={() => handleNotifFilterChange('rejected')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        filters?.notif_status === 'rejected'
+                                            ? 'bg-rose-500 text-white shadow-sm'
+                                            : 'text-rose-400 hover:text-white'
+                                    }`}
+                                >
+                                    Reddedilenler
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSavePlan} className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Paket Türü *</label>
-                                        <select
-                                            value={planForm.type || 'individual'}
-                                            onChange={(e) => {
-                                                const t = e.target.value;
-                                                let updates = { type: t };
-                                                if (t === 'business') {
-                                                    updates.allow_vps_access = true;
-                                                    updates.max_parallel_downloads = 0;
-                                                } else if (t === 'extra') {
-                                                    updates.allowed_durations = [1];
-                                                }
-                                                setPlanForm({ ...planForm, ...updates });
-                                            }}
-                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white font-bold focus:outline-none focus:border-[#00B074]"
-                                        >
-                                            <option value="individual">Bireysel Paket (Standart)</option>
-                                            <option value="business">Business Paket (VPS IP + Sınırsız İndirme)</option>
-                                            <option value="extra">Ek Kota Paketi (30 Gün Geçerli)</option>
-                                        </select>
-                                    </div>
+                            {/* Search */}
+                            <div className="relative flex-1 max-w-sm">
+                                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                                <input
+                                    type="text"
+                                    placeholder="Referans kodu, isim veya dekont no..."
+                                    value={notifSearchInput}
+                                    onChange={(e) => setNotifSearchInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            router.get('/admin/plans', {
+                                                ...filters,
+                                                tab: 'notifications',
+                                                notif_search: notifSearchInput,
+                                                notifs_page: 1,
+                                            }, { preserveState: true, preserveScroll: true });
+                                        }
+                                    }}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Paket Adı *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            placeholder="Örn: VIP Paket, Business Pro"
-                                            value={planForm.name}
-                                            onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
-                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                        />
-                                    </div>
+                        {/* Notifications Table */}
+                        <div className="bg-[#0A0D15] border border-white/[0.08] rounded-2xl overflow-hidden shadow-xl shadow-black/20">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-[11px] uppercase tracking-wider text-gray-400 bg-white/[0.02] border-b border-white/[0.04]">
+                                        <tr>
+                                            <th className="px-6 py-3.5 font-semibold">Ref & Tarih</th>
+                                            <th className="px-6 py-3.5 font-semibold">Kullanıcı</th>
+                                            <th className="px-6 py-3.5 font-semibold">Paket & Yükseltme</th>
+                                            <th className="px-6 py-3.5 font-semibold">Ödeme & Tutar</th>
+                                            <th className="px-6 py-3.5 font-semibold">Gönderen / Dekont No</th>
+                                            <th className="px-6 py-3.5 font-semibold">Durum</th>
+                                            <th className="px-6 py-3.5 font-semibold text-right">İşlem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.04]">
+                                        {notifsList.map((pn) => (
+                                            <tr key={pn.id} className="hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-mono font-bold text-white text-[11px]">{pn.reference_code}</div>
+                                                    <div className="text-[10px] text-gray-500 font-mono mt-0.5">{pn.created_at}</div>
+                                                </td>
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Slug (Benzersiz Kod)</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Örn: vip, business-pro (Boşsa otomatik)"
-                                            value={planForm.slug}
-                                            onChange={(e) => setPlanForm({ ...planForm, slug: e.target.value })}
-                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                        />
-                                    </div>
-                                </div>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-white">{pn.user_name}</div>
+                                                    <div className="text-[11px] text-gray-400 font-mono">{pn.user_email}</div>
+                                                </td>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Açıklama</label>
-                                    <textarea
-                                        rows="2"
-                                        placeholder="Paket avantajları, içerik hakları..."
-                                        value={planForm.description}
-                                        onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
-                                        className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
+                                                <td className="px-6 py-4">
+                                                    <div className="font-semibold text-white">{pn.plan_name}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono">
+                                                        {pn.duration_months} Ay {pn.is_upgrade && <span className="text-amber-400 font-bold">(Yükseltme)</span>}
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-6 py-4">
+                                                    <div className="font-black text-emerald-400 font-mono text-sm">{pn.formatted_amount}</div>
+                                                    <div className="text-[10px] text-gray-400">{pn.method_name}</div>
+                                                </td>
+
+                                                <td className="px-6 py-4">
+                                                    <div className="text-gray-200 font-medium">{pn.sender_name || '-'}</div>
+                                                    {pn.tx_hash && (
+                                                        <div className="text-[10px] text-gray-500 font-mono truncate max-w-[150px]" title={pn.tx_hash}>
+                                                            {pn.tx_hash}
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                                        pn.status === 'pending'
+                                                            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse'
+                                                            : pn.status === 'approved'
+                                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                                            : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                                                    }`}>
+                                                        {pn.status_label}
+                                                    </span>
+                                                </td>
+
+                                                <td className="px-6 py-4 text-right">
+                                                    {pn.status === 'pending' ? (
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleApproveNotification(pn)}
+                                                                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1"
+                                                            >
+                                                                <Check className="w-3.5 h-3.5" />
+                                                                <span>Onayla</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRejectNotification(pn)}
+                                                                className="px-3 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-xs transition-all"
+                                                            >
+                                                                <span>Reddet</span>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[11px] text-gray-500 font-mono">
+                                                            {pn.processed_at}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+
+                                        {notifsList.length === 0 && (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                                                    Bildirim kaydı bulunamadı.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {paymentNotifications?.last_page > 1 && (
+                                <div className="px-6 py-4 border-t border-white/[0.06]">
+                                    <Pagination
+                                        pagination={paymentNotifications}
+                                        onPageChange={(page) => {
+                                            router.get('/admin/plans', {
+                                                ...filters,
+                                                tab: 'notifications',
+                                                notifs_page: page,
+                                            }, { preserveState: true, preserveScroll: true });
+                                        }}
                                     />
                                 </div>
+                            )}
+                        </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-[#07090E] border border-white/[0.06]">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-emerald-400 mb-1">Aylık İndirme Kotası (GB) *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="1"
-                                            max="100000"
-                                            placeholder="Örn: 500"
-                                            value={planForm.monthly_quota_gb}
-                                            onChange={(e) => setPlanForm({ ...planForm, monthly_quota_gb: parseInt(e.target.value) || '' })}
-                                            className="w-full px-3.5 py-2.5 bg-[#0A0D14] border border-emerald-500/40 rounded-xl text-sm font-bold text-emerald-400 focus:outline-none focus:border-[#00B074]"
-                                        />
+                    </div>
+                )}
+
+                {/* ========================================================= */}
+                {/* SECTION 4: ÖDEME YÖNTEMLERİ (METHODS) */}
+                {/* ========================================================= */}
+                {currentSection === 'methods' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {paymentMethods.map((method) => (
+                                <div
+                                    key={method.id}
+                                    className={`bg-[#0A0D15] border rounded-2xl p-6 transition-all relative flex flex-col justify-between shadow-xl shadow-black/20 ${
+                                        method.is_active ? 'border-white/[0.08] hover:border-[#00B074]/50' : 'border-white/[0.04] opacity-60'
+                                    }`}
+                                >
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-emerald-400 font-mono font-bold">
+                                                    <Coins className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-white text-base">{method.name}</h3>
+                                                    <span className="text-[10px] text-gray-500 font-mono">Driver: {method.driver}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Toggle Switch */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleTogglePaymentMethod(method)}
+                                                className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${
+                                                    method.is_active ? 'bg-emerald-500' : 'bg-white/[0.12]'
+                                                }`}
+                                                title={method.is_active ? 'Aktif (Tıklayarak Kapat)' : 'Pasif (Tıklayarak Aç)'}
+                                            >
+                                                <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                                    method.is_active ? 'translate-x-5' : 'translate-x-0'
+                                                }`} />
+                                            </button>
+                                        </div>
+
+                                        <p className="text-xs text-gray-400 leading-relaxed">
+                                            {method.description || 'Ödeme yöntemi açıklaması bulunmuyor.'}
+                                        </p>
+
+                                        {method.instructions && (
+                                            <div className="p-3 rounded-xl bg-[#06080E] border border-white/[0.04] text-[11px] text-gray-300 font-mono whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
+                                                {method.instructions}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Eşzamanlı İndirme Limiti</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="1"
-                                            max="20"
-                                            value={planForm.max_parallel_downloads}
-                                            onChange={(e) => setPlanForm({ ...planForm, max_parallel_downloads: parseInt(e.target.value) || 4 })}
-                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                        />
-                                    </div>
+                                    <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between">
+                                        <span className={`text-[11px] font-bold ${method.is_active ? 'text-emerald-400' : 'text-gray-500'}`}>
+                                            ● {method.is_active ? 'Aktif (Kullanımda)' : 'Pasif'}
+                                        </span>
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-300 mb-1">Hız Limiti (Mbps)</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            placeholder="Sınırsız (Boş)"
-                                            value={planForm.speed_limit_mbps}
-                                            onChange={(e) => setPlanForm({ ...planForm, speed_limit_mbps: e.target.value === '' ? '' : parseInt(e.target.value) || '' })}
-                                            className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Pricing Inputs */}
-                                <div className="space-y-2">
-                                    <label className="block text-xs font-semibold text-gray-300">Süreye Göre Fiyatlandırma (₺)</label>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div>
-                                            <span className="block text-[10px] text-gray-400 mb-1">1 Ay Fiyatı</span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                required
-                                                value={planForm.price_1m}
-                                                onChange={(e) => setPlanForm({ ...planForm, price_1m: parseFloat(e.target.value) || 0 })}
-                                                className="w-full px-3 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <span className="block text-[10px] text-gray-400 mb-1">3 Ay Fiyatı</span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                required
-                                                value={planForm.price_3m}
-                                                onChange={(e) => setPlanForm({ ...planForm, price_3m: parseFloat(e.target.value) || 0 })}
-                                                className="w-full px-3 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <span className="block text-[10px] text-gray-400 mb-1">6 Ay Fiyatı</span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                required
-                                                value={planForm.price_6m}
-                                                onChange={(e) => setPlanForm({ ...planForm, price_6m: parseFloat(e.target.value) || 0 })}
-                                                className="w-full px-3 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <span className="block text-[10px] text-gray-400 mb-1">12 Ay Fiyatı</span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                required
-                                                value={planForm.price_12m}
-                                                onChange={(e) => setPlanForm({ ...planForm, price_12m: parseFloat(e.target.value) || 0 })}
-                                                className="w-full px-3 py-2 bg-[#07090E] border border-white/[0.08] rounded-xl text-xs text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Allowed Durations Toggle */}
-                                <div className="space-y-2 pt-2 border-t border-white/[0.06]">
-                                    <label className="block text-xs font-semibold text-gray-300">
-                                        Geçerli Abonelik Döngüleri (Satın Alınabilir Süreler) *
-                                    </label>
-                                    <p className="text-[11px] text-gray-400">
-                                        Bu paket için aktif edilecek döngüleri seçin. Örneğin sadece 6 ay ve 1 yıla özel paket oluşturmak için 1 ve 3 ayı kapatabilirsiniz.
-                                    </p>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-                                        {[
-                                            { months: 1, label: '1 Aylık' },
-                                            { months: 3, label: '3 Aylık' },
-                                            { months: 6, label: '6 Aylık' },
-                                            { months: 12, label: '12 Aylık' },
-                                        ].map((opt) => {
-                                            const isAllowed = (planForm.allowed_durations || [1, 3, 6, 12]).includes(opt.months);
-                                            return (
-                                                <button
-                                                    key={opt.months}
-                                                    type="button"
-                                                    onClick={() => toggleAllowedDuration(opt.months)}
-                                                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                                                        isAllowed
-                                                            ? 'bg-[#00B074]/15 border-[#00B074] text-white shadow-sm'
-                                                            : 'bg-[#07090E] border-white/[0.08] text-gray-500 hover:text-gray-300'
-                                                    }`}
-                                                >
-                                                    <span>{opt.label}</span>
-                                                    {isAllowed ? (
-                                                        <Check className="w-4 h-4 text-[#00B074]" />
-                                                    ) : (
-                                                        <XCircle className="w-4 h-4 text-gray-600" />
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* VPS / Sunucu IP İzni Toggle */}
-                                <div className="space-y-2 pt-2 border-t border-white/[0.06]">
-                                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#07090E] border border-white/[0.08]">
-                                        <div>
-                                            <label className="text-xs font-bold text-white block">
-                                                VPS / Sunucu IP İndirme İzni
-                                            </label>
-                                            <p className="text-[11px] text-gray-400 mt-0.5">
-                                                Açık olursa kullanıcılar VPS, Veri Merkezi veya Sunucu IP'lerinden indirme yapabilir. Kapalı olursa sadece ev/mobil IP'lerden indirme yapabilirler.
-                                            </p>
-                                        </div>
                                         <button
                                             type="button"
-                                            onClick={() => setPlanForm({ ...planForm, allow_vps_access: !planForm.allow_vps_access })}
-                                            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                                                planForm.allow_vps_access
-                                                    ? 'bg-[#00B074]/20 border border-[#00B074]/40 text-[#00B074]'
-                                                    : 'bg-gray-800 border border-gray-700 text-gray-400'
-                                            }`}
+                                            onClick={() => handleOpenEditMethod(method)}
+                                            className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-xs font-semibold text-white transition-colors flex items-center gap-1.5"
                                         >
-                                            {planForm.allow_vps_access ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                                            <span>{planForm.allow_vps_access ? 'İZİN VERİLDİ' : 'ENGELLE (KAPALI)'}</span>
+                                            <Edit3 className="w-3 h-3" />
+                                            <span>Düzenle</span>
                                         </button>
                                     </div>
                                 </div>
-
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/[0.08]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCreatePlanOpen(false)}
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] text-gray-300 text-xs font-semibold hover:bg-white/[0.08]"
-                                    >
-                                        İptal
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmittingPlan}
-                                        className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-md shadow-[#00B074]/20"
-                                    >
-                                        {isSubmittingPlan ? 'Kaydediliyor...' : editingPlan ? 'Güncelle' : 'Paketi Oluştur'}
-                                    </button>
-                                </div>
-                            </form>
+                            ))}
                         </div>
                     </div>
                 )}
 
-                {/* MODAL 2: ASSIGN QUOTA / PLAN TO USER */}
-                {isAssignModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                        <div className="bg-[#0D111A] border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl">
-                            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-4">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                    <UserCheck className="w-5 h-5 text-[#00B074]" />
-                                    <span>Kullanıcıya Paket & Kota Tanımla</span>
-                                </h3>
+                {/* ========================================================= */}
+                {/* SECTION 5: İŞLEM GEÇMİŞİ (HISTORY) */}
+                {/* ========================================================= */}
+                {currentSection === 'history' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                        
+                        {/* Filters */}
+                        <div className="flex items-center justify-between gap-4 flex-wrap bg-[#0A0D15] border border-white/[0.08] rounded-2xl p-4 shadow-xl shadow-black/20">
+                            <div className="flex items-center gap-1 bg-[#06080E] p-1 rounded-xl border border-white/[0.08] text-xs">
                                 <button
-                                    onClick={() => setIsAssignModalOpen(false)}
-                                    className="p-1.5 rounded-lg text-gray-400 hover:text-white"
+                                    onClick={() => handleHistoryFilterChange('all')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        (filters?.history_status || 'all') === 'all'
+                                            ? 'bg-[#00B074] text-white shadow-sm'
+                                            : 'text-gray-400 hover:text-white'
+                                    }`}
                                 >
-                                    <X className="w-5 h-5" />
+                                    Tümü
+                                </button>
+                                <button
+                                    onClick={() => handleHistoryFilterChange('active')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        filters?.history_status === 'active'
+                                            ? 'bg-[#00B074] text-white shadow-sm'
+                                            : 'text-emerald-400 hover:text-white'
+                                    }`}
+                                >
+                                    Aktif
+                                </button>
+                                <button
+                                    onClick={() => handleHistoryFilterChange('cancelled')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        filters?.history_status === 'cancelled'
+                                            ? 'bg-[#00B074] text-white shadow-sm'
+                                            : 'text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                    İptal Edilenler
+                                </button>
+                                <button
+                                    onClick={() => handleHistoryFilterChange('expired')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                                        filters?.history_status === 'expired'
+                                            ? 'bg-[#00B074] text-white shadow-sm'
+                                            : 'text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                    Süresi Dolanlar
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSaveAssignment} className="space-y-4 text-xs">
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Hedef Kullanıcı *</label>
-                                    {assignModalUser ? (
-                                        <div className="space-y-2">
-                                            <div className="p-3 bg-[#07090E] border border-white/[0.08] rounded-xl font-bold text-white flex items-center justify-between">
-                                                <span>{assignModalUser.name} ({assignModalUser.email})</span>
-                                            </div>
-                                            {assignModalUser.has_extras && (
-                                                <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1">
-                                                    <span className="text-[10px] uppercase font-bold text-purple-300 block">Mevcut Aktif Ek Paketleri:</span>
-                                                    {assignModalUser.extras.map((ex) => (
-                                                        <div key={ex.id} className="text-[11px] text-purple-200 flex justify-between font-mono">
-                                                            <span>• {ex.name} ({ex.allocated_formatted})</span>
-                                                            <span className="text-purple-400">Bitiş: {ex.expires_at}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <select
-                                            value={assignForm.user_id}
-                                            onChange={(e) => setAssignForm({ ...assignForm, user_id: e.target.value })}
-                                            className="w-full p-3 bg-[#07090E] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                            required
-                                        >
-                                            <option value="">Kullanıcı Seçiniz...</option>
-                                            {users.map(u => (
-                                                <option key={u.id} value={u.id}>{u.name} - ({u.email})</option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
+                            <div className="relative flex-1 max-w-sm">
+                                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                                <input
+                                    type="text"
+                                    placeholder="Kullanıcı, paket veya not ara..."
+                                    value={historySearchInput}
+                                    onChange={(e) => setHistorySearchInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            router.get('/admin/plans', {
+                                                ...filters,
+                                                tab: 'history',
+                                                history_search: historySearchInput,
+                                                history_page: 1,
+                                            }, { preserveState: true, preserveScroll: true });
+                                        }
+                                    }}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none"
+                                />
+                            </div>
+                        </div>
 
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Paket Şablonu veya Özel Kota</label>
-                                    <select
-                                        value={assignForm.plan_id}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val !== 'custom' && val !== 'none') {
-                                                const selPlan = plans.find(p => String(p.id) === String(val));
-                                                setAssignForm({
-                                                    ...assignForm,
-                                                    plan_id: val,
-                                                    custom_quota_gb: selPlan ? selPlan.monthly_quota_gb : 500,
-                                                });
-                                            } else {
-                                                setAssignForm({ ...assignForm, plan_id: val });
-                                            }
-                                        }}
-                                        className="w-full p-3 bg-[#07090E] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                    >
-                                        <option value="custom">Özel Tanımlı İndirme Kotası (Manuel GB)</option>
-                                        {plans.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name} Şablonu ({p.monthly_quota_gb} GB/Ay)</option>
+                        {/* History Table */}
+                        <div className="bg-[#0A0D15] border border-white/[0.08] rounded-2xl overflow-hidden shadow-xl shadow-black/20">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-[11px] uppercase tracking-wider text-gray-400 bg-white/[0.02] border-b border-white/[0.04]">
+                                        <tr>
+                                            <th className="px-6 py-3.5 font-semibold">ID</th>
+                                            <th className="px-6 py-3.5 font-semibold">Kullanıcı</th>
+                                            <th className="px-6 py-3.5 font-semibold">Paket</th>
+                                            <th className="px-6 py-3.5 font-semibold">Döngü & Tutar</th>
+                                            <th className="px-6 py-3.5 font-semibold">Başlangıç - Bitiş</th>
+                                            <th className="px-6 py-3.5 font-semibold">Durum</th>
+                                            <th className="px-6 py-3.5 font-semibold">Notlar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.04]">
+                                        {historyList.map((sub) => (
+                                            <tr key={sub.id} className="hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-4 font-mono text-gray-500 text-[11px]">#{sub.id}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-white">{sub.user_name}</div>
+                                                    <div className="text-[11px] text-gray-400 font-mono">{sub.user_email}</div>
+                                                </td>
+                                                <td className="px-6 py-4 font-semibold text-white">
+                                                    {sub.plan_name}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-emerald-400 font-mono">{sub.formatted_price}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono">
+                                                        {sub.is_perpetual ? 'Süresiz' : `${sub.duration_months} Ay`}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 font-mono text-[11px] text-gray-300">
+                                                    <div>{sub.starts_at}</div>
+                                                    <div className="text-gray-500">Bitiş: {sub.expires_at}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                                        sub.status === 'active'
+                                                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                                            : sub.status === 'cancelled'
+                                                            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                                            : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                                                    }`}>
+                                                        {sub.status_label}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-400 text-[11px] max-w-xs truncate" title={sub.notes}>
+                                                    {sub.notes || '-'}
+                                                </td>
+                                            </tr>
                                         ))}
-                                    </select>
-                                </div>
 
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Verilecek İndirme Kotası (GB)</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={assignForm.custom_quota_gb}
-                                        onChange={(e) => setAssignForm({ ...assignForm, custom_quota_gb: parseInt(e.target.value) || 0 })}
-                                        className="w-full p-3 bg-[#07090E] border border-emerald-500/30 rounded-xl text-emerald-400 font-bold font-mono focus:outline-none"
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1 text-xs">
-                                        Kullanıcıya Özel Hız Limiti (Mbps)
-                                        <span className="text-[10px] text-gray-400 font-normal ml-2 block sm:inline">(Boş = Paket Varsayılanını Kullan, 0 = Sınırsız / Tam Hız)</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="10000"
-                                        placeholder="Paket Varsayılanı (Boş)"
-                                        value={assignForm.custom_speed_limit_mbps}
-                                        onChange={(e) => setAssignForm({ ...assignForm, custom_speed_limit_mbps: e.target.value === '' ? '' : parseInt(e.target.value) })}
-                                        className="w-full p-3 bg-[#07090E] border border-white/[0.08] rounded-xl text-white font-mono focus:outline-none focus:border-[#00B074] text-xs"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Süre Türü</label>
-                                    <select
-                                        value={assignForm.duration_type}
-                                        onChange={(e) => setAssignForm({ ...assignForm, duration_type: e.target.value })}
-                                        className="w-full p-3 bg-[#07090E] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                    >
-                                        <option value="1">1 Ay (30 Gün)</option>
-                                        <option value="3">3 Ay (90 Gün)</option>
-                                        <option value="6">6 Ay (180 Gün)</option>
-                                        <option value="12">1 Yıl (365 Gün)</option>
-                                        <option value="perpetual">♾️ SÜRESİZ KOTA (Süre Sınırı Yok)</option>
-                                    </select>
-                                </div>
-
-                                <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/[0.08]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsAssignModalOpen(false)}
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] text-gray-300 text-xs font-semibold hover:bg-white/[0.08]"
-                                    >
-                                        İptal
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmittingAssign}
-                                        className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-md shadow-[#00B074]/20"
-                                    >
-                                        {isSubmittingAssign ? 'Kaydediliyor...' : 'Kotayı Tanımla'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* MODAL 3: DELETE PLAN CONFIRMATION */}
-                {deletingPlan && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                        <div className="bg-[#0D111A] border border-white/10 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
-                                    <AlertTriangle className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-white">Paketi Sil</h3>
-                                    <p className="text-xs text-gray-400 mt-0.5">{deletingPlan.name} silinecektir.</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-gray-300 leading-relaxed">
-                                Bu paketi silmek istediğinizden emin misiniz? Bu pakete bağlı olan kullanıcıların kotası etkilenmeyecektir.
-                            </p>
-
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <button
-                                    onClick={() => setDeletingPlan(null)}
-                                    className="px-4 py-2 rounded-xl bg-white/[0.04] text-gray-300 text-xs font-semibold hover:bg-white/[0.08]"
-                                >
-                                    İptal
-                                </button>
-                                <button
-                                    onClick={handleConfirmDeletePlan}
-                                    disabled={isSubmittingPlan}
-                                    className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold disabled:opacity-50"
-                                >
-                                    {isSubmittingPlan ? 'Siliniyor...' : 'Evet, Paketi Sil'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* MODAL 4: EDIT PAYMENT METHOD SETTINGS */}
-                {editingMethod && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                        <div className="bg-[#0D111A] border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]">
-                            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                    <Building2 className="w-5 h-5 text-[#00B074]" />
-                                    <span>'{editingMethod.name}' Ayarlarını Düzenle</span>
-                                </h3>
-                                <button
-                                    onClick={() => setEditingMethod(null)}
-                                    className="p-1.5 rounded-lg text-gray-400 hover:text-white"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                                        {historyList.length === 0 && (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                                                    Abonelik geçmişi kaydı bulunamadı.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <form onSubmit={handleSaveMethod} className="space-y-4 text-xs">
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Yöntem Adı *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={methodForm.name}
-                                        onChange={(e) => setMethodForm({ ...methodForm, name: e.target.value })}
-                                        className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
+                            {subscriptionsHistory?.last_page > 1 && (
+                                <div className="px-6 py-4 border-t border-white/[0.06]">
+                                    <Pagination
+                                        pagination={subscriptionsHistory}
+                                        onPageChange={(page) => {
+                                            router.get('/admin/plans', {
+                                                ...filters,
+                                                tab: 'history',
+                                                history_page: page,
+                                            }, { preserveState: true, preserveScroll: true });
+                                        }}
                                     />
                                 </div>
-
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Kısa Açıklama</label>
-                                    <input
-                                        type="text"
-                                        value={methodForm.description}
-                                        onChange={(e) => setMethodForm({ ...methodForm, description: e.target.value })}
-                                        className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                    />
-                                </div>
-
-                                {/* Driver Specific Settings */}
-                                {editingMethod.driver === 'bank' && (
-                                    <div className="p-4 rounded-2xl bg-[#07090E] border border-white/[0.06] space-y-3">
-                                        <span className="text-xs font-bold text-[#00B074] block">Banka Hesabı Bilgileri</span>
-                                        
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">Banka Adı</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Örn: Ziraat Bankası, Garanti BBVA"
-                                                value={methodForm.settings?.bank_name || ''}
-                                                onChange={(e) => setMethodForm({
-                                                    ...methodForm,
-                                                    settings: { ...methodForm.settings, bank_name: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 bg-[#0A0D14] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">Alıcı Adı (Hesap Sahibi)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Örn: Fatih Ateş"
-                                                value={methodForm.settings?.account_holder || ''}
-                                                onChange={(e) => setMethodForm({
-                                                    ...methodForm,
-                                                    settings: { ...methodForm.settings, account_holder: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 bg-[#0A0D14] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">IBAN Numarası</label>
-                                            <input
-                                                type="text"
-                                                placeholder="TR00 0000 0000 0000 0000 0000 00"
-                                                value={methodForm.settings?.iban || ''}
-                                                onChange={(e) => setMethodForm({
-                                                    ...methodForm,
-                                                    settings: { ...methodForm.settings, iban: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 bg-[#0A0D14] border border-emerald-500/30 font-mono text-emerald-400 font-bold rounded-xl focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {editingMethod.driver === 'crypto' && (
-                                    <div className="p-4 rounded-2xl bg-[#07090E] border border-white/[0.06] space-y-3">
-                                        <span className="text-xs font-bold text-amber-400 block">Kripto Cüzdan Bilgileri</span>
-                                        
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">Ağ (Network)</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Örn: TRC-20 (Tron Network)"
-                                                value={methodForm.settings?.network || ''}
-                                                onChange={(e) => setMethodForm({
-                                                    ...methodForm,
-                                                    settings: { ...methodForm.settings, network: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 bg-[#0A0D14] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">USDT Cüzdan Adresi</label>
-                                            <input
-                                                type="text"
-                                                placeholder="TRC-20 Cüzdan adresi..."
-                                                value={methodForm.settings?.wallet_address || ''}
-                                                onChange={(e) => setMethodForm({
-                                                    ...methodForm,
-                                                    settings: { ...methodForm.settings, wallet_address: e.target.value }
-                                                })}
-                                                className="w-full px-3 py-2 bg-[#0A0D14] border border-amber-500/30 font-mono text-amber-400 font-bold rounded-xl focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-gray-300 font-semibold mb-1">Ödeme Talimatları & Kullanıcı Notu</label>
-                                    <textarea
-                                        rows="3"
-                                        placeholder="Kullanıcıya gösterilecek özel talimatlar..."
-                                        value={methodForm.instructions}
-                                        onChange={(e) => setMethodForm({ ...methodForm, instructions: e.target.value })}
-                                        className="w-full px-3.5 py-2.5 bg-[#07090E] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:border-[#00B074]"
-                                    />
-                                </div>
-
-                                <div className="flex items-center justify-between p-3 rounded-xl bg-[#07090E] border border-white/[0.06]">
-                                    <span className="text-gray-300 font-semibold">Aktiflik Durumu</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setMethodForm({ ...methodForm, is_active: !methodForm.is_active })}
-                                        className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                                            methodForm.is_active
-                                                ? 'bg-[#00B074]/20 border border-[#00B074]/40 text-[#00B074]'
-                                                : 'bg-gray-800 border border-gray-700 text-gray-400'
-                                        }`}
-                                    >
-                                        {methodForm.is_active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                                        <span>{methodForm.is_active ? 'AKTİF' : 'PASİF'}</span>
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.08]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingMethod(null)}
-                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] text-gray-300 text-xs font-semibold hover:bg-white/[0.08]"
-                                    >
-                                        İptal
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmittingMethod}
-                                        className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-md shadow-[#00B074]/20"
-                                    >
-                                        {isSubmittingMethod ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
-                                    </button>
-                                </div>
-                            </form>
+                            )}
                         </div>
+
                     </div>
                 )}
 
             </div>
+
+            {/* ========================================================= */}
+            {/* MODAL 1: CREATE / EDIT PLAN MODAL */}
+            {/* ========================================================= */}
+            {isCreatePlanOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#0A0D15] border border-white/[0.1] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl shadow-black/80 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Package className="w-5 h-5 text-emerald-400" />
+                                <span>{editingPlan ? `Paketi Düzenle: ${editingPlan.name}` : 'Yeni İndirme Paketi Oluştur'}</span>
+                            </h2>
+                            <button onClick={() => setIsCreatePlanOpen(false)} className="text-gray-400 hover:text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSavePlan} className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Paket Adı</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={planForm.name}
+                                        onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                                        placeholder="Örn: Pro VIP 1 TB"
+                                        className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Paket Tipi</label>
+                                    <select
+                                        value={planForm.type}
+                                        onChange={(e) => setPlanForm({ ...planForm, type: e.target.value })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="individual">Bireysel Paket (Aylık Yenilenen)</option>
+                                        <option value="business">Business / VIP Paket (Limitsiz İndirme & VPS İzni)</option>
+                                        <option value="extra">Ek Kota Paketi (30 Gün Geçerli Tek Seferlik)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Kota Miktarı (GB)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        value={planForm.monthly_quota_gb}
+                                        onChange={(e) => setPlanForm({ ...planForm, monthly_quota_gb: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-mono"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Sıralama Önceliği</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={planForm.sort_order}
+                                        onChange={(e) => setPlanForm({ ...planForm, sort_order: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Pricing Grid */}
+                            <div className="p-4 rounded-xl bg-[#06080E] border border-white/[0.06] space-y-3">
+                                <label className="block text-xs font-bold text-emerald-400">Abonelik Döngüsü Fiyatlandırması (₺)</label>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    <div>
+                                        <span className="text-[10px] text-gray-400">1 Ay Fiyatı</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={planForm.price_1m}
+                                            onChange={(e) => setPlanForm({ ...planForm, price_1m: e.target.value })}
+                                            className="w-full bg-[#0A0D15] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white font-mono mt-1"
+                                        />
+                                    </div>
+                                    {planForm.type !== 'extra' && (
+                                        <>
+                                            <div>
+                                                <span className="text-[10px] text-gray-400">3 Ay Fiyatı</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    required
+                                                    value={planForm.price_3m}
+                                                    onChange={(e) => setPlanForm({ ...planForm, price_3m: e.target.value })}
+                                                    className="w-full bg-[#0A0D15] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white font-mono mt-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-gray-400">6 Ay Fiyatı</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    required
+                                                    value={planForm.price_6m}
+                                                    onChange={(e) => setPlanForm({ ...planForm, price_6m: e.target.value })}
+                                                    className="w-full bg-[#0A0D15] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white font-mono mt-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-gray-400">12 Ay Fiyatı</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    required
+                                                    value={planForm.price_12m}
+                                                    onChange={(e) => setPlanForm({ ...planForm, price_12m: e.target.value })}
+                                                    className="w-full bg-[#0A0D15] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white font-mono mt-1"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Speed & Concurrency & VPS */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                        Eşzamanlı İndirme Sınırı (0 = Limitsiz)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={planForm.max_parallel_downloads}
+                                        onChange={(e) => setPlanForm({ ...planForm, max_parallel_downloads: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-mono"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                        Hız Limiti Mbps (Boş = Limitsiz Hat)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        placeholder="Limitsiz için boş bırakın"
+                                        value={planForm.speed_limit_mbps}
+                                        onChange={(e) => setPlanForm({ ...planForm, speed_limit_mbps: e.target.value })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-6 pt-2">
+                                <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={planForm.allow_vps_access}
+                                        onChange={(e) => setPlanForm({ ...planForm, allow_vps_access: e.target.checked })}
+                                        className="w-4 h-4 rounded text-emerald-500 focus:ring-0 bg-[#06080E] border-white/20"
+                                    />
+                                    <span>VPS / Datacenter IP İndirmesine İzin Ver</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={planForm.is_active}
+                                        onChange={(e) => setPlanForm({ ...planForm, is_active: e.target.checked })}
+                                        className="w-4 h-4 rounded text-emerald-500 focus:ring-0 bg-[#06080E] border-white/20"
+                                    />
+                                    <span>Paket Satışta (Aktif)</span>
+                                </label>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.06]">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreatePlanOpen(false)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-xs font-semibold text-gray-300"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingPlan}
+                                    className="px-5 py-2 rounded-xl bg-[#00B074] hover:bg-[#009663] text-xs font-bold text-white shadow-lg shadow-[#00B074]/20"
+                                >
+                                    {isSubmittingPlan ? 'Kaydediliyor...' : (editingPlan ? 'Değişiklikleri Güncelle' : 'Paketi Kaydet')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 2: DELETE PLAN MODAL WITH TRANSFER */}
+            {/* ========================================================= */}
+            {deletingPlan && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#0A0D15] border border-rose-500/30 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl shadow-black/80">
+                        <div className="flex items-start gap-3">
+                            <div className="p-3 rounded-xl bg-rose-500/15 text-rose-400 shrink-0">
+                                <AlertTriangle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-white">Paketi Sil: {deletingPlan.name}</h3>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Bu paketi silmek istediğinize emin misiniz? Kayıtlı aboneleri başka bir pakete transfer edebilirsiniz.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-semibold text-gray-300">
+                                Aktif Aboneler İçin Transfer Hedefi:
+                            </label>
+                            <select
+                                value={targetPlanForDelete}
+                                onChange={(e) => setTargetPlanForDelete(e.target.value)}
+                                className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                            >
+                                <option value="none">Abonelikleri İptal Et (Paketsiz / Free Yap)</option>
+                                {plans.filter(p => p.id !== deletingPlan.id).map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name} Paketine Transfer Et
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingPlan(null)}
+                                className="px-4 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-gray-300"
+                            >
+                                Vazgeç
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmDeletePlan}
+                                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white"
+                            >
+                                Paketi Kalıcı Olarak Sil
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 3: ASSIGN PLAN / QUOTA MODAL */}
+            {/* ========================================================= */}
+            {isAssignModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#0A0D15] border border-white/[0.1] rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl shadow-black/80 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+                            <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                <UserCheck className="w-5 h-5 text-emerald-400" />
+                                <span>{assignModalUser ? `${assignModalUser.name} - Kota & Paket Ata` : 'Kullanıcıya Kota / Paket Tanımla'}</span>
+                            </h2>
+                            <button onClick={() => setIsAssignModalOpen(false)} className="text-gray-400 hover:text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveAssign} className="space-y-4">
+                            {!assignModalUser && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Hedef Kullanıcı ID</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={assignForm.user_id}
+                                        onChange={(e) => setAssignForm({ ...assignForm, user_id: e.target.value })}
+                                        placeholder="Kullanıcı ID girin..."
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none font-mono"
+                                    />
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Tanımlanacak Paket</label>
+                                <select
+                                    value={assignForm.plan_id}
+                                    onChange={(e) => setAssignForm({ ...assignForm, plan_id: e.target.value })}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none cursor-pointer"
+                                >
+                                    <option value="custom">Özel Boyutlu İndirme Kotası (GB)</option>
+                                    <option value="none">Paketi Kaldır (Paketsiz Yap)</option>
+                                    {plans.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name} ({p.monthly_quota_gb} GB - {p.type_label})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {(assignForm.plan_id === 'custom' || !assignForm.plan_id) && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Özel Kota Miktarı (GB)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={assignForm.custom_quota_gb}
+                                        onChange={(e) => setAssignForm({ ...assignForm, custom_quota_gb: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white font-mono"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Süre / Döngü</label>
+                                    <select
+                                        value={assignForm.duration_type}
+                                        onChange={(e) => setAssignForm({ ...assignForm, duration_type: e.target.value })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white cursor-pointer"
+                                    >
+                                        <option value="1">1 Ay</option>
+                                        <option value="3">3 Ay</option>
+                                        <option value="6">6 Ay</option>
+                                        <option value="12">12 Ay (1 Yıl)</option>
+                                        <option value="perpetual">Süresiz (Ömür Boyu)</option>
+                                        <option value="custom">Özel Ay Sayısı</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Özel Hız Limiti Mbps (Opsiyonel)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Standart hat için boş"
+                                        value={assignForm.custom_speed_limit_mbps}
+                                        onChange={(e) => setAssignForm({ ...assignForm, custom_speed_limit_mbps: e.target.value })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            {assignForm.duration_type === 'custom' && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Ay Sayısı</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="120"
+                                        value={assignForm.custom_months}
+                                        onChange={(e) => setAssignForm({ ...assignForm, custom_months: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white font-mono"
+                                    />
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Admin Notu</label>
+                                <input
+                                    type="text"
+                                    value={assignForm.notes}
+                                    onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })}
+                                    placeholder="Örn: Kampanya kapsamında tanımlandı"
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.06]">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAssignModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-gray-300"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingAssign}
+                                    className="px-5 py-2 rounded-xl bg-[#00B074] hover:bg-[#009663] text-xs font-bold text-white shadow-lg shadow-[#00B074]/20"
+                                >
+                                    {isSubmittingAssign ? 'Tanımlanıyor...' : 'Kotayı Tanımla'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 4: DIRECT EXTRA QUOTA MODAL */}
+            {/* ========================================================= */}
+            {extraQuotaModalUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#0A0D15] border border-amber-500/30 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl shadow-black/80">
+                        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-amber-400" />
+                                <span>Anlık Ek Kota Ekle (+GB)</span>
+                            </h3>
+                            <button onClick={() => setExtraQuotaModalUser(null)} className="text-gray-400 hover:text-white">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-400">
+                            <strong>{extraQuotaModalUser.name}</strong> kullanıcısına mevcut paketinden bağımsız, belirlenen gün süresince geçerli ek indirme kotası tanımlayın.
+                        </p>
+
+                        <form onSubmit={handleSaveExtraQuota} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Kota Miktarı (GB)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        required
+                                        value={extraQuotaForm.quota_gb}
+                                        onChange={(e) => setExtraQuotaForm({ ...extraQuotaForm, quota_gb: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Geçerlilik (Gün)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="365"
+                                        required
+                                        value={extraQuotaForm.days}
+                                        onChange={(e) => setExtraQuotaForm({ ...extraQuotaForm, days: Number(e.target.value) })}
+                                        className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white font-mono"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Ek Kota Tanım Adı</label>
+                                <input
+                                    type="text"
+                                    value={extraQuotaForm.name}
+                                    onChange={(e) => setExtraQuotaForm({ ...extraQuotaForm, name: e.target.value })}
+                                    placeholder="Örn: Telafi Ek Kotası"
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.06]">
+                                <button
+                                    type="button"
+                                    onClick={() => setExtraQuotaModalUser(null)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-gray-300"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingExtraQuota}
+                                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs shadow-lg shadow-amber-500/20"
+                                >
+                                    {isSubmittingExtraQuota ? 'Ekleniyor...' : 'Ek Kotayı Ekle'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 5: EXTEND DURATION MODAL */}
+            {/* ========================================================= */}
+            {extendDurationUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#0A0D15] border border-indigo-500/30 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl shadow-black/80">
+                        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-indigo-400" />
+                                <span>Abonelik Süresini Uzat</span>
+                            </h3>
+                            <button onClick={() => setExtendDurationUser(null)} className="text-gray-400 hover:text-white">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-400">
+                            <strong>{extendDurationUser.name}</strong> kullanıcısının aktif aboneliğinin bitiş tarihine gün ilave edin.
+                        </p>
+
+                        <form onSubmit={handleSaveExtendDuration} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Eklenecek Gün Sayısı</label>
+                                <div className="grid grid-cols-4 gap-2 mb-2">
+                                    {[7, 15, 30, 90].map((d) => (
+                                        <button
+                                            key={d}
+                                            type="button"
+                                            onClick={() => setExtendDurationDays(d)}
+                                            className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                                                extendDurationDays === d ? 'bg-indigo-600 text-white' : 'bg-white/[0.04] text-gray-400 hover:text-white'
+                                            }`}
+                                        >
+                                            +{d} Gün
+                                        </button>
+                                    ))}
+                                </div>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="3650"
+                                    required
+                                    value={extendDurationDays}
+                                    onChange={(e) => setExtendDurationDays(Number(e.target.value))}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white font-mono"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Açıklama / Not</label>
+                                <input
+                                    type="text"
+                                    value={extendDurationNotes}
+                                    onChange={(e) => setExtendDurationNotes(e.target.value)}
+                                    placeholder="Örn: Sunucu bakım telafisi"
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.06]">
+                                <button
+                                    type="button"
+                                    onClick={() => setExtendDurationUser(null)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-gray-300"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingExtend}
+                                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20"
+                                >
+                                    {isSubmittingExtend ? 'Uzatılıyor...' : 'Süreyi Uzat'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* MODAL 6: EDIT PAYMENT METHOD MODAL */}
+            {/* ========================================================= */}
+            {editingMethod && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-[#0A0D15] border border-white/[0.1] rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl shadow-black/80 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <Coins className="w-5 h-5 text-emerald-400" />
+                                <span>Ödeme Yöntemini Düzenle: {editingMethod.name}</span>
+                            </h3>
+                            <button onClick={() => setEditingMethod(null)} className="text-gray-400 hover:text-white">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSavePaymentMethod} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Görünen Ad</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={methodForm.name}
+                                    onChange={(e) => setMethodForm({ ...methodForm, name: e.target.value })}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">Kısa Açıklama</label>
+                                <input
+                                    type="text"
+                                    value={methodForm.description}
+                                    onChange={(e) => setMethodForm({ ...methodForm, description: e.target.value })}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                                    Havale / IBAN / Cüzdan Talimatları (Kullanıcıya Gösterilir)
+                                </label>
+                                <textarea
+                                    rows={5}
+                                    value={methodForm.instructions}
+                                    onChange={(e) => setMethodForm({ ...methodForm, instructions: e.target.value })}
+                                    className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl p-3 text-xs text-white font-mono leading-relaxed"
+                                />
+                            </div>
+
+                            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                                <input
+                                    type="checkbox"
+                                    checked={methodForm.is_active}
+                                    onChange={(e) => setMethodForm({ ...methodForm, is_active: e.target.checked })}
+                                    className="w-4 h-4 rounded text-emerald-500 focus:ring-0 bg-[#06080E] border-white/20"
+                                />
+                                <span>Bu Ödeme Yöntemi Aktif (Kullanıcılara Göster)</span>
+                            </label>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.06]">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingMethod(null)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.06] text-xs font-semibold text-gray-300"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingMethod}
+                                    className="px-5 py-2 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white font-bold text-xs shadow-lg shadow-[#00B074]/20"
+                                >
+                                    {isSubmittingMethod ? 'Kaydediliyor...' : 'Yöntemi Güncelle'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 }
-

@@ -101,10 +101,16 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     // Plan & Quota Management Routes
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');
+    Route::post('/plans/{plan}/toggle', [PlanController::class, 'toggle'])->name('plans.toggle');
+    Route::post('/plans/{plan}/clone', [PlanController::class, 'clone'])->name('plans.clone');
     Route::put('/plans/{plan}', [PlanController::class, 'update'])->name('plans.update');
     Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
     Route::post('/plans/users/assign', [PlanController::class, 'assignUserPlan'])->name('plans.users.assign');
     Route::post('/plans/users/{user}/remove', [PlanController::class, 'removeUserPlan'])->name('plans.users.remove');
+    Route::post('/plans/users/{user}/reset-usage', [PlanController::class, 'resetUsage'])->name('plans.users.reset-usage');
+    Route::post('/plans/users/{user}/extend-duration', [PlanController::class, 'extendDuration'])->name('plans.users.extend-duration');
+    Route::post('/plans/users/{user}/extra-quota', [PlanController::class, 'addExtraQuotaDirect'])->name('plans.users.extra-quota');
+    Route::post('/plans/users/{user}/sync-media-account', [PlanController::class, 'syncMediaAccount'])->name('plans.users.sync-media-account');
 
     // Payment Method & Notification Management Routes
     Route::post('/payment-methods/{paymentMethod}/toggle', [PaymentMethodController::class, 'toggle'])->name('payment-methods.toggle');
