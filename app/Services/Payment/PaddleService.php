@@ -45,8 +45,17 @@ class PaddleService
         $env = strtolower(trim($env)) === 'production' ? 'production' : 'sandbox';
 
         $clientToken = trim((string) ($dbSettings['client_token'] ?? config('services.paddle.client_token', '')));
+        $clientToken = trim($clientToken, " \t\n\r\0\x0B\"'");
+
         $apiKey = trim((string) ($dbSettings['api_key'] ?? config('services.paddle.api_key', '')));
+        $apiKey = trim($apiKey, " \t\n\r\0\x0B\"'");
+        if (str_starts_with(strtolower($apiKey), 'bearer ')) {
+            $apiKey = trim(substr($apiKey, 7));
+        }
+
         $webhookSecret = trim((string) ($dbSettings['webhook_secret'] ?? config('services.paddle.webhook_secret', '')));
+        $webhookSecret = trim($webhookSecret, " \t\n\r\0\x0B\"'");
+
         $currency = strtoupper(trim((string) ($dbSettings['currency'] ?? config('services.paddle.currency', 'TRY'))));
 
         $baseUrl = $env === 'production' ? self::PRODUCTION_API_URL : self::SANDBOX_API_URL;
@@ -148,7 +157,17 @@ class PaddleService
 
         if (! $response->successful()) {
             $errorBody = $response->json();
-            $errorMessage = $errorBody['error']['detail'] ?? $response->body();
+            $detail = (string) ($errorBody['error']['detail'] ?? '');
+            $code = (string) ($errorBody['error']['code'] ?? '');
+
+            if (str_contains($detail, 'no default payment link') || str_contains($code, 'no_default_payment_link')) {
+                $errorMessage = "Paddle hesabınızda 'Default Payment Link' tanımlanmamış. Lütfen Paddle Dashboard > Checkout > Checkout settings ekranında varsayılan ödeme bağlantınızı (örn: ".url('/pricing').') girip kaydedin.';
+            } elseif (str_contains($detail, 'Authentication header') || str_contains($code, 'authentication_malformed')) {
+                $errorMessage = "Paddle API anahtar biçimi geçersiz. API Key 'pdl_sdbx_apikey_...' formatında olmalı ve başında 'Bearer' yazmamalıdır.";
+            } else {
+                $errorMessage = $detail ?: $response->body();
+            }
+
             Log::error('Paddle createTransaction failed', [
                 'status' => $response->status(),
                 'response' => $errorBody,

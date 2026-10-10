@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { CheckCircle2, Coins, Copy, CreditCard, Info, X } from 'lucide-react';
+import { CheckCircle2, Coins, Copy, CreditCard, HelpCircle, Info, X } from 'lucide-react';
+import PaddleSetupGuideModal from './PaddleSetupGuideModal';
 
 export default function EditPaymentMethodModal({ method, onClose }) {
     if (!method) return null;
@@ -14,6 +15,7 @@ export default function EditPaymentMethodModal({ method, onClose }) {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+    const [showGuideModal, setShowGuideModal] = useState(false);
 
     const isPaddle = method.driver === 'paddle';
     const webhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/webhooks/paddle` : '/webhooks/paddle';
@@ -88,9 +90,19 @@ export default function EditPaymentMethodModal({ method, onClose }) {
 
                     {isPaddle && (
                         <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-3.5">
-                            <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
-                                <Info className="w-4 h-4 shrink-0" />
-                                <span>Paddle Billing (v2) Sanal POS Yapılandırması</span>
+                            <div className="flex items-center justify-between border-b border-blue-500/15 pb-2.5">
+                                <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
+                                    <Info className="w-4 h-4 shrink-0" />
+                                    <span>Paddle Billing (v2) Yapılandırması</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGuideModal(true)}
+                                    className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                                >
+                                    <HelpCircle className="w-3.5 h-3.5" />
+                                    <span>Nasıl Yapılır? (Rehber)</span>
+                                </button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -124,9 +136,19 @@ export default function EditPaymentMethodModal({ method, onClose }) {
                             </div>
 
                             <div>
-                                <label className="block text-[11px] font-semibold text-gray-300 mb-1">
-                                    Client-Side Token (Paddle.js İstemci Anahtarı)
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="text-[11px] font-semibold text-gray-300">
+                                        Client-Side Token (Paddle.js İstemci Anahtarı)
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGuideModal(true)}
+                                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <HelpCircle className="w-3 h-3" />
+                                        <span>Nasıl alınır?</span>
+                                    </button>
+                                </div>
                                 <input
                                     type="text"
                                     placeholder="test_... veya live_..."
@@ -140,9 +162,19 @@ export default function EditPaymentMethodModal({ method, onClose }) {
                             </div>
 
                             <div>
-                                <label className="block text-[11px] font-semibold text-gray-300 mb-1">
-                                    API Key (Gizli API Anahtarı)
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="text-[11px] font-semibold text-gray-300">
+                                        API Key (Gizli API Anahtarı)
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGuideModal(true)}
+                                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <HelpCircle className="w-3 h-3" />
+                                        <span>Nasıl alınır?</span>
+                                    </button>
+                                </div>
                                 <input
                                     type="password"
                                     placeholder="pdl_sdb_... veya pdl_live_..."
@@ -151,14 +183,24 @@ export default function EditPaymentMethodModal({ method, onClose }) {
                                     className="w-full bg-[#06080E] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-blue-500"
                                 />
                                 <span className="text-[10px] text-gray-500 block mt-0.5">
-                                    Paddle Dashboard &gt; Developer tools &gt; Authentication &gt; API keys
+                                    Paddle Dashboard &gt; Developer tools &gt; Authentication &gt; API keys (Transactions: Read &amp; Write)
                                 </span>
                             </div>
 
                             <div>
-                                <label className="block text-[11px] font-semibold text-gray-300 mb-1">
-                                    Webhook Secret Key (Bildirim Gizli Anahtarı)
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="text-[11px] font-semibold text-gray-300">
+                                        Webhook Secret Key (Bildirim Gizli Anahtarı)
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGuideModal(true)}
+                                        className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <HelpCircle className="w-3 h-3" />
+                                        <span>Nasıl kurulur?</span>
+                                    </button>
+                                </div>
                                 <input
                                     type="password"
                                     placeholder="pdl_ntfset_..."
@@ -245,6 +287,15 @@ export default function EditPaymentMethodModal({ method, onClose }) {
                     </div>
                 </form>
             </div>
+
+            {isPaddle && (
+                <PaddleSetupGuideModal
+                    isOpen={showGuideModal}
+                    onClose={() => setShowGuideModal(false)}
+                    webhookUrl={webhookUrl}
+                    environment={form.settings?.environment || 'sandbox'}
+                />
+            )}
         </div>
     );
 }
