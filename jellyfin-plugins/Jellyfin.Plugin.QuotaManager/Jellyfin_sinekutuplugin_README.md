@@ -202,9 +202,9 @@ GitHub Pages, GitHub Releases veya web sitenizde yayınlanacak bir `manifest.jso
 Eklenti ile Laravel arasındaki iletişim API Anahtarı (API Key) ile güvence altına alınmıştır.
 
 ### Laravel Tarafı (`.env`)
-Laravel projenizin `.env` dosyasında anahtarınızı tanımlayın:
+Laravel projenizin `.env` dosyasında eklentiye özel API anahtarınızı tanımlayın:
 ```env
-JELLYFIN_API_KEY=sinekutu_super_secret_key_2026
+JELLYFIN_PLUGIN_API_KEY=sinekutu_super_secret_key_2026
 ```
 
 ### Güvenlik Doğrulaması
@@ -223,7 +223,7 @@ Jellyfin Yönetici Paneli -> **Eklentiler** -> **SineKutu Kota Yönetimi** sekme
 | Parametre | Açıklama | Varsayılan Değer |
 | :--- | :--- | :--- |
 | **Laravel API Base URL** | Laravel API uç noktası adresi | `https://siteniz.com/api/jellyfin` |
-| **Laravel API Anahtarı** | `.env` içindeki `JELLYFIN_API_KEY` ile aynı olmalıdır | `sinekutu_super_secret_key_2026` |
+| **Laravel API Anahtarı** | `.env` içindeki `JELLYFIN_PLUGIN_API_KEY` ile aynı olmalıdır | `sinekutu_super_secret_key_2026` |
 | **Batch Düşüm Eşiği (MB)** | Laravel'e göndermeden önce RAM'de birikecek veri | `15` MB |
 | **Batch Düşüm Aralığı (Sn)** | Veri eşiğe ulaşmasa bile Laravel'e aktarılma süresi | `30` saniye |
 | **API Hatasında Yayını Durdur** | Laravel sunucusuna ulaşılamazsa yayını kes | `İşaretli (True)` |
