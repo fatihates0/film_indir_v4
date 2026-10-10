@@ -26,6 +26,7 @@ class PaymentNotificationController extends Controller
             'plan_id' => 'required|exists:plans,id',
             'payment_method_id' => 'required|exists:payment_methods,id',
             'duration_months' => 'required|integer|in:1,3,6,12',
+            'is_upgrade' => 'nullable|boolean',
             'sender_name' => 'nullable|string|max:150',
             'tx_hash' => 'nullable|string|max:255',
             'user_notes' => 'nullable|string|max:500',
@@ -40,27 +41,40 @@ class PaymentNotificationController extends Controller
         }
 
         $plan = Plan::findOrFail($validated['plan_id']);
+        $isUpgrade = $request->boolean('is_upgrade');
+        $oldPlanId = null;
 
-        // Extra Quota validation: User MUST have an active main subscription to buy extra quota!
-        if ($plan->isExtra()) {
+        if ($isUpgrade) {
+            $calc = $subscriptionService->calculateUpgrade($user, $plan);
+            if (! $calc || ! ($calc['can_upgrade'] ?? false)) {
+                return redirect()->back()->with('error', 'Bu pakete yükseltme yapılamaz veya aktif paketiniz bulunmamaktadır.');
+            }
+
+            $amount = (float) $calc['upgrade_amount'];
+            $oldPlanId = (int) $calc['current_plan']['id'];
+            $durationMonths = 1;
+        } elseif ($plan->isExtra()) {
+            // Extra Quota validation: User MUST have an active main subscription to buy extra quota!
             if (! $subscriptionService->canBuyExtraQuota($user)) {
                 return redirect()->back()->with('error', 'Ek kota satın alabilmek için aktif bir bireysel veya business paketinizin bulunması gerekmektedir.');
             }
             $durationMonths = 1;
+            $amount = $plan->getPriceForDuration(1);
         } else {
             $durationMonths = (int) $validated['duration_months'];
             if (! $plan->isDurationAllowed($durationMonths)) {
                 return redirect()->back()->with('error', "{$plan->name} paketi için seçilen {$durationMonths} aylık abonelik döngüsü geçerli değildir.");
             }
+            $amount = $plan->getPriceForDuration($durationMonths);
         }
-
-        $amount = $plan->getPriceForDuration($durationMonths);
 
         $referenceCode = 'PAY-'.date('Ymd').'-'.strtoupper(Str::random(6));
 
         PaymentNotification::create([
             'user_id' => $user->id,
             'plan_id' => $plan->id,
+            'is_upgrade' => $isUpgrade,
+            'old_plan_id' => $oldPlanId,
             'payment_method_id' => $paymentMethod->id,
             'duration_months' => $durationMonths,
             'amount' => $amount,
@@ -71,7 +85,11 @@ class PaymentNotificationController extends Controller
             'status' => 'pending',
         ]);
 
-        return redirect()->back()->with('success', "Ödeme bildiriminiz başarıyla alındı! Referans Kodunuz: {$referenceCode}. Admin onayının ardından paketiniz tanımlanacaktır.");
+        $successMsg = $isUpgrade
+            ? "Paket yükseltme bildiriminiz başarıyla alındı! Referans Kodunuz: {$referenceCode}. Admin onayının ardından yeni paketiniz aktif edilecektir."
+            : "Ödeme bildiriminiz başarıyla alındı! Referans Kodunuz: {$referenceCode}. Admin onayının ardından paketiniz tanımlanacaktır.";
+
+        return redirect()->back()->with('success', $successMsg);
     }
 
     /**
@@ -93,7 +111,14 @@ class PaymentNotificationController extends Controller
 
         try {
             DB::transaction(function () use ($notification, $subscriptionService, $user, $plan, $admin, $request) {
-                if ($plan && $plan->isExtra()) {
+                if ($notification->is_upgrade) {
+                    $subscriptionService->upgradeSubscription(
+                        $user,
+                        $plan,
+                        (float) $notification->amount,
+                        "Ödeme Bildirimi #{$notification->reference_code} (Paket Yükseltme) onaylandı"
+                    );
+                } elseif ($plan && $plan->isExtra()) {
                     $subscriptionService->purchaseExtraQuota(
                         $user,
                         $plan,
@@ -121,7 +146,11 @@ class PaymentNotificationController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        return redirect()->back()->with('success', "#{$notification->reference_code} referanslı ödeme bildirimi onaylandı ve kullanıcının paketi tanımlandı.");
+        $successMsg = $notification->is_upgrade
+            ? "#{$notification->reference_code} referanslı paket yükseltme bildirimi onaylandı ve kullanıcının yeni kotası tanımlandı."
+            : "#{$notification->reference_code} referanslı ödeme bildirimi onaylandı ve kullanıcının paketi tanımlandı.";
+
+        return redirect()->back()->with('success', $successMsg);
     }
 
     /**

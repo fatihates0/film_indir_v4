@@ -18,6 +18,8 @@ class PaymentNotification extends Model
     protected $fillable = [
         'user_id',
         'plan_id',
+        'is_upgrade',
+        'old_plan_id',
         'payment_method_id',
         'duration_months',
         'amount',
@@ -39,6 +41,8 @@ class PaymentNotification extends Model
     protected function casts(): array
     {
         return [
+            'is_upgrade' => 'boolean',
+            'old_plan_id' => 'integer',
             'duration_months' => 'integer',
             'amount' => 'decimal:2',
             'processed_at' => 'datetime',
@@ -59,6 +63,14 @@ class PaymentNotification extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    /**
+     * Old plan if this is an upgrade.
+     */
+    public function oldPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'old_plan_id');
     }
 
     /**

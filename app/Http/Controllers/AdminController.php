@@ -311,24 +311,44 @@ class AdminController extends Controller
     {
         return [
             [
-                'question' => 'İndirmeler VIP/Premium sunuculardan mı yapılıyor?',
-                'answer' => 'Evet! Tüm indirmeler yüksek hızlı Dedicated Gateway (Storage Box) sunucularımız üzerinden doğrudan bağlantı ile maksimum hızınızda gerçekleştirilir.',
+                'question' => 'Ödeme yapar yapmaz üyeliğim başlıyor mu? Kartımla ödeme yapmak güvenli mi?',
+                'answer' => "Başlıyor. Ödemeniz onaylandıktan sonra sistem hesabınızı çoğunlukla 5 saniye içinde kendiliğinden açar. Ödeme sayfası 256-bit SSL ile korunuyor ve kart bilgileriniz bizde saklanmıyor. Kartınızı SineKutu'ya değil, ödemeyi alan aracı firmaya girersiniz. SineKutu'nun kendi sayfaları da SSL ile çalışır.",
             ],
             [
-                'question' => 'Aynı anda birden fazla dosya indirebilir miyim?',
-                'answer' => 'Paket seviyenize bağlı olarak aynı anda 2, 5 veya sınırsız eş zamanlı indirme yapabilirsiniz. Detaylar paket özelliklerinde belirtilmiştir.',
+                'question' => 'Satın aldığım üyeliğin parasını geri alabilir miyim?',
+                'answer' => 'Alamazsınız. Üyelik satın alındığı anda içeriklerin tamamı size açıldığı için dijital üyeliklerde iade yok. Mantık şuna benzer: Marketten bisküvi alıp paketi açıyor, birini de yiyorsunuz. Sonra aynı paketi geri götürüp para istemek olmaz.',
             ],
             [
-                'question' => 'Kotalarım ne zaman yenilenir?',
-                'answer' => 'Aylık paket kotalarınız abonelik süreniz boyunca her 30 günde bir otomatik yenilenir. Kullanılmayan kotalar bir sonraki aya devretmez. Ek kotalar ise 30 gün geçerlidir.',
+                'question' => 'Şu anki paketimden daha yüksek bir pakete geçmek mümkün mü?',
+                'answer' => 'Mümkün. Geçiş sırasında ekranda bir bilgilendirme görürsünüz. Ödemeyi tamamladığınızda yeni paketiniz hesabınıza tanımlanır.',
             ],
             [
-                'question' => 'Hangi ödeme yöntemleri destekleniyor?',
-                'answer' => 'Banka havalesi, EFT, FAST ve Kripto para (USDT, BTC vb.) ile ödeme yapabilirsiniz.',
+                'question' => 'Aylık kotamı tamamen kullanırsam ne olur?',
+                'answer' => 'Kota yenilenene kadar beklemek de, ek kota paketi satın almak da size kalmış. Kotanız her ay, üyeliği ilk aldığınız günün tarihinde sıfırlanıp yeniden yüklenir.',
             ],
             [
-                'question' => 'İndirme hızı sınırı var mı?',
-                'answer' => 'Hayır! İndirmelerde herhangi bir sunucu kaynaklı hız kısıtlaması uygulanmaz. İnternet servis sağlayıcınızın desteklediği maksimum bant genişliğini kullanabilirsiniz.',
+                'question' => 'SineKutu TV üzerinden film izlediğimde de kotam azalıyor mu?',
+                'answer' => 'Azalıyor. Emby, Plex ve siteden indirdiğiniz her şey ile online izlediğiniz içerikler tek bir kotadan harcanır. Bununla birlikte kotaları geniş tutuyoruz. Nitekim üyelerimizin bir çoğu kendi kotasını dolduramıyor.',
+            ],
+            [
+                'question' => 'Jellyfin, Emby ve Plex kütüphanelerinde sitedeki her film ve dizi yer alıyor mu?',
+                'answer' => 'Yer alıyor. Üç platform da site ile birebir eşleşiyor ve içeriğin hepsini barındırıyor. Siteye yeni bir film girdiği anda aynı film Jellyfin, Emby ve Plex tarafında da görünür olur, beklemeden açıp izleyebilirsiniz.',
+            ],
+            [
+                'question' => "Android TV'de 100 Mbit bağlantıyla 4K film takılmadan oynar mı?",
+                'answer' => "Bazı 4K filmlerin iki ayrı versiyonu var: 4K Remux ve 4K Normal. Televizyonda izleyecekseniz 4K Normal'i seçmenizi öneririz. Android TV'niz Wi-Fi üzerinden 100 Mbit alıyorsa 4K Normal sorunsuz oynar ve bu, ulaşabileceğiniz en iyi görüntüdür. İnternetiniz zaman zaman yavaşlasa bile Full HD'yi donmadan izlersiniz.
+
+Hangi cihazdan açarsanız açın kalite, indirdiğiniz dosyayla eşittir. Görüntü BluRay kaynağından olduğu gibi gelir, internet için yeniden sıkıştırılmaz.",
+            ],
+            [
+                'question' => 'İndirirken ulaşabileceğim en yüksek hız ne kadar?',
+                'answer' => "Sunucu altyapımız 5 Gbit'e kadar çıkabiliyor. Koşullar uygunsa ve IDM kullanıyorsanız bu hıza ulaşırsınız. Limit her sunucu için ayrı işlediğinden, aynı anda iki sunucudan dosya çekerseniz toplam 10 Gbit'e varabilir. Rakamlar sunucunun boş olduğu andaki değerlerdir. Yoğunlukta 500 Mbit'i güvence altına alıyoruz.
+
+Bu hızı herkes göremez, çünkü sınırı sizin internet aboneliğiniz belirler. Örneğin 35 Mbit'lik bir hatta saniyede yaklaşık 3,5 MB indirirsiniz. Sunucu tarafında yapılacak hiçbir şey bağlantınızı hızlandırmaz.",
+            ],
+            [
+                'question' => 'Üyelikte uymam gereken kurallar ve sınırlamalar neler?',
+                'answer' => 'Hesap sadece sizin kendi kullanımınız için tanımlanır. İçerikleri başka sitelerde paylaşmak ya da kopyalayıp çoğaltmak yasak. Sunucu/datacenter IP\'siyle ya da VPN üzerinden bağlanmak da yasak. Bu kurallardan birini çiğnediğiniz anlaşılırsa hesabınız kapatılır ve ödediğiniz ücret iade edilmez.',
             ],
         ];
     }

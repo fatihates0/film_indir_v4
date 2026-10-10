@@ -1634,16 +1634,30 @@ class FrontController extends Controller
     /**
      * Display the subscription packages & pricing page.
      */
-    public function pricing()
+    public function pricing(Request $request, SubscriptionService $subscriptionService)
     {
         $plans = Plan::active()->get();
         $paymentMethods = PaymentMethod::active()->get();
         $faqs = Setting::get('pricing_faq_settings', AdminController::defaultFaqs());
 
+        $upgrades = [];
+        $user = $request->user();
+        if ($user && $subscriptionService->hasActiveMainSubscription($user)) {
+            foreach ($plans as $p) {
+                if (! $p->isExtra()) {
+                    $calc = $subscriptionService->calculateUpgrade($user, $p);
+                    if ($calc && ($calc['can_upgrade'] ?? false)) {
+                        $upgrades[$p->id] = $calc;
+                    }
+                }
+            }
+        }
+
         return Inertia::render('Pricing', array_merge($this->getCommonData(), [
             'plans' => $plans,
             'paymentMethods' => $paymentMethods,
             'faqs' => $faqs,
+            'upgrades' => $upgrades,
         ]));
     }
 

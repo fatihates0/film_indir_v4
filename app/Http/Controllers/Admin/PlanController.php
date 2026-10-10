@@ -133,7 +133,7 @@ class PlanController extends Controller
 
         $paymentMethods = PaymentMethod::orderBy('sort_order')->get();
 
-        $paymentNotifications = PaymentNotification::with(['user', 'plan', 'paymentMethod'])
+        $paymentNotifications = PaymentNotification::with(['user', 'plan', 'oldPlan', 'paymentMethod'])
             ->whereHas('user', function ($q) {
                 $q->where('role', '!=', UserRole::ADMIN);
             })
@@ -146,6 +146,8 @@ class PlanController extends Controller
                     'user_email' => $pn->user ? $pn->user->email : '-',
                     'plan_name' => $pn->plan?->name ?? 'Özel Paket',
                     'plan_type' => $pn->plan?->type ?? 'individual',
+                    'is_upgrade' => (bool) $pn->is_upgrade,
+                    'old_plan_name' => $pn->oldPlan?->name,
                     'method_name' => $pn->paymentMethod?->name ?? $pn->payment_method_id,
                     'method_driver' => $pn->paymentMethod?->driver ?? 'manual',
                     'duration_months' => $pn->duration_months,

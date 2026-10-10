@@ -1220,8 +1220,24 @@ export default function PlansIndex({
                                                     </td>
 
                                                     <td className="px-6 py-4">
-                                                        <div className="font-bold text-white">{item.plan_name} ({item.duration_months} Ay)</div>
-                                                        <div className="text-emerald-400 font-mono font-bold">{item.formatted_amount}</div>
+                                                        {item.is_upgrade ? (
+                                                            <div>
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 inline-block mb-1">
+                                                                    Paket Yükseltme
+                                                                </span>
+                                                                <div className="font-bold text-white flex items-center gap-1.5 text-xs">
+                                                                    <span className="text-gray-400 line-through">{item.old_plan_name || 'Eski Paket'}</span>
+                                                                    <span>➔</span>
+                                                                    <span className="text-purple-300">{item.plan_name}</span>
+                                                                </div>
+                                                                <div className="text-emerald-400 font-mono font-bold text-xs mt-0.5">Fark: {item.formatted_amount}</div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="font-bold text-white">{item.plan_name} ({item.duration_months} Ay)</div>
+                                                                <div className="text-emerald-400 font-mono font-bold">{item.formatted_amount}</div>
+                                                            </>
+                                                        )}
                                                     </td>
 
                                                     <td className="px-6 py-4">

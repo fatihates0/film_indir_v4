@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Head, Link, usePage, router } from '@inertiajs/react';
 import Layout from '../Components/Layout';
 import AuthModal from '../Components/AuthModal';
-import { 
-    Check, Zap, Shield, HardDrive, Download, ArrowRight, 
-    Sparkles, RefreshCw, Clock, AlertCircle, Building2, Coins, 
+import {
+    Check, Zap, Shield, HardDrive, Download, ArrowRight,
+    Sparkles, RefreshCw, Clock, AlertCircle, Building2, Coins,
     Copy, CheckCircle2, X, Info, Server, PlusCircle, UserCheck, Lock,
     HelpCircle, ChevronDown
 } from 'lucide-react';
 
-export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) {
+export default function Pricing({ plans = [], paymentMethods = [], faqs = [], upgrades = {} }) {
     const { auth, flash } = usePage().props;
     const [selectedDuration, setSelectedDuration] = useState(1); // 1, 3, 6, 12
     const [openFaqIndex, setOpenFaqIndex] = useState(0); // Default open first FAQ item
@@ -18,6 +18,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
 
     // Checkout Modal State
     const [checkoutPlan, setCheckoutPlan] = useState(null);
+    const [isUpgradeCheckout, setIsUpgradeCheckout] = useState(false);
     const [selectedMethodId, setSelectedMethodId] = useState(paymentMethods.length > 0 ? paymentMethods[0].id : '');
     const [senderName, setSenderName] = useState('');
     const [txHash, setTxHash] = useState('');
@@ -81,7 +82,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
         return allowed.map(m => m === 12 ? '12 Aylık' : `${m} Aylık`).join(', ');
     };
 
-    const handleOpenCheckout = (plan) => {
+    const handleOpenCheckout = (plan, isUpgrade = false) => {
         if (!user) {
             setAuthModalMode('login');
             setAuthModalOpen(true);
@@ -95,7 +96,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
         }
 
         const allowed = plan.allowed_durations || [1, 3, 6, 12];
-        const isAllowed = plan.type === 'extra' ? true : allowed.includes(selectedDuration);
+        const isAllowed = plan.type === 'extra' || isUpgrade ? true : allowed.includes(selectedDuration);
 
         if (!isAllowed) {
             const firstAllowed = allowed[0] || 1;
@@ -104,6 +105,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
         }
 
         setCheckoutPlan(plan);
+        setIsUpgradeCheckout(Boolean(isUpgrade));
         if (paymentMethods.length > 0) {
             setSelectedMethodId(paymentMethods[0].id);
         }
@@ -127,7 +129,8 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
         router.post('/payment-notifications', {
             plan_id: checkoutPlan.id,
             payment_method_id: selectedMethodId,
-            duration_months: checkoutPlan.type === 'extra' ? 1 : selectedDuration,
+            duration_months: checkoutPlan.type === 'extra' || isUpgradeCheckout ? 1 : selectedDuration,
+            is_upgrade: isUpgradeCheckout,
             sender_name: senderName,
             tx_hash: txHash,
             user_notes: userNotes,
@@ -135,6 +138,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
             preserveScroll: true,
             onSuccess: () => {
                 setCheckoutPlan(null);
+                setIsUpgradeCheckout(false);
             },
             onFinish: () => setIsSubmittingNotice(false),
         });
@@ -149,31 +153,56 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
         const isExtraPlan = plan.type === 'extra';
         const isBusinessPlan = plan.type === 'business';
 
+        const upgradeInfo = upgrades && upgrades[plan.id];
+        const isUpgradeAvailable = Boolean(upgradeInfo && upgradeInfo.can_upgrade);
+        const isCurrentPlan = Boolean(user && quota?.has_active_main_sub && quota?.plan_id === plan.id);
+        const isDowngrade = Boolean(
+            user &&
+            quota?.has_active_main_sub &&
+            !isExtraPlan &&
+            !isCurrentPlan &&
+            !isUpgradeAvailable &&
+            plan.monthly_quota_gb < (quota?.monthly_quota_gb || 0)
+        );
+
         return (
             <div
                 key={plan.id}
-                className={`relative rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 ${
-                    isBusinessPlan
-                        ? 'bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-amber-500/10 dark:from-[#1E1912] dark:to-[#12100C] border-2 border-amber-500/80 shadow-2xl shadow-amber-500/10'
-                        : isExtraPlan
-                            ? 'bg-gradient-to-b from-sky-50 to-white dark:from-[#101B2B] dark:to-[#0D1420] border border-sky-500/50 hover:border-sky-400 shadow-xl'
-                            : isFeatured
-                                ? 'bg-gradient-to-b from-emerald-50 to-white dark:from-[#161D2B] dark:to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
-                                : 'bg-white dark:bg-[#121620] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 shadow-md dark:shadow-none'
-                }`}
+                className={`relative rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 ${isCurrentPlan
+                        ? 'bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-emerald-500/10 dark:from-[#0D1F18] dark:to-[#0A1612] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/15'
+                        : isUpgradeAvailable
+                            ? 'bg-gradient-to-b from-purple-500/5 via-indigo-500/5 to-purple-500/10 dark:from-[#171124] dark:to-[#0F0C18] border-2 border-purple-500/40 hover:border-purple-500 shadow-xl shadow-purple-500/10'
+                            : isBusinessPlan
+                                ? 'bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-amber-500/10 dark:from-[#1E1912] dark:to-[#12100C] border-2 border-amber-500/80 shadow-2xl shadow-amber-500/10'
+                                : isExtraPlan
+                                    ? 'bg-gradient-to-b from-sky-50 to-white dark:from-[#101B2B] dark:to-[#0D1420] border border-sky-500/50 hover:border-sky-400 shadow-xl'
+                                    : isFeatured
+                                        ? 'bg-gradient-to-b from-emerald-50 to-white dark:from-[#161D2B] dark:to-[#10141E] border-2 border-[#00B074] shadow-2xl shadow-[#00B074]/10 transform md:-translate-y-2'
+                                        : 'bg-white dark:bg-[#121620] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 shadow-md dark:shadow-none'
+                    }`}
             >
                 {/* Badges */}
-                {isBusinessPlan && (
+                {isCurrentPlan && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00B074] text-white shadow-lg shadow-[#00B074]/30 flex items-center gap-1.5 whitespace-nowrap">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Mevcut Paketiniz
+                    </div>
+                )}
+                {!isCurrentPlan && isUpgradeAvailable && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 flex items-center gap-1.5 whitespace-nowrap">
+                        <Sparkles className="w-3.5 h-3.5" /> Yükseltilebilir Paket
+                    </div>
+                )}
+                {!isCurrentPlan && !isUpgradeAvailable && isBusinessPlan && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500 text-black shadow-lg shadow-amber-500/30 flex items-center gap-1.5 whitespace-nowrap">
                         <Server className="w-3.5 h-3.5" /> Sunucu IP Destekli Business
                     </div>
                 )}
-                {isExtraPlan && (
+                {!isCurrentPlan && !isUpgradeAvailable && isExtraPlan && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-sky-500 text-white shadow-lg shadow-sky-500/30 flex items-center gap-1.5 whitespace-nowrap">
                         <PlusCircle className="w-3.5 h-3.5" /> 30 Gün Geçerli Ek Kota
                     </div>
                 )}
-                {!isBusinessPlan && !isExtraPlan && isFeatured && (
+                {!isCurrentPlan && !isUpgradeAvailable && !isBusinessPlan && !isExtraPlan && isFeatured && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#00B074] text-white shadow-lg shadow-[#00B074]/30 whitespace-nowrap">
                         En Çok Tercih Edilen
                     </div>
@@ -184,13 +213,12 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">{plan.name}</h3>
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                                isBusinessPlan
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${isBusinessPlan
                                     ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
                                     : isExtraPlan
                                         ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30'
                                         : 'bg-[#00B074]/10 text-[#00B074] border-[#00B074]/30'
-                            }`}>
+                                }`}>
                                 {plan.type_label}
                             </span>
                         </div>
@@ -288,7 +316,43 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
 
                 {/* Action Button */}
                 <div className="pt-8">
-                    {isExtraPlan && user && quota && !quota.can_buy_extra_quota ? (
+                    {isCurrentPlan ? (
+                        <div className="w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold bg-[#00B074]/15 border border-[#00B074]/40 text-[#00B074] flex items-center justify-center gap-2 select-none shadow-sm">
+                            <CheckCircle2 className="w-4 h-4 text-[#00B074]" />
+                            <span>Mevcut Aktif Paketiniz</span>
+                        </div>
+                    ) : isUpgradeAvailable ? (
+                        <div className="space-y-2.5">
+                            <div className="p-2.5 rounded-xl bg-purple-500/10 dark:bg-purple-950/40 border border-purple-500/30 flex items-center justify-between text-[11px] text-purple-700 dark:text-purple-300">
+                                <span className="font-semibold flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                    Kalan {upgradeInfo.remaining_days} gün farkı:
+                                </span>
+                                <span className="font-black text-xs font-mono text-purple-900 dark:text-purple-200">
+                                    {upgradeInfo.formatted_upgrade_amount}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleOpenCheckout(plan, true)}
+                                className="w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xl shadow-purple-500/25 active:scale-[0.99]"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                <span>Paketi Yükselt ({upgradeInfo.formatted_upgrade_amount})</span>
+                                <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ) : isDowngrade ? (
+                        <button
+                            type="button"
+                            disabled
+                            className="w-full py-3.5 px-4 rounded-2xl text-xs font-bold bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-slate-400 dark:text-gray-500 flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                            title="Mevcut paketinizden daha düşük kotalı bir pakete geçiş yapılamaz."
+                        >
+                            <Lock className="w-4 h-4 text-slate-400 dark:text-gray-500" />
+                            <span>Daha Düşük Paket</span>
+                        </button>
+                    ) : isExtraPlan && user && quota && !quota.can_buy_extra_quota ? (
                         <button
                             type="button"
                             disabled
@@ -301,16 +365,15 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                     ) : (
                         <button
                             type="button"
-                            onClick={() => handleOpenCheckout(plan)}
-                            className={`w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                isBusinessPlan
+                            onClick={() => handleOpenCheckout(plan, false)}
+                            className={`w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${isBusinessPlan
                                     ? 'bg-amber-500 hover:bg-amber-600 text-black shadow-xl shadow-amber-500/20'
                                     : isExtraPlan
                                         ? 'bg-sky-500 hover:bg-sky-600 text-white shadow-xl shadow-sky-500/20'
                                         : isFeatured
                                             ? 'bg-[#00B074] hover:bg-[#009663] text-white shadow-xl shadow-[#00B074]/30'
                                             : 'bg-slate-900 dark:bg-white/10 hover:bg-slate-800 dark:hover:bg-white/20 text-white'
-                            }`}
+                                }`}
                         >
                             <span>{isExtraPlan ? 'Ek Kota Satın Al' : 'Paket Seç & Öde'}</span>
                             <ArrowRight className="w-4 h-4" />
@@ -327,7 +390,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
 
             <div className="min-h-screen bg-[#f4f5f8] dark:bg-[#0A0D14] text-slate-800 dark:text-gray-200 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
                 <div className="max-w-7xl mx-auto space-y-16">
-                    
+
                     {/* CURRENT USER QUOTA BANNER */}
                     {user && quota && quota.has_subscription && (
                         <div className="bg-gradient-to-r from-[#00B074]/10 via-emerald-500/10 to-[#00B074]/5 dark:from-[#00B074]/15 dark:via-emerald-950/20 dark:to-[#00B074]/5 bg-white dark:bg-emerald-950/10 border border-[#00B074]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden space-y-4">
@@ -355,7 +418,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                         <span className="text-[#00B074] font-bold">{quota.formatted_remaining} / {quota.formatted_allocated}</span>
                                     </div>
                                     <div className="w-full bg-slate-200 dark:bg-black/40 h-2.5 rounded-full overflow-hidden border border-slate-300 dark:border-white/5">
-                                        <div 
+                                        <div
                                             className="bg-gradient-to-r from-[#00B074] to-emerald-400 h-full rounded-full transition-all duration-500"
                                             style={{ width: `${quota.usage_percentage}%` }}
                                         />
@@ -398,7 +461,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                     <div className="flex items-center gap-2.5 text-xs text-rose-700 dark:text-rose-300">
                                         <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                                         <span>
-                                            Süresiz özel kotanız <strong>5 GB</strong>'ın altına düşmüştür (Kalan: {quota.formatted_remaining}). Yeni bir paket satın alabilmek için bu paketi sonlandırabilirsiniz.
+                                            Süresiz özel kotanız <strong>5 GB</strong>'ın altına düşmüştür. Yeni bir paket satın alabilmek için bu paketi sonlandırabilirsiniz.
                                         </span>
                                     </div>
                                     <button
@@ -435,11 +498,10 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                         key={opt.months}
                                         type="button"
                                         onClick={() => setSelectedDuration(opt.months)}
-                                        className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${
-                                            selectedDuration === opt.months
+                                        className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${selectedDuration === opt.months
                                                 ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/20'
                                                 : 'text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300/60 dark:hover:bg-white/5'
-                                        }`}
+                                            }`}
                                     >
                                         {opt.label}
                                         {opt.badge && (
@@ -615,11 +677,10 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                     return (
                                         <div
                                             key={index}
-                                            className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
-                                                isOpen
+                                            className={`rounded-2xl border transition-all duration-200 overflow-hidden ${isOpen
                                                     ? 'bg-white dark:bg-[#121620] border-[#00B074]/50 shadow-xl shadow-[#00B074]/5'
                                                     : 'bg-white/70 dark:bg-[#0D111A]/80 border-slate-200 dark:border-white/[0.06] hover:border-slate-300 dark:hover:border-white/15'
-                                            }`}
+                                                }`}
                                         >
                                             <button
                                                 type="button"
@@ -627,9 +688,8 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                                 className="w-full px-6 py-4 text-left flex items-center justify-between gap-4 font-bold text-xs sm:text-sm text-slate-900 dark:text-white cursor-pointer select-none"
                                             >
                                                 <span className="flex items-center gap-3 min-w-0">
-                                                    <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs shrink-0 font-mono font-bold ${
-                                                        isOpen ? 'bg-[#00B074] text-white' : 'bg-[#00B074]/10 text-[#00B074] border border-[#00B074]/20'
-                                                    }`}>
+                                                    <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs shrink-0 font-mono font-bold ${isOpen ? 'bg-[#00B074] text-white' : 'bg-[#00B074]/10 text-[#00B074] border border-[#00B074]/20'
+                                                        }`}>
                                                         ?
                                                     </span>
                                                     <span className="truncate">{faq.question}</span>
@@ -658,44 +718,81 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
             {checkoutPlan && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md">
                     <div className="bg-white dark:bg-[#0D111A] border border-slate-200 dark:border-white/10 rounded-3xl max-w-xl w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh] space-y-5 text-slate-800 dark:text-gray-200">
-                        
-                        {/* Modal Header */}
-                        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.08]">
-                            <div>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                                    checkoutPlan.type === 'business' ? 'text-amber-600 dark:text-amber-400' : checkoutPlan.type === 'extra' ? 'text-sky-600 dark:text-sky-400' : 'text-[#00B074]'
-                                }`}>
-                                    Sipariş ve Ödeme Bildirimi
-                                </span>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
-                                    <span>{checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : `(${selectedDuration} Ay)`}</span>
-                                </h3>
-                            </div>
-                            <button
-                                onClick={() => setCheckoutPlan(null)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
 
-                        {/* Order Summary Box */}
-                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
-                            <div>
-                                <span className="text-xs text-slate-500 dark:text-gray-400 block">Ödenecek Tutar</span>
-                                <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
-                                    ₺{getPrice(checkoutPlan, selectedDuration)}
-                                </span>
-                            </div>
-                            <div className="text-right">
-                                <span className="text-xs text-slate-500 dark:text-gray-400 block">
-                                    {checkoutPlan.type === 'extra' ? 'Ek İndirme Kotası' : 'Aylık İndirme Kotası'}
-                                </span>
-                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-                                    {checkoutPlan.monthly_quota_gb} GB {checkoutPlan.type === 'extra' ? '(30 Gün)' : '/ Ay'}
-                                </span>
-                            </div>
-                        </div>
+                        {/* Modal Header */}
+                        {(() => {
+                            const currentUpgrade = isUpgradeCheckout && upgrades ? upgrades[checkoutPlan.id] : null;
+                            return (
+                                <>
+                                    <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.08]">
+                                        <div>
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                                isUpgradeCheckout
+                                                    ? 'text-purple-600 dark:text-purple-400'
+                                                    : checkoutPlan.type === 'business'
+                                                        ? 'text-amber-600 dark:text-amber-400'
+                                                        : checkoutPlan.type === 'extra'
+                                                            ? 'text-sky-600 dark:text-sky-400'
+                                                            : 'text-[#00B074]'
+                                            }`}>
+                                                {isUpgradeCheckout ? 'Paket Yükseltme Bildirimi' : 'Sipariş ve Ödeme Bildirimi'}
+                                            </span>
+                                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
+                                                {isUpgradeCheckout && currentUpgrade ? (
+                                                    <span className="flex items-center gap-2">
+                                                        <span>{currentUpgrade.current_plan.name}</span>
+                                                        <ArrowRight className="w-4 h-4 text-purple-500 shrink-0" />
+                                                        <span className="text-purple-600 dark:text-purple-400">{checkoutPlan.name}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span>{checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : `(${selectedDuration} Ay)`}</span>
+                                                )}
+                                            </h3>
+                                        </div>
+                                        <button
+                                            onClick={() => setCheckoutPlan(null)}
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+
+                                    {/* Order Summary Box */}
+                                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
+                                        <div>
+                                            <span className="text-xs text-slate-500 dark:text-gray-400 block">
+                                                {isUpgradeCheckout ? `Ödenecek Fark (${currentUpgrade?.remaining_days || 0} Gün)` : 'Ödenecek Tutar'}
+                                            </span>
+                                            <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                                                {isUpgradeCheckout && currentUpgrade
+                                                    ? currentUpgrade.formatted_upgrade_amount
+                                                    : `₺${getPrice(checkoutPlan, selectedDuration)}`}
+                                            </span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xs text-slate-500 dark:text-gray-400 block">
+                                                {isUpgradeCheckout ? 'Yeni Kota Tavanı' : checkoutPlan.type === 'extra' ? 'Ek İndirme Kotası' : 'Aylık İndirme Kotası'}
+                                            </span>
+                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                                                {checkoutPlan.monthly_quota_gb} GB {isUpgradeCheckout ? '(Mevcut Dönem)' : checkoutPlan.type === 'extra' ? '(30 Gün)' : '/ Ay'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {isUpgradeCheckout && currentUpgrade && (
+                                        <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-500/30 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2.5">
+                                            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                                            <div className="space-y-0.5">
+                                                <strong className="block text-slate-900 dark:text-white font-bold">Paket Yükseltme Bilgisi:</strong>
+                                                <p className="leading-relaxed text-[11px] text-slate-600 dark:text-purple-200">
+                                                    Mevcut döneminizin bitiş tarihi (<strong>{currentUpgrade.period_end_formatted}</strong>) değişmez. İndirme kotanız anında <strong>{checkoutPlan.monthly_quota_gb} GB</strong> tavanına yükseltilir, şu ana kadarki harcamanız korunur.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
 
                         {/* Payment Methods Selector Tabs */}
                         {paymentMethods.length === 0 ? (
@@ -717,15 +814,13 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [] }) 
                                                     key={pm.id}
                                                     type="button"
                                                     onClick={() => setSelectedMethodId(pm.id)}
-                                                    className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 ${
-                                                        isSelected
+                                                    className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 ${isSelected
                                                             ? 'bg-[#00B074]/10 dark:bg-[#00B074]/15 border-[#00B074] text-slate-900 dark:text-white shadow-lg shadow-[#00B074]/10'
                                                             : 'bg-slate-50 dark:bg-[#07090E] border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 hover:border-slate-300 dark:hover:border-white/20'
-                                                    }`}
+                                                        }`}
                                                 >
-                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                                                        isSelected ? 'bg-[#00B074] text-white' : 'bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-gray-400'
-                                                    }`}>
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#00B074] text-white' : 'bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-gray-400'
+                                                        }`}>
                                                         {pm.driver === 'bank' ? <Building2 className="w-5 h-5" /> : <Coins className="w-5 h-5" />}
                                                     </div>
                                                     <div>

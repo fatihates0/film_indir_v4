@@ -776,6 +776,8 @@ class SubscriptionService
             'subscription_expires_at' => $subscription?->is_perpetual ? null : $subscription?->expires_at->toIso8601String(),
             'is_perpetual' => (bool) ($subscription?->is_perpetual),
             'can_cancel_perpetual' => $canCancelPerpetual,
+            'plan_id' => $plan?->id,
+            'can_upgrade' => (bool) ($hasMainSub && $plan && ! $subscription?->is_perpetual),
             'subscription_id' => $subscription?->id,
             'can_download' => $totalRemaining > 0,
             'max_parallel_downloads' => $maxParallel,
@@ -783,6 +785,146 @@ class SubscriptionService
             'speed_limit_mbps' => $speedLimit,
             'allows_vps_access' => $allowsVps,
         ];
+    }
+
+    /**
+     * Calculate proration upgrade price and metadata for switching to a target plan.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function calculateUpgrade(User $user, Plan $targetPlan): ?array
+    {
+        if ($user->isAdmin() || $targetPlan->isExtra()) {
+            return null;
+        }
+
+        $period = $this->getCurrentPeriod($user);
+        if (! $period) {
+            return null;
+        }
+
+        $subscription = $period->subscription;
+        if (! $subscription || $subscription->is_perpetual) {
+            return null;
+        }
+
+        $currentPlan = $subscription->plan;
+        if (! $currentPlan || $currentPlan->id === $targetPlan->id) {
+            return null;
+        }
+
+        // Target plan must have higher monthly quota
+        if ($targetPlan->monthly_quota_bytes <= $currentPlan->monthly_quota_bytes) {
+            return null;
+        }
+
+        $now = Carbon::now();
+        $periodStart = $period->period_start;
+        $periodEnd = $period->period_end;
+
+        $currentPeriodDays = max(1, (int) round($periodStart->diffInDays($periodEnd)));
+        $remainingDays = max(0, (int) ceil($now->diffInDays($periodEnd, false)));
+
+        if ($remainingDays <= 0) {
+            return null;
+        }
+
+        $currentPrice1m = (float) $currentPlan->price_1m;
+        $targetPrice1m = (float) $targetPlan->price_1m;
+
+        // Daily rate difference for current cycle
+        $dailyDiff = max(0.0, ($targetPrice1m - $currentPrice1m) / $currentPeriodDays);
+        $currentCycleDiff = $dailyDiff * $remainingDays;
+
+        // Check future months if multi-month subscription
+        $totalMonths = max(1, $subscription->duration_months);
+        $remainingFutureMonths = max(0, $totalMonths - $period->period_number);
+        $futureMonthsDiff = 0.0;
+        if ($remainingFutureMonths > 0) {
+            $futureMonthlyCurrent = $currentPlan->getPriceForDuration($totalMonths) / $totalMonths;
+            $futureMonthlyTarget = $targetPlan->getPriceForDuration($totalMonths) / $totalMonths;
+            $futureMonthsDiff = max(0.0, ($futureMonthlyTarget - $futureMonthlyCurrent) * $remainingFutureMonths);
+        }
+
+        $totalUpgradeAmount = round(max(5.0, $currentCycleDiff + $futureMonthsDiff), 2);
+
+        return [
+            'can_upgrade' => true,
+            'current_plan' => [
+                'id' => $currentPlan->id,
+                'name' => $currentPlan->name,
+                'monthly_quota_gb' => $currentPlan->monthly_quota_gb,
+                'formatted_quota' => $currentPlan->formatted_quota,
+            ],
+            'target_plan' => [
+                'id' => $targetPlan->id,
+                'name' => $targetPlan->name,
+                'monthly_quota_gb' => $targetPlan->monthly_quota_gb,
+                'formatted_quota' => $targetPlan->formatted_quota,
+            ],
+            'remaining_days' => $remainingDays,
+            'period_end_formatted' => $periodEnd->format('d.m.Y H:i'),
+            'upgrade_amount' => $totalUpgradeAmount,
+            'formatted_upgrade_amount' => '₺'.number_format($totalUpgradeAmount, 2, ',', '.'),
+            'quota_ceiling_gb' => $targetPlan->monthly_quota_gb,
+        ];
+    }
+
+    /**
+     * Perform the upgrade to a target plan preserving current billing period end and usage.
+     */
+    public function upgradeSubscription(
+        User $user,
+        Plan $targetPlan,
+        float $pricePaid,
+        ?string $notes = null
+    ): Subscription {
+        if ($targetPlan->isExtra()) {
+            throw new \InvalidArgumentException('Ek kota paketine yükseltme yapılamaz.');
+        }
+
+        $period = $this->getCurrentPeriod($user);
+        if (! $period) {
+            throw new \RuntimeException('Aktif bir abonelik dönemi bulunamadı.');
+        }
+
+        $subscription = $period->subscription;
+        if (! $subscription || $subscription->is_perpetual) {
+            throw new \RuntimeException('Süresiz veya geçersiz bir abonelik yükseltilemez.');
+        }
+
+        $oldPlan = $subscription->plan;
+
+        return DB::transaction(function () use ($user, $subscription, $period, $targetPlan, $pricePaid, $notes) {
+            // Update subscription
+            $subscription->update([
+                'plan_id' => $targetPlan->id,
+                'price_paid' => (float) $subscription->price_paid + $pricePaid,
+                'notes' => trim(($subscription->notes ? $subscription->notes.' | ' : '').($notes ?? "Paket {$targetPlan->name} yükseltildi (₺{$pricePaid})")),
+            ]);
+
+            // Raise current period quota ceiling to target plan's monthly quota
+            // Existing used_bytes is untouched, so remaining increases by the difference!
+            $period->update([
+                'allocated_bytes' => $targetPlan->monthly_quota_bytes,
+            ]);
+
+            // Sync user's plan attribute on User model
+            if ($targetPlan->isBusiness()) {
+                $user->update(['plan' => 'vip']);
+            } else {
+                $slugLower = strtolower($targetPlan->slug);
+                if (in_array($slugLower, ['free', 'basic', 'premium', 'vip'])) {
+                    $user->update(['plan' => $slugLower]);
+                } else {
+                    $user->update(['plan' => 'premium']);
+                }
+            }
+
+            ProvisionMediaAccount::dispatch($user);
+
+            return $subscription->fresh(['plan', 'activePeriod']);
+        });
     }
 
     /**

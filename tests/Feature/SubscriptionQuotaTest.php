@@ -6,6 +6,8 @@ use App\Enums\StorageBoxProtocol;
 use App\Enums\UserRole;
 use App\Models\DownloadTicket;
 use App\Models\MediaFile;
+use App\Models\PaymentMethod;
+use App\Models\PaymentNotification;
 use App\Models\Plan;
 use App\Models\StorageBox;
 use App\Models\User;
@@ -971,5 +973,91 @@ class SubscriptionQuotaTest extends TestCase
         // Quota summary should reflect no subscription
         $newQuota = $service->getQuotaSummary($user);
         $this->assertFalse($newQuota['has_subscription']);
+    }
+
+    public function test_user_can_calculate_and_upgrade_subscription_plan(): void
+    {
+        $user = User::factory()->create();
+        $plan1 = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+        $plan2 = Plan::where('monthly_quota_gb', 2500)->firstOrFail();
+
+        $service = app(SubscriptionService::class);
+        $sub = $service->subscribe($user, $plan1, 1);
+        $period = $service->getCurrentPeriod($user);
+
+        // Simulate 500 GB used
+        $period->update([
+            'used_bytes' => 500 * 1024 * 1024 * 1024,
+        ]);
+
+        $calc = $service->calculateUpgrade($user, $plan2);
+        $this->assertNotNull($calc);
+        $this->assertTrue($calc['can_upgrade']);
+        $this->assertGreaterThan(0, $calc['upgrade_amount']);
+        $this->assertEquals($plan2->monthly_quota_gb, $calc['quota_ceiling_gb']);
+
+        // Upgrade subscription
+        $upgradedSub = $service->upgradeSubscription($user, $plan2, $calc['upgrade_amount'], 'Test Upgrade');
+        $this->assertEquals($plan2->id, $upgradedSub->plan_id);
+
+        $period->refresh();
+        // Quota ceiling should now be Plan 2 (2500 GB)
+        $this->assertEquals($plan2->monthly_quota_bytes, $period->allocated_bytes);
+        // Used bytes should remain 500 GB
+        $this->assertEquals(500 * 1024 * 1024 * 1024, $period->used_bytes);
+        // Remaining bytes should be 2000 GB
+        $this->assertEquals(2000 * 1024 * 1024 * 1024, $period->remaining_bytes);
+    }
+
+    public function test_upgrade_payment_notification_submission_and_approval(): void
+    {
+        $user = User::factory()->create();
+        $admin = User::factory()->create(['role' => UserRole::ADMIN]);
+        $plan1 = Plan::where('monthly_quota_gb', 1500)->firstOrFail();
+        $plan2 = Plan::where('monthly_quota_gb', 2500)->firstOrFail();
+
+        $paymentMethod = PaymentMethod::first() ?? PaymentMethod::create([
+            'id' => 'test_bank_transfer',
+            'name' => 'Banka Havalesi',
+            'driver' => 'bank',
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan1, 1);
+
+        // Submit upgrade notification
+        $response = $this->actingAs($user)->post(route('payment-notifications.store'), [
+            'plan_id' => $plan2->id,
+            'payment_method_id' => $paymentMethod->id,
+            'duration_months' => 1,
+            'is_upgrade' => true,
+            'sender_name' => 'Fatih Ates',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $notification = PaymentNotification::where('user_id', $user->id)
+            ->where('is_upgrade', true)
+            ->first();
+
+        $this->assertNotNull($notification);
+        $this->assertEquals($plan2->id, $notification->plan_id);
+        $this->assertEquals($plan1->id, $notification->old_plan_id);
+        $this->assertEquals('pending', $notification->status);
+
+        // Admin approves
+        $approveResponse = $this->actingAs($admin)->post(route('admin.payment-notifications.approve', $notification));
+        $approveResponse->assertRedirect();
+        $approveResponse->assertSessionHas('success');
+
+        $notification->refresh();
+        $this->assertEquals('approved', $notification->status);
+
+        $currentPeriod = $service->getCurrentPeriod($user);
+        $this->assertEquals($plan2->id, $currentPeriod->subscription->plan_id);
+        $this->assertEquals($plan2->monthly_quota_bytes, $currentPeriod->allocated_bytes);
     }
 }
