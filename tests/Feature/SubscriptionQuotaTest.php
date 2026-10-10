@@ -805,4 +805,62 @@ class SubscriptionQuotaTest extends TestCase
         $extraQuota->refresh();
         $this->assertEquals($fiveGb, $extraQuota->used_bytes);
     }
+
+    public function test_check_active_endpoint_evaluates_client_ip_not_gateway_server_ip(): void
+    {
+        $user = User::factory()->create();
+        $plan = Plan::where('type', Plan::TYPE_INDIVIDUAL)->firstOrFail();
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $plan, 1);
+
+        $box = StorageBox::create([
+            'name' => 'Gateway Box IP Test',
+            'host' => 'gw.filmindir.com',
+            'protocol' => StorageBoxProtocol::CustomGateway,
+            'port' => 443,
+            'username' => 'u1',
+            'password' => 'secret123',
+            'total_capacity_gb' => 1000,
+            'free_capacity_gb' => 500,
+            'used_capacity_gb' => 500,
+            'status' => 'active',
+            'connection_status' => 'online',
+        ]);
+
+        $file = MediaFile::create([
+            'storage_box_id' => $box->id,
+            'name' => 'File.mkv',
+            'path' => '/movies/File.mkv',
+            'directory' => '/movies',
+            'extension' => 'mkv',
+            'size_bytes' => 1024 * 1024 * 1024,
+        ]);
+
+        $ticket = DownloadTicket::create([
+            'token' => DownloadTicket::generateToken(),
+            'user_id' => $user->id,
+            'media_file_id' => $file->id,
+            'subscription_period_id' => $service->getCurrentPeriod($user)?->id,
+            'bytes_downloaded' => 0,
+            'status' => 'pending',
+            'expires_at' => now()->addHours(3),
+        ]);
+
+        // Simulated webhook from Gateway server with Hetzner datacenter IP in CF-Connecting-IP header,
+        // but real residential client_ip in body.
+        $response = $this->withHeaders([
+            'CF-Connecting-IP' => '159.69.1.1', // Hetzner datacenter IP (hosting keyword)
+        ])->postJson(route('downloads.check-active'), [
+            'token' => $ticket->token,
+            'user_id' => $user->id,
+            'media_file_id' => $file->id,
+            'client_ip' => '176.234.12.34', // Residential IP
+            'max_parallel_downloads' => 3,
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'allowed' => true,
+        ]);
+    }
 }

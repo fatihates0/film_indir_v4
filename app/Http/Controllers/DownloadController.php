@@ -221,8 +221,45 @@ class DownloadController extends Controller
         $token = $request->input('token');
         $userId = $request->input('user_id');
         $mediaFileId = (int) $request->input('media_file_id');
-        $clientIps = $this->getAllClientIps($request, $request->input('client_ip'));
-        $primaryIp = $this->getCleanIp($request, $request->input('client_ip'));
+
+        /** @var DownloadTicket|null $ticket */
+        $ticket = null;
+        if ($token) {
+            $ticket = DownloadTicket::where('token', $token)->with(['user'])->first();
+        }
+
+        $user = $ticket?->user ?? ($userId ? User::find($userId) : null);
+
+        // Extract client IPs strictly for the downloading client, NOT the gateway server
+        $candidateIp = $request->input('client_ip');
+        $clientIps = [];
+
+        if (! empty($candidateIp)) {
+            $parts = explode(',', (string) $candidateIp);
+            foreach ($parts as $p) {
+                $clean = trim(preg_replace('/^::ffff:/i', '', $p));
+                if (! empty($clean) && filter_var($clean, FILTER_VALIDATE_IP)) {
+                    if (! $this->isCloudflareOrProxyIp($clean)) {
+                        $clientIps[] = $clean;
+                    }
+                }
+            }
+        }
+
+        // Fallback to ticket's original client IP if gateway didn't supply one
+        if (empty($clientIps) && $ticket?->ip_address) {
+            $ticketIp = trim(preg_replace('/^::ffff:/i', '', (string) $ticket->ip_address));
+            if (! empty($ticketIp) && filter_var($ticketIp, FILTER_VALIDATE_IP) && ! $this->isCloudflareOrProxyIp($ticketIp)) {
+                $clientIps[] = $ticketIp;
+            }
+        }
+
+        // Only fall back to request IPs if neither gateway nor ticket provided one
+        if (empty($clientIps)) {
+            $clientIps = $this->getAllClientIps($request);
+        }
+
+        $primaryIp = ! empty($clientIps) ? $clientIps[0] : $this->getCleanIp($request);
 
         // 1. Blacklist Check (Always Deny - checks all candidate IPv4 and IPv6 addresses)
         if (! empty($clientIps) && $this->vpsDetectionService->isBlacklisted($clientIps)) {
@@ -232,14 +269,6 @@ class DownloadController extends Controller
                 'message' => 'IP adresiniz sistem yönetimi tarafından engellenmiştir (Blacklist).',
             ], 403);
         }
-
-        /** @var DownloadTicket|null $ticket */
-        $ticket = null;
-        if ($token) {
-            $ticket = DownloadTicket::where('token', $token)->with(['user'])->first();
-        }
-
-        $user = $ticket?->user ?? ($userId ? User::find($userId) : null);
 
         if (! $user || $user->isAdmin()) {
             if ($ticket && $primaryIp) {
