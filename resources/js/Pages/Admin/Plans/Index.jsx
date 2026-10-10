@@ -768,17 +768,30 @@ export default function PlansIndex({
                                                     </td>
 
                                                     <td className="px-6 py-4">
-                                                        {user.has_active_sub ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="px-3 py-1 rounded-xl bg-[#00B074]/15 border border-[#00B074]/30 text-[#00B074] font-bold text-xs flex items-center gap-1.5">
-                                                                    <Sparkles className="w-3.5 h-3.5" />
-                                                                    {user.plan_name}
-                                                                </span>
-                                                                {user.is_perpetual && (
-                                                                    <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
-                                                                        <Infinity className="w-3.5 h-3.5" /> Süresiz
-                                                                    </span>
+                                                        {user.has_any_package ? (
+                                                            <div className="flex flex-col gap-1.5 items-start">
+                                                                {user.has_active_sub && (
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="px-3 py-1 rounded-xl bg-[#00B074]/15 border border-[#00B074]/30 text-[#00B074] font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-[#00B074]/5">
+                                                                            <Sparkles className="w-3.5 h-3.5" />
+                                                                            {user.main_plan_name || user.plan_name}
+                                                                        </span>
+                                                                        {user.is_perpetual && (
+                                                                            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                                                                                <Infinity className="w-3.5 h-3.5" /> Süresiz
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 )}
+                                                                {user.has_extras && user.extras.map((extra) => (
+                                                                    <div key={extra.id} className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="px-2.5 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-purple-500/5">
+                                                                            <Plus className="w-3 h-3 text-purple-400" />
+                                                                            <span>{extra.name}</span>
+                                                                            <span className="text-[10px] text-purple-400/80 font-mono">({extra.allocated_formatted})</span>
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         ) : (
                                                             <span className="px-3 py-1 rounded-xl bg-gray-800 text-gray-400 text-xs font-semibold">
@@ -788,10 +801,10 @@ export default function PlansIndex({
                                                     </td>
 
                                                     <td className="px-6 py-4">
-                                                        {user.has_active_sub ? (
+                                                        {user.has_any_package ? (
                                                             <div className="w-48 space-y-1.5">
                                                                 <div className="flex justify-between text-[11px]">
-                                                                    <span className="text-gray-300 font-mono">{user.quota_used} / {user.quota_total}</span>
+                                                                    <span className="text-gray-200 font-mono font-bold">{user.quota_used} / {user.quota_total}</span>
                                                                     <span className="text-gray-400 font-bold">{Math.round(user.quota_percentage)}%</span>
                                                                 </div>
                                                                 <div className="w-full h-2 bg-[#07090E] rounded-full overflow-hidden border border-white/[0.04]">
@@ -802,6 +815,18 @@ export default function PlansIndex({
                                                                         style={{ width: `${Math.min(100, user.quota_percentage)}%` }}
                                                                     />
                                                                 </div>
+                                                                {user.has_active_sub && user.has_extras && (
+                                                                    <div className="pt-1 border-t border-white/[0.04] flex flex-col gap-0.5 text-[10px] font-mono">
+                                                                        <div className="flex justify-between text-gray-400">
+                                                                            <span>Ana Paket:</span>
+                                                                            <span className="text-gray-300">{user.main_quota_used} / {user.main_quota_total}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between text-purple-400">
+                                                                            <span>Ek Paket:</span>
+                                                                            <span className="text-purple-300">{user.extra_quota_used} / {user.extra_quota_total}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <span className="text-gray-500 text-xs">Kota Tanımlanmamış</span>
@@ -829,10 +854,25 @@ export default function PlansIndex({
                                                     </td>
 
                                                     <td className="px-6 py-4">
-                                                        {user.has_active_sub ? (
-                                                            <span className={`text-xs font-mono ${user.is_perpetual ? 'text-emerald-400 font-bold' : 'text-gray-300'}`}>
-                                                                {user.expires_at}
-                                                            </span>
+                                                        {user.has_any_package ? (
+                                                            <div className="flex flex-col gap-1 text-xs font-mono">
+                                                                {user.has_active_sub && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-gray-500 uppercase font-sans font-semibold">Ana:</span>
+                                                                        <span className={user.is_perpetual ? 'text-emerald-400 font-bold' : 'text-gray-300'}>
+                                                                            {user.expires_at}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {user.has_extras && user.extras.map((extra) => (
+                                                                    <div key={extra.id} className="flex items-center gap-1.5 text-[11px]">
+                                                                        <span className="text-[10px] text-purple-400 uppercase font-sans font-semibold">Ek:</span>
+                                                                        <span className="text-purple-300" title={`Kalan: ${extra.days_left ?? 0} gün`}>
+                                                                            {extra.expires_at}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         ) : (
                                                             <span className="text-gray-500 text-xs">-</span>
                                                         )}
@@ -1520,8 +1560,21 @@ export default function PlansIndex({
                                 <div>
                                     <label className="block text-gray-300 font-semibold mb-1">Hedef Kullanıcı *</label>
                                     {assignModalUser ? (
-                                        <div className="p-3 bg-[#07090E] border border-white/[0.08] rounded-xl font-bold text-white flex items-center justify-between">
-                                            <span>{assignModalUser.name} ({assignModalUser.email})</span>
+                                        <div className="space-y-2">
+                                            <div className="p-3 bg-[#07090E] border border-white/[0.08] rounded-xl font-bold text-white flex items-center justify-between">
+                                                <span>{assignModalUser.name} ({assignModalUser.email})</span>
+                                            </div>
+                                            {assignModalUser.has_extras && (
+                                                <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1">
+                                                    <span className="text-[10px] uppercase font-bold text-purple-300 block">Mevcut Aktif Ek Paketleri:</span>
+                                                    {assignModalUser.extras.map((ex) => (
+                                                        <div key={ex.id} className="text-[11px] text-purple-200 flex justify-between font-mono">
+                                                            <span>• {ex.name} ({ex.allocated_formatted})</span>
+                                                            <span className="text-purple-400">Bitiş: {ex.expires_at}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <select

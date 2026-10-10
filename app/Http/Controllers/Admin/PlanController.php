@@ -47,6 +47,23 @@ class PlanController extends Controller
                 $totalUsed = $mainUsed + $extraUsed;
                 $totalPercentage = $totalAllocated > 0 ? round(min(100.0, max(0.0, ($totalUsed / $totalAllocated) * 100)), 1) : 0;
 
+                $extrasList = $activeExtras->map(function ($extra) {
+                    return [
+                        'id' => $extra->id,
+                        'name' => $extra->name,
+                        'allocated_formatted' => SubscriptionPeriod::formatBytes($extra->allocated_bytes),
+                        'used_formatted' => SubscriptionPeriod::formatBytes($extra->used_bytes),
+                        'remaining_formatted' => SubscriptionPeriod::formatBytes($extra->remaining_bytes),
+                        'allocated_bytes' => $extra->allocated_bytes,
+                        'used_bytes' => $extra->used_bytes,
+                        'remaining_bytes' => $extra->remaining_bytes,
+                        'expires_at' => $extra->expires_at ? $extra->expires_at->format('d.m.Y H:i') : null,
+                        'days_left' => $extra->expires_at ? max(0, (int) now()->diffInDays($extra->expires_at, false)) : null,
+                    ];
+                })->values()->all();
+
+                $mainPlanName = $period ? ($period->subscription->plan?->name ?? ($period->subscription->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası')) : null;
+
                 return [
                     'id' => $u->id,
                     'name' => $u->name,
@@ -54,18 +71,28 @@ class PlanController extends Controller
                     'role' => $u->role->value,
                     'role_label' => $u->role->label(),
                     'plan_key' => $u->plan->value,
-                    'plan_name' => $period ? ($period->subscription->plan?->name ?? ($period->subscription->is_perpetual ? 'Süresiz Özel Kota' : 'Özel İndirme Kotası')) : $u->plan->label(),
+                    'plan_name' => $mainPlanName ?? ($activeExtras->isNotEmpty() ? 'Ek Kota Paketi' : $u->plan->label()),
+                    'main_plan_name' => $mainPlanName,
                     'plan_id' => $period?->subscription?->plan_id,
                     'plan_type' => $period?->subscription?->plan?->type ?? 'individual',
                     'has_active_sub' => $activeSub !== null,
+                    'has_extras' => ! empty($extrasList),
+                    'has_any_package' => $activeSub !== null || ! empty($extrasList),
                     'is_perpetual' => (bool) ($activeSub?->is_perpetual),
                     'quota_used' => SubscriptionPeriod::formatBytes($totalUsed),
                     'quota_total' => SubscriptionPeriod::formatBytes($totalAllocated),
                     'quota_used_bytes' => $totalUsed,
                     'quota_allocated_bytes' => $totalAllocated,
                     'quota_percentage' => $totalPercentage,
-                    'active_extras_count' => $activeExtras->count(),
+                    'main_quota_used' => SubscriptionPeriod::formatBytes($mainUsed),
+                    'main_quota_total' => SubscriptionPeriod::formatBytes($mainAllocated),
+                    'main_allocated_bytes' => $mainAllocated,
+                    'main_used_bytes' => $mainUsed,
+                    'extra_quota_used' => SubscriptionPeriod::formatBytes($extraUsed),
+                    'extra_quota_total' => SubscriptionPeriod::formatBytes($extraAllocated),
+                    'active_extras_count' => count($extrasList),
                     'extra_quota_formatted' => SubscriptionPeriod::formatBytes($activeExtras->sum(fn ($e) => $e->remaining_bytes)),
+                    'extras' => $extrasList,
                     'custom_speed_limit_mbps' => $u->custom_speed_limit_mbps,
                     'expires_at' => $activeSub ? ($activeSub->is_perpetual ? 'Süresiz' : $activeSub->expires_at->format('d.m.Y H:i')) : null,
                     'created_at' => $u->created_at->format('d.m.Y H:i'),
