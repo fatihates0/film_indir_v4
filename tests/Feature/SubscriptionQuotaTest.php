@@ -863,4 +863,43 @@ class SubscriptionQuotaTest extends TestCase
             'allowed' => true,
         ]);
     }
+
+    public function test_extra_quota_packages_do_not_grant_vps_access_only_main_subscription_controls_it(): void
+    {
+        $user = User::factory()->create();
+        $individualPlan = Plan::where('type', Plan::TYPE_INDIVIDUAL)->firstOrFail();
+        $individualPlan->update(['allow_vps_access' => false]);
+
+        $service = app(SubscriptionService::class);
+        $service->subscribe($user, $individualPlan, 1);
+
+        // Ana pakette VPS kapalı -> VPS izni yok
+        $this->assertFalse($service->allowsVpsAccess($user));
+
+        // Ek paket satın alınsa dahi ana pakette VPS kapalı olduğu için VPS izni verilmemeli
+        $extraPlan = Plan::create([
+            'name' => '2000 GB Extra VPS',
+            'slug' => '2000-gb-extra-vps',
+            'type' => Plan::TYPE_EXTRA,
+            'monthly_quota_gb' => 2000,
+            'monthly_quota_bytes' => 2000 * 1024 * 1024 * 1024,
+            'price_1m' => 100,
+            'price_3m' => 100,
+            'price_6m' => 100,
+            'price_12m' => 100,
+            'max_parallel_downloads' => 3,
+            'allow_vps_access' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $service->purchaseExtraQuota($user, $extraPlan);
+
+        // Ek paket VPS iznini değiştiremez: hala false olmalı
+        $this->assertFalse($service->allowsVpsAccess($user));
+
+        // Ana pakette VPS izni açıldığında ise izin verilmeli
+        $individualPlan->update(['allow_vps_access' => true]);
+        $this->assertTrue($service->allowsVpsAccess($user));
+    }
 }

@@ -183,7 +183,11 @@ class PlanController extends Controller
         $monthlyQuotaBytes = (int) $validated['monthly_quota_gb'] * 1024 * 1024 * 1024;
         $allowedDurations = $type === Plan::TYPE_EXTRA ? [1] : (! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12]);
 
-        $allowVps = $type === Plan::TYPE_BUSINESS ? true : (bool) ($validated['allow_vps_access'] ?? false);
+        $allowVps = match ($type) {
+            Plan::TYPE_BUSINESS => true,
+            Plan::TYPE_EXTRA => false,
+            default => (bool) ($validated['allow_vps_access'] ?? false),
+        };
         $maxParallel = $type === Plan::TYPE_BUSINESS ? 0 : (int) $validated['max_parallel_downloads'];
 
         Plan::create([
@@ -236,7 +240,11 @@ class PlanController extends Controller
         $monthlyQuotaBytes = (int) $validated['monthly_quota_gb'] * 1024 * 1024 * 1024;
         $allowedDurations = $type === Plan::TYPE_EXTRA ? [1] : (! empty($validated['allowed_durations']) ? array_values(array_map('intval', $validated['allowed_durations'])) : [1, 3, 6, 12]);
 
-        $allowVps = $type === Plan::TYPE_BUSINESS ? true : (bool) ($validated['allow_vps_access'] ?? false);
+        $allowVps = match ($type) {
+            Plan::TYPE_BUSINESS => true,
+            Plan::TYPE_EXTRA => false,
+            default => (bool) ($validated['allow_vps_access'] ?? false),
+        };
         $maxParallel = $type === Plan::TYPE_BUSINESS ? 0 : (int) $validated['max_parallel_downloads'];
 
         $plan->update([

@@ -554,6 +554,8 @@ class SubscriptionService
 
     /**
      * Check if a user is allowed to download from VPS / Server IP addresses.
+     * VPS access is strictly determined by the user's active MAIN subscription.
+     * Extra quota packages do not grant or modify VPS download access.
      */
     public function allowsVpsAccess(User $user): bool
     {
@@ -561,14 +563,39 @@ class SubscriptionService
             return true;
         }
 
-        $period = $this->getCurrentPeriod($user);
-        if ($period && $period->subscription && $period->subscription->plan) {
-            $plan = $period->subscription->plan;
+        // 1. Check all active main subscriptions directly via plan
+        $hasActiveSubVps = $user->subscriptions()
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where(function ($q) {
+                $q->where('is_perpetual', true)
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->whereHas('plan', function ($q) {
+                $q->whereIn('type', [Plan::TYPE_INDIVIDUAL, Plan::TYPE_BUSINESS])
+                    ->where(function ($pq) {
+                        $pq->where('allow_vps_access', true)
+                            ->orWhere('type', Plan::TYPE_BUSINESS);
+                    });
+            })
+            ->exists();
 
-            // Business plans automatically allow VPS / Server access
-            if ($plan->isBusiness() || (bool) $plan->allow_vps_access) {
+        if ($hasActiveSubVps) {
+            return true;
+        }
+
+        // 2. Check current active period's subscription plan
+        $period = $this->getCurrentPeriod($user);
+        if ($period) {
+            $plan = $period->subscription?->plan;
+            if ($plan && ($plan->isBusiness() || (bool) $plan->allow_vps_access)) {
                 return true;
             }
+        }
+
+        // 3. Legacy User plan enum
+        if ($user->plan && in_array($user->plan->value, ['vip', 'business'], true)) {
+            return true;
         }
 
         return false;
