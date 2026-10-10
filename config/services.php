@@ -42,13 +42,6 @@ return [
         'image_base_url' => env('TMDB_IMAGE_BASE_URL', 'https://image.tmdb.org/t/p/w500'),
     ],
 
-    'storage' => [
-        'secret_key' => env('STORAGE_SECRET_KEY', ''),
-        'default_node_url' => env('STORAGE_NODE_1_URL', 'https://dl3.fatihates.com.tr'),
-        'gateway_secret' => env('GATEWAY_WEBHOOK_SECRET', ''),
-        'app_url' => env('STORAGE_APP_URL', env('APP_URL')),
-    ],
-
     'jellyfin' => [
         'url' => env('JELLYFIN_URL', ''),
         'api_key' => env('JELLYFIN_API_KEY', ''),

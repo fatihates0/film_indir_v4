@@ -7,27 +7,8 @@ use RuntimeException;
 
 class StorageTokenService
 {
-    protected string $defaultSecretKey;
-
-    protected string $defaultNodeUrl;
-
-    public function __construct()
-    {
-        $secretKey = config('services.storage.secret_key', '');
-
-        if (empty($secretKey)) {
-            throw new RuntimeException(
-                'STORAGE_SECRET_KEY env değişkeni tanımlanmamış. '.
-                '.env dosyasına güçlü bir değer ekleyin: STORAGE_SECRET_KEY=...'
-            );
-        }
-
-        $this->defaultSecretKey = $secretKey;
-        $this->defaultNodeUrl = rtrim(config('services.storage.default_node_url', 'https://dl3.fatihates.com.tr'), '/');
-    }
-
     /**
-     * Build full base URL for a storage box or default node.
+     * Build full base URL for a storage box.
      * Fully supports IP addresses, domains, custom ports, HTTP, and HTTPS.
      */
     public function getBaseUrl(?StorageBox $storageBox = null): string
@@ -46,19 +27,19 @@ class StorageTokenService
             return "{$scheme}://{$cleanHost}{$portSuffix}";
         }
 
-        return $this->defaultNodeUrl;
+        throw new RuntimeException('Geçerli bir depolama sunucusu (Storage Box) belirtilmedi.');
     }
 
     /**
-     * Get secret key for a storage box or default key.
+     * Get HMAC secret key for a storage box.
      */
     public function getSecretKey(?StorageBox $storageBox = null): string
     {
-        if ($storageBox && $storageBox->password) {
+        if ($storageBox && ! empty($storageBox->password)) {
             return trim($storageBox->password);
         }
 
-        return $this->defaultSecretKey;
+        throw new RuntimeException('Seçilen depolama sunucusu için HMAC Gizli Anahtarı tanımlanmamış.');
     }
 
     /**
@@ -97,7 +78,7 @@ class StorageTokenService
         ?int $maxParallelDownloads = null,
         ?int $speedLimitMbps = null
     ): string {
-        $appUrl = config('services.storage.app_url', config('app.url', url('/')));
+        $appUrl = config('app.url', url('/'));
 
         $extraPayload = [
             'file_path' => '/'.ltrim($filePath, '/'),
