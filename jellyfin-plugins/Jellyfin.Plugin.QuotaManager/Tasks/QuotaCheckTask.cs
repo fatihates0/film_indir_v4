@@ -21,13 +21,13 @@ namespace Jellyfin.Plugin.QuotaManager.Tasks
             _quotaService = Plugin.Instance?.QuotaService;
         }
 
-        public string Name => "Bant Genişliği & Kota Senkronizasyon Görevi";
+        public string Name => "SineKutu Kota Senkronizasyon Görevi";
 
-        public string Key => "QuotaManagerCheckTask";
+        public string Key => "SineKutuQuotaCheckTask";
 
-        public string Description => "Kullanıcı trafik kotalarını kontrol eder, Laravel API ile abonelik tarihlerini senkronize eder ve kotası bitenleri kısıtlar.";
+        public string Description => "SineKutu kullanıcı trafik kotalarını kontrol eder, Laravel API ile abonelik tarihlerini senkronize eder ve kotası bitenleri kısıtlar.";
 
-        public string Category => "Quota Manager";
+        public string Category => "SineKutu Kota Yönetimi";
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {

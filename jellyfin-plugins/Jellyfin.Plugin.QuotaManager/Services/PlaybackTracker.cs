@@ -26,6 +26,10 @@ namespace Jellyfin.Plugin.QuotaManager.Services
         private readonly ConcurrentDictionary<string, string> _deniedSessions
             = new ConcurrentDictionary<string, string>();
 
+        // Başlatılmakta olan oturumlar (race condition koruması)
+        private readonly ConcurrentDictionary<string, byte> _startingSessions
+            = new ConcurrentDictionary<string, byte>();
+
         public PlaybackTracker(
             ISessionManager sessionManager,
             QuotaService quotaService,
@@ -59,16 +63,22 @@ namespace Jellyfin.Plugin.QuotaManager.Services
         /// </summary>
         private async void OnPlaybackStart(object? sender, PlaybackProgressEventArgs e)
         {
+            if (e.Session == null || e.Session.UserId.Equals(Guid.Empty) || string.IsNullOrEmpty(e.Session.UserName))
+            {
+                return;
+            }
+
+            var username = e.Session.UserName;
+            var sessionId = e.Session.Id;
+
+            // Aynı oturum için eşzamanlı erişim denetimi yapılmasını engelle
+            if (!_startingSessions.TryAdd(sessionId, 0))
+            {
+                return;
+            }
+
             try
             {
-                if (e.Session == null || e.Session.UserId.Equals(Guid.Empty) || string.IsNullOrEmpty(e.Session.UserName))
-                {
-                    return;
-                }
-
-                var username = e.Session.UserName;
-                var sessionId = e.Session.Id;
-
                 _logger.LogInformation("Kullanıcı {Username} bir içerik başlatıyor (Oturum: {SessionId}). Laravel erişim denetimi yapılıyor...", username, sessionId);
 
                 // 1. Laravel üzerinden canlı paket ve kota kontrolü
@@ -128,7 +138,8 @@ namespace Jellyfin.Plugin.QuotaManager.Services
                     AccumulatedBytes = 0,
                     LastSyncTime = DateTime.UtcNow,
                     RemainingBytes = accessCheck.RemainingBytes,
-                    IsExhausted = false
+                    IsExhausted = false,
+                    IsInitialized = false // İlk gelen progress raporu konumu senkronize edecek
                 };
 
                 _activeSessions[sessionId] = sessionState;
@@ -136,6 +147,10 @@ namespace Jellyfin.Plugin.QuotaManager.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "PlaybackStart erişim denetimi esnasında beklenmeyen bir hata oluştu.");
+            }
+            finally
+            {
+                _startingSessions.TryRemove(sessionId, out _);
             }
         }
 
@@ -168,8 +183,10 @@ namespace Jellyfin.Plugin.QuotaManager.Services
                 // Oturum aktif listede yoksa (örneğin eklenti yeniden başlatıldıysa)
                 if (!_activeSessions.TryGetValue(sessionId, out var sessionState))
                 {
-                    // Oturumu başlat
-                    OnPlaybackStart(sender, e);
+                    if (!_startingSessions.ContainsKey(sessionId))
+                    {
+                        OnPlaybackStart(sender, e);
+                    }
                     return;
                 }
 
@@ -185,21 +202,40 @@ namespace Jellyfin.Plugin.QuotaManager.Services
 
                 var currentTicks = e.PlaybackPositionTicks ?? 0;
                 var now = DateTime.UtcNow;
+
+                // 1. İLK KONUM SENKRONİZASYONU (Resume / Başlangıç Koruması):
+                // Kullanıcı filme kaldığı yerden (örneğin 15. veya 50. dakikada) devam etse dahi,
+                // ilk gelen progress raporu sadece başlangıç konumunu senkronize eder.
+                // Geçmiş dakikalar için KESİNLİKLE kota düşülmez.
+                if (!sessionState.IsInitialized)
+                {
+                    sessionState.LastPositionTicks = currentTicks;
+                    sessionState.LastCheckTime = now;
+                    sessionState.IsInitialized = true;
+                    _logger.LogInformation("Kullanıcı {Username} oturumu ({SessionId}) başlangıç/resume konumu {Minutes} dakika ({Ticks} ticks) olarak eşitlendi. İlk senkronizasyonda kota düşülmedi.",
+                        sessionState.Username, sessionId, Math.Round((double)currentTicks / (TimeSpan.TicksPerSecond * 60), 2), currentTicks);
+                    return;
+                }
+
                 long elapsedTicks = currentTicks - sessionState.LastPositionTicks;
                 double wallClockSeconds = (now - sessionState.LastCheckTime).TotalSeconds;
-
+                if (wallClockSeconds < 0.01)
+                {
+                    wallClockSeconds = 0.01;
+                }
                 sessionState.LastCheckTime = now;
 
                 if (elapsedTicks > 0)
                 {
                     double playbackSeconds = (double)elapsedTicks / TimeSpan.TicksPerSecond;
 
-                    // İleri sarma koruması (Seek / skip):
-                    // Eğer kullanıcı videoyu 30 dakika ileri sardıysa, 30 dakikalık veri indirmemiştir.
-                    // Gerçek dünyada geçen süreyi aşan sıçramalarda süreyi gerçek zaman dilimiyle sınırla.
-                    if (playbackSeconds > wallClockSeconds * 2.5 && wallClockSeconds > 1.0)
+                    // 2. İLERİ SARMA KORUMASI (Anti-Seek Guard):
+                    // Kullanıcı videoyu ileri sardığında (örneğin 10 dakika ileri atladığında),
+                    // o 10 dakikayı indirip izlememiştir; yalnızca yeni atladığı yerdeki 2-3 saniyelik tampon (buffer) verisini indirmiştir.
+                    // Bu sebeple oynatma ilerlemesi gerçek dünyada geçen süreden belirgin derecede fazlaysa, süreyi tampon miktarıyla sınırla.
+                    if (playbackSeconds > wallClockSeconds * 2.0)
                     {
-                        playbackSeconds = Math.Min(playbackSeconds, Math.Max(wallClockSeconds * 1.5, 4.0));
+                        playbackSeconds = Math.Min(playbackSeconds, Math.Max(wallClockSeconds * 1.5, 3.0));
                     }
 
                     // Akışın gerçek bitrate değerini belirle (Transcode veya doğrudan oynatma)
@@ -460,5 +496,6 @@ namespace Jellyfin.Plugin.QuotaManager.Services
         public DateTime LastSyncTime { get; set; }
         public long RemainingBytes { get; set; }
         public bool IsExhausted { get; set; }
+        public bool IsInitialized { get; set; }
     }
 }

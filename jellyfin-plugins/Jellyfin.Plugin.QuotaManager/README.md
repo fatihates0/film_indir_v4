@@ -1,4 +1,4 @@
-# Jellyfin.Plugin.QuotaManager
+# SineKutu Kota Yönetimi (Jellyfin Eklentisi)
 
 Jellyfin sunucusu için geliştirilmiş **Canlı Paket & Kota Doğrulamalı Trafik Yöneticisi (.NET 8.0)** eklentisi.
 
@@ -73,7 +73,7 @@ Derleme çıktısı:
    ```bash
    sudo systemctl restart jellyfin
    ```
-5. Jellyfin Yönetici Paneli -> **Eklentiler (Plugins)** -> **Quota Manager** sekmesinden:
+5. Jellyfin Yönetici Paneli -> **Eklentiler (Plugins)** -> **SineKutu Kota Yönetimi** sekmesinden:
    - **Laravel API Base URL**: `http://<domain>/api/jellyfin`
    - **Laravel API Anahtarı**: *(Varsa .env içindeki JELLYFIN_PLUGIN_API_KEY)*
    - **Kaydet** butonuna basın.

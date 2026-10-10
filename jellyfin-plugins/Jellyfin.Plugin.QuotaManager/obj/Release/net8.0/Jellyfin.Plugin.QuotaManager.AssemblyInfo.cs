@@ -12,9 +12,9 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("Jellyfin.Plugin.QuotaManager")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
-[assembly: System.Reflection.AssemblyDescriptionAttribute("Jellyfin Bandwidth & Traffic Quota Manager Plugin")]
+[assembly: System.Reflection.AssemblyDescriptionAttribute("SineKutu Kota Yönetimi Eklentisi")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+186d0920d050318dbf2ca624bba18464f3e87d54")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f4442e1d43b9adb44653691ff6c987a0cc01e94d")]
 [assembly: System.Reflection.AssemblyProductAttribute("Jellyfin.Plugin.QuotaManager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Jellyfin.Plugin.QuotaManager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

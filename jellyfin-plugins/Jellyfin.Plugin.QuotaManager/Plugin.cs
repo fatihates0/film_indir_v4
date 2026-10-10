@@ -15,11 +15,11 @@ namespace Jellyfin.Plugin.QuotaManager
 
         public QuotaService? QuotaService { get; set; }
 
-        public override string Name => "Quota Manager";
+        public override string Name => "SineKutu Kota Yönetimi";
 
         public override Guid Id => Guid.Parse("d7e8f9a0-1234-4567-89ab-cdef01234567");
 
-        public override string Description => "Jellyfin kullanıcı bant genişliği ve trafik kotalarını takip edip Laravel abonelikleri ile senkronize kısıtlar.";
+        public override string Description => "SineKutu kullanıcı paket ve trafik kotalarını takip edip Laravel abonelikleri ile senkronize kısıtlar.";
 
         public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
             : base(applicationPaths, xmlSerializer)
@@ -33,7 +33,7 @@ namespace Jellyfin.Plugin.QuotaManager
             {
                 new PluginPageInfo
                 {
-                    Name = "Quota Manager",
+                    Name = "SineKutu Kota Yönetimi",
                     EmbeddedResourcePath = GetType().Namespace + ".Web.configPage.html"
                 }
             };
