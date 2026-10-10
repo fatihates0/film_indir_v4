@@ -203,19 +203,7 @@ namespace Jellyfin.Plugin.QuotaManager.Services
                     }
 
                     // Akışın gerçek bitrate değerini belirle (Transcode veya doğrudan oynatma)
-                    int bitrate = e.Session.TranscodingInfo?.Bitrate
-                                 ?? e.Item?.GetMediaSources(false)?.FirstOrDefault()?.Bitrate
-                                 ?? 0;
-
-                    if (bitrate <= 0 && e.Item?.RunTimeTicks > 0 && e.Item?.Size > 0)
-                    {
-                        bitrate = (int)((e.Item.Size.Value * 8.0 * TimeSpan.TicksPerSecond) / e.Item.RunTimeTicks.Value);
-                    }
-
-                    if (bitrate <= 0)
-                    {
-                        bitrate = 6_000_000; // 6 Mbps makul varsayılan
-                    }
+                    int bitrate = GetStreamBitrate(e);
 
                     // Aktarılan bayt miktarı: (bitrate / 8) * geçen saniye
                     long bytesTransferred = (long)((bitrate / 8.0) * playbackSeconds);
@@ -365,6 +353,96 @@ namespace Jellyfin.Plugin.QuotaManager.Services
             {
                 _logger.LogError(ex, "Oturum durdurma esnasında hata ({SessionId}).", sessionId);
             }
+        }
+
+        /// <summary>
+        /// Farklı Jellyfin sürümlerinde binary uyumsuzluk ve MissingMethodException olmadan güvenli bitrate tespiti yapar.
+        /// </summary>
+        private int GetStreamBitrate(PlaybackProgressEventArgs e)
+        {
+            // 1. Transcoding bilgisi
+            try
+            {
+                if (e.Session?.TranscodingInfo?.Bitrate > 0)
+                {
+                    return e.Session.TranscodingInfo.Bitrate.Value;
+                }
+            }
+            catch { }
+
+            // 2. e.Session.NowPlayingItem (BaseItemDto) MediaSources bilgisi
+            try
+            {
+                var mediaSources = e.Session?.NowPlayingItem?.MediaSources;
+                if (mediaSources != null)
+                {
+                    var firstSource = mediaSources.FirstOrDefault();
+                    if (firstSource?.Bitrate != null && firstSource.Bitrate.Value > 0)
+                    {
+                        return firstSource.Bitrate.Value;
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Dosya boyutu ve oynatma süresi
+            try
+            {
+                if (e.Item?.RunTimeTicks > 0)
+                {
+                    long runtimeTicks = e.Item.RunTimeTicks.Value;
+                    long? fileSize = null;
+
+                    var sizeProp = e.Item.GetType().GetProperty("Size");
+                    if (sizeProp != null)
+                    {
+                        fileSize = sizeProp.GetValue(e.Item) as long?;
+                    }
+
+                    if (fileSize.HasValue && fileSize.Value > 0)
+                    {
+                        return (int)((fileSize.Value * 8.0 * TimeSpan.TicksPerSecond) / runtimeTicks);
+                    }
+                }
+            }
+            catch { }
+
+            // 4. Refleksiyon ile GetMediaSources çağrısı (Sürüm farkları için koruma)
+            try
+            {
+                if (e.Item != null)
+                {
+                    var itemType = e.Item.GetType();
+                    var method = itemType.GetMethod("GetMediaSources", new[] { typeof(bool) })
+                                 ?? itemType.GetMethod("GetMediaSources", Type.EmptyTypes);
+
+                    if (method != null)
+                    {
+                        var parameters = method.GetParameters().Length == 1 ? new object[] { false } : null;
+                        var result = method.Invoke(e.Item, parameters) as System.Collections.IEnumerable;
+                        if (result != null)
+                        {
+                            foreach (var src in result)
+                            {
+                                var bitrateProp = src?.GetType().GetProperty("Bitrate");
+                                if (bitrateProp != null)
+                                {
+                                    var bVal = bitrateProp.GetValue(src) as int?;
+                                    if (bVal.HasValue && bVal.Value > 0)
+                                    {
+                                        return bVal.Value;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 5. Güvenli varsayılan değer: 6 Mbps
+            return 6_000_000;
         }
     }
 
