@@ -52,9 +52,10 @@ class JellyfinServer extends Model
     public function client(int $timeout = 6)
     {
         return Http::withHeaders([
+            'Authorization' => 'MediaBrowser Client="SineKutu", Device="Server", DeviceId="sine-01", Version="1.0.0", Token="'.$this->api_key.'"',
             'X-Emby-Token' => $this->api_key,
             'Content-Type' => 'application/json',
-        ])->timeout($timeout);
+        ])->withoutVerifying()->timeout($timeout);
     }
 
     /**
@@ -67,7 +68,20 @@ class JellyfinServer extends Model
         $start = microtime(true);
 
         try {
-            $response = $this->client(5)->get("{$this->clean_url}/System/Info");
+            $url = $this->clean_url;
+            $response = $this->client(5)->get("{$url}/System/Info");
+
+            // Eğer https ve :8096 portuyla denenip SSL hatası veya başarısız olursa, ters proxy 443 portunu dene
+            if (! $response->successful() && str_starts_with($url, 'https://') && str_ends_with($url, ':8096')) {
+                $fallbackUrl = preg_replace('/:8096$/', '', $url);
+                $fallbackResponse = $this->client(5)->get("{$fallbackUrl}/System/Info");
+                if ($fallbackResponse->successful()) {
+                    $url = $fallbackUrl;
+                    $response = $fallbackResponse;
+                    $this->updateQuietly(['url' => $fallbackUrl]);
+                }
+            }
+
             $latency = (int) round((microtime(true) - $start) * 1000);
 
             if ($response->successful()) {
@@ -103,6 +117,36 @@ class JellyfinServer extends Model
                 'latency_ms' => $latency,
             ];
         } catch (Throwable $e) {
+            // Eğer https:// ve :8096 ise cURL SSL hatası durumunda 443 portunu kurtarma denemesi yap
+            if (str_starts_with($this->clean_url, 'https://') && str_ends_with($this->clean_url, ':8096')) {
+                try {
+                    $fallbackUrl = preg_replace('/:8096$/', '', $this->clean_url);
+                    $fallbackResponse = $this->client(5)->get("{$fallbackUrl}/System/Info");
+                    if ($fallbackResponse->successful()) {
+                        $this->updateQuietly(['url' => $fallbackUrl]);
+                        $serverInfo = $fallbackResponse->json();
+                        $users = $this->getUsers(3);
+                        $usersCount = is_array($users) ? count($users) : $this->cached_users_count;
+                        $latency = (int) round((microtime(true) - $start) * 1000);
+
+                        $this->update([
+                            'last_status' => 'online',
+                            'last_checked_at' => now(),
+                            'cached_users_count' => $usersCount,
+                        ]);
+
+                        return [
+                            'success' => true,
+                            'message' => 'Bağlantı başarılı! (Sürüm: '.($serverInfo['Version'] ?? 'Bilinmiyor').' - URL portsuz HTTPS olarak düzeltildi)',
+                            'server_info' => $serverInfo,
+                            'users_count' => $usersCount,
+                            'latency_ms' => $latency,
+                        ];
+                    }
+                } catch (Throwable $ignored) {
+                }
+            }
+
             $latency = (int) round((microtime(true) - $start) * 1000);
 
             $this->update([
