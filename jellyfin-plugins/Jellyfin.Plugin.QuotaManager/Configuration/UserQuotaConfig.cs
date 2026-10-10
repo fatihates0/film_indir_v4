@@ -6,6 +6,7 @@ namespace Jellyfin.Plugin.QuotaManager.Configuration
     {
         public Guid UserId { get; set; }
         public string Username { get; set; } = string.Empty;
+        public bool HasPackage { get; set; } = true;
         public long MaxBytes { get; set; } = 50L * 1024 * 1024 * 1024; // Default 50 GB
         public long UsedBytes { get; set; } = 0;
         public DateTime CycleStartDate { get; set; } = DateTime.UtcNow;

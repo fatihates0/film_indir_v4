@@ -10,42 +10,57 @@
             <div class="content-primary">
                 <form id="QuotaManagerConfigForm">
                     <div class="sectionTitleContainer flex align-items-center">
-                        <h2 class="sectionTitle">Jellyfin Bant Genişliği & Traffic Kota Yöneticisi</h2>
-                    </div>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel" for="DefaultQuotaGB">Varsayılan Aylık Kota (GB):</label>
-                        <input is="emby-input" type="number" id="DefaultQuotaGB" name="DefaultQuotaGB" min="1" step="1" required />
-                        <div class="fieldDescription">Kullanıcılara özel kota atanmamışsa geçerli olan varsayılan bant genişliği.</div>
-                    </div>
-
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableAutoDisable" name="EnableAutoDisable" />
-                            <span>Kota Dolduğunda Hesabı Otomatik Pasife Al (IsDisabled)</span>
-                        </label>
-                    </div>
-
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableSessionTermination" name="EnableSessionTermination" />
-                            <span>Kota Dolduğunda Aktif Oynatma Oturumlarını Kapat (Close Session)</span>
-                        </label>
+                        <h2 class="sectionTitle">Jellyfin Bant Genişliği & Trafik Kota Yöneticisi</h2>
                     </div>
 
                     <div class="inputContainer">
                         <label class="inputLabel" for="LaravelApiUrl">Laravel API Base URL:</label>
-                        <input is="emby-input" type="url" id="LaravelApiUrl" name="LaravelApiUrl" placeholder="http://localhost:8000/api/jellyfin" />
+                        <input is="emby-input" type="url" id="LaravelApiUrl" name="LaravelApiUrl" placeholder="http://localhost:8000/api/jellyfin" required />
                         <div class="fieldDescription">Laravel uygulamasındaki Jellyfin entegrasyon API adresi.</div>
                     </div>
 
                     <div class="inputContainer">
                         <label class="inputLabel" for="LaravelApiKey">Laravel API Anahtarı (X-Api-Key):</label>
                         <input is="emby-input" type="text" id="LaravelApiKey" name="LaravelApiKey" />
+                        <div class="fieldDescription">Laravel .env dosyasındaki JELLYFIN_PLUGIN_API_KEY anahtarı (isteğe bağlı).</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="BlockPlaybackOnApiFailure" name="BlockPlaybackOnApiFailure" />
+                            <span>Laravel API'ye Ulaşılamadığında Yayını Engelle (Güvenlik Önlemi)</span>
+                        </label>
+                        <div class="fieldDescription">Etkinleştirildiğinde, Laravel sunucusuna ulaşılamazsa kaçak izlemeyi önlemek için yayın başlatılmaz.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableSessionTermination" name="EnableSessionTermination" />
+                            <span>Kota Dolduğunda Aktif Oynatma Oturumlarını Otomatik Kapat (Stop Stream)</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableAutoDisable" name="EnableAutoDisable" />
+                            <span>Kota Dolduğunda Kullanıcı Hesabını Jellyfin Üzerinde Pasife Al</span>
+                        </label>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel" for="SyncIntervalMinutes">Senkronizasyon Sıklığı (Dakika):</label>
+                        <label class="inputLabel" for="BatchDeductThresholdMB">Toplu Kota Düşüm Eşiği (MB):</label>
+                        <input is="emby-input" type="number" id="BatchDeductThresholdMB" name="BatchDeductThresholdMB" min="1" max="100" step="1" />
+                        <div class="fieldDescription">İzleme esnasında kaç MB biriktiğinde Laravel'e tek seferde düşüm yapılacağı (Varsayılan: 15 MB).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="BatchDeductIntervalSeconds">Toplu Düşüm Zaman Aralığı (Saniye):</label>
+                        <input is="emby-input" type="number" id="BatchDeductIntervalSeconds" name="BatchDeductIntervalSeconds" min="5" max="300" step="5" />
+                        <div class="fieldDescription">MB eşiğine ulaşılmasa bile kaç saniyede bir Laravel kotasından düşüleceği (Varsayılan: 30 sn).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="SyncIntervalMinutes">Periyodik Senkronizasyon Sıklığı (Dakika):</label>
                         <input is="emby-input" type="number" id="SyncIntervalMinutes" name="SyncIntervalMinutes" min="5" step="5" />
                     </div>
 
@@ -57,44 +72,198 @@
         </div>
 
         <script type="text/javascript">
-            var QuotaManagerConfig = {
-                pluginUniqueId: 'd7e8f9a0-1234-4567-89ab-cdef01234567'
-            };
+            (function () {
+                var pluginUniqueId = 'd7e8f9a0-1234-4567-89ab-cdef01234567';
 
-            define(['loading', 'ApiClient'], function (loading, ApiClient) {
-                return function (view, params) {
-                    view.addEventListener('viewshow', function () {
-                        loading.show();
-                        ApiClient.getPluginConfiguration(QuotaManagerConfig.pluginUniqueId).then(function (config) {
-                            view.querySelector('#DefaultQuotaGB').value = config.DefaultQuotaGB || 50;
-                            view.querySelector('#EnableAutoDisable').checked = !!config.EnableAutoDisable;
-                            view.querySelector('#EnableSessionTermination').checked = !!config.EnableSessionTermination;
-                            view.querySelector('#LaravelApiUrl').value = config.LaravelApiUrl || '';
-                            view.querySelector('#LaravelApiKey').value = config.LaravelApiKey || '';
-                            view.querySelector('#SyncIntervalMinutes').value = config.SyncIntervalMinutes || 30;
-                            loading.hide();
-                        });
+                function getApiClient() {
+                    return window.ApiClient;
+                }
+
+                function showLoading() {
+                    if (window.Dashboard && window.Dashboard.showLoadingMsg) {
+                        window.Dashboard.showLoadingMsg();
+                    }
+                }
+
+                function hideLoading() {
+                    if (window.Dashboard && window.Dashboard.hideLoadingMsg) {
+                        window.Dashboard.hideLoadingMsg();
+                    }
+                }
+
+                function loadConfiguration(view) {
+                    var apiClient = getApiClient();
+                    if (!apiClient) {
+                        return;
+                    }
+
+                    showLoading();
+
+                    apiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
+                        if (!config) {
+                            hideLoading();
+                            return;
+                        }
+
+                        var url = config.LaravelApiUrl || config.laravelApiUrl || 'http://localhost:8000/api/jellyfin';
+                        var key = config.LaravelApiKey || config.laravelApiKey || '';
+
+                        var blockApi = config.BlockPlaybackOnApiFailure !== undefined ? config.BlockPlaybackOnApiFailure :
+                                       (config.blockPlaybackOnApiFailure !== undefined ? config.blockPlaybackOnApiFailure : true);
+
+                        var termSession = config.EnableSessionTermination !== undefined ? config.EnableSessionTermination :
+                                          (config.enableSessionTermination !== undefined ? config.enableSessionTermination : true);
+
+                        var autoDisable = config.EnableAutoDisable !== undefined ? config.EnableAutoDisable :
+                                          (config.enableAutoDisable !== undefined ? config.enableAutoDisable : false);
+
+                        var threshold = config.BatchDeductThresholdMB || config.batchDeductThresholdMB || 15;
+                        var interval = config.BatchDeductIntervalSeconds || config.batchDeductIntervalSeconds || 30;
+                        var syncMins = config.SyncIntervalMinutes || config.syncIntervalMinutes || 30;
+
+                        var inputUrl = view.querySelector('#LaravelApiUrl');
+                        if (inputUrl) inputUrl.value = url;
+
+                        var inputKey = view.querySelector('#LaravelApiKey');
+                        if (inputKey) inputKey.value = key;
+
+                        var chkBlock = view.querySelector('#BlockPlaybackOnApiFailure');
+                        if (chkBlock) chkBlock.checked = !!blockApi;
+
+                        var chkTerm = view.querySelector('#EnableSessionTermination');
+                        if (chkTerm) chkTerm.checked = !!termSession;
+
+                        var chkAuto = view.querySelector('#EnableAutoDisable');
+                        if (chkAuto) chkAuto.checked = !!autoDisable;
+
+                        var inputThreshold = view.querySelector('#BatchDeductThresholdMB');
+                        if (inputThreshold) inputThreshold.value = threshold;
+
+                        var inputInterval = view.querySelector('#BatchDeductIntervalSeconds');
+                        if (inputInterval) inputInterval.value = interval;
+
+                        var inputSync = view.querySelector('#SyncIntervalMinutes');
+                        if (inputSync) inputSync.value = syncMins;
+
+                        hideLoading();
+                    }).catch(function (err) {
+                        console.error('QuotaManager konfigürasyonu yüklenirken hata:', err);
+                        hideLoading();
                     });
+                }
 
-                    view.querySelector('#QuotaManagerConfigForm').addEventListener('submit', function (e) {
+                function saveConfiguration(view, e) {
+                    if (e) {
                         e.preventDefault();
-                        loading.show();
-                        ApiClient.getPluginConfiguration(QuotaManagerConfig.pluginUniqueId).then(function (config) {
-                            config.DefaultQuotaGB = parseInt(view.querySelector('#DefaultQuotaGB').value, 10);
-                            config.EnableAutoDisable = view.querySelector('#EnableAutoDisable').checked;
-                            config.EnableSessionTermination = view.querySelector('#EnableSessionTermination').checked;
-                            config.LaravelApiUrl = view.querySelector('#LaravelApiUrl').value;
-                            config.LaravelApiKey = view.querySelector('#LaravelApiKey').value;
-                            config.SyncIntervalMinutes = parseInt(view.querySelector('#SyncIntervalMinutes').value, 10);
+                    }
 
-                            ApiClient.updatePluginConfiguration(QuotaManagerConfig.pluginUniqueId, config).then(function (result) {
-                                Dashboard.processPluginConfigurationUpdateResult(result);
-                            });
-                        });
+                    var apiClient = getApiClient();
+                    if (!apiClient) {
                         return false;
+                    }
+
+                    showLoading();
+
+                    apiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
+                        config = config || {};
+
+                        var url = view.querySelector('#LaravelApiUrl').value;
+                        var key = view.querySelector('#LaravelApiKey').value;
+                        var blockApi = view.querySelector('#BlockPlaybackOnApiFailure').checked;
+                        var termSession = view.querySelector('#EnableSessionTermination').checked;
+                        var autoDisable = view.querySelector('#EnableAutoDisable').checked;
+                        var threshold = parseInt(view.querySelector('#BatchDeductThresholdMB').value, 10) || 15;
+                        var interval = parseInt(view.querySelector('#BatchDeductIntervalSeconds').value, 10) || 30;
+                        var syncMins = parseInt(view.querySelector('#SyncIntervalMinutes').value, 10) || 30;
+
+                        config.LaravelApiUrl = url;
+                        config.laravelApiUrl = url;
+
+                        config.LaravelApiKey = key;
+                        config.laravelApiKey = key;
+
+                        config.BlockPlaybackOnApiFailure = blockApi;
+                        config.blockPlaybackOnApiFailure = blockApi;
+
+                        config.EnableSessionTermination = termSession;
+                        config.enableSessionTermination = termSession;
+
+                        config.EnableAutoDisable = autoDisable;
+                        config.enableAutoDisable = autoDisable;
+
+                        config.BatchDeductThresholdMB = threshold;
+                        config.batchDeductThresholdMB = threshold;
+
+                        config.BatchDeductIntervalSeconds = interval;
+                        config.batchDeductIntervalSeconds = interval;
+
+                        config.SyncIntervalMinutes = syncMins;
+                        config.syncIntervalMinutes = syncMins;
+
+                        apiClient.updatePluginConfiguration(pluginUniqueId, config).then(function (result) {
+                            hideLoading();
+                            if (window.Dashboard && window.Dashboard.processPluginConfigurationUpdateResult) {
+                                window.Dashboard.processPluginConfigurationUpdateResult(result);
+                            } else if (window.Dashboard && window.Dashboard.alert) {
+                                window.Dashboard.alert('Ayarlar başarıyla kaydedildi.');
+                            }
+                        }).catch(function (err) {
+                            hideLoading();
+                            console.error('Konfigürasyon kaydedilemedi:', err);
+                            if (window.Dashboard && window.Dashboard.alert) {
+                                window.Dashboard.alert('Ayarlar kaydedilirken hata oluştu.');
+                            }
+                        });
                     });
-                };
-            });
+
+                    return false;
+                }
+
+                function setupPage(view) {
+                    if (!view) return;
+
+                    loadConfiguration(view);
+
+                    var form = view.querySelector('#QuotaManagerConfigForm');
+                    if (form) {
+                        form.onsubmit = function (e) {
+                            return saveConfiguration(view, e);
+                        };
+                    }
+                }
+
+                // 1. AMD RequireJS desteği (Jellyfin eski sürümleri için)
+                if (typeof define === 'function' && define.amd) {
+                    define(['loading', 'ApiClient'], function () {
+                        return function (view) {
+                            view.addEventListener('viewshow', function () {
+                                setupPage(view);
+                            });
+                            view.addEventListener('pageshow', function () {
+                                setupPage(view);
+                            });
+                            setupPage(view);
+                        };
+                    });
+                }
+
+                // 2. Doğrudan DOM çalıştırma desteği (Jellyfin 10.8, 10.9, 10.10 için)
+                document.addEventListener('DOMContentLoaded', function () {
+                    var page = document.querySelector('#QuotaManagerConfigPage');
+                    if (page) setupPage(page);
+                });
+
+                var pageElem = document.querySelector('#QuotaManagerConfigPage');
+                if (pageElem) {
+                    pageElem.addEventListener('pageshow', function () {
+                        setupPage(pageElem);
+                    });
+                    pageElem.addEventListener('viewshow', function () {
+                        setupPage(pageElem);
+                    });
+                    setupPage(pageElem);
+                }
+            })();
         </script>
     </div>
 </body>

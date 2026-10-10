@@ -20,22 +20,26 @@ class JellyfinQuotaController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (! $this->validateApiKey($request)) {
+            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı.'], 401);
+        }
+
         $users = User::all();
         $response = [];
 
         foreach ($users as $user) {
             $summary = $this->subscriptionService->getQuotaSummary($user);
-
-            if (! $summary || ! $summary['has_subscription']) {
-                continue;
-            }
+            $hasPackage = $this->subscriptionService->hasActiveMainSubscription($user);
 
             $response[] = [
                 'user_id' => $user->id,
                 'username' => $user->name,
-                'max_bytes' => $summary['allocated_bytes'],
-                'used_bytes' => $summary['used_bytes'],
-                'remaining_bytes' => $summary['remaining_bytes'],
+                'email' => $user->email,
+                'is_admin' => $user->isAdmin(),
+                'has_package' => $hasPackage,
+                'max_bytes' => $summary['allocated_bytes'] ?? 0,
+                'used_bytes' => $summary['used_bytes'] ?? 0,
+                'remaining_bytes' => $summary['remaining_bytes'] ?? 0,
                 'cycle_start_date' => now()->startOfMonth()->toIso8601String(),
                 'cycle_end_date' => $summary['period_end'] ?? now()->addMonth()->toIso8601String(),
             ];
@@ -46,58 +50,92 @@ class JellyfinQuotaController extends Controller
 
     /**
      * Jellyfin oynatma başlatılmadan önce kullanıcının paket ve kota erişimini denetler.
+     *
+     * Kural 1: Paketi ve kotası yoksa -> İzletilmez (allowed: false, reason: no_package).
+     * Kural 2: Paketi var kotası yoksa -> İzletilmez (allowed: false, reason: quota_exhausted).
+     * Kural 3: Paketi var kotası varsa -> İzletilir (allowed: true, reason: access_granted).
      */
     public function checkAccess(Request $request): JsonResponse
     {
-        $username = $request->query('username');
+        if (! $this->validateApiKey($request)) {
+            return response()->json([
+                'allowed' => false,
+                'reason' => 'unauthorized',
+                'message' => 'Yetkisiz erişim: Geçersiz API anahtarı.',
+            ], 401);
+        }
+
+        $username = $request->query('username') ?? $request->input('username');
 
         if (! $username) {
-            return response()->json(['allowed' => false, 'message' => 'Kullanıcı adı belirtilmedi.'], 400);
+            return response()->json([
+                'allowed' => false,
+                'reason' => 'missing_username',
+                'has_package' => false,
+                'remaining_bytes' => 0,
+                'message' => 'Kullanıcı adı veya e-posta belirtilmedi.',
+            ]);
         }
 
         /** @var User|null $user */
-        $user = User::where('name', $username)->orWhere('email', $username)->first();
+        $user = User::whereRaw('LOWER(name) = ?', [strtolower($username)])
+            ->orWhereRaw('LOWER(email) = ?', [strtolower($username)])
+            ->first();
 
         if (! $user) {
             return response()->json([
                 'allowed' => false,
                 'reason' => 'user_not_found',
-                'message' => 'Kullanıcı sistemde bulunamadı.',
-            ], 404);
+                'has_package' => false,
+                'remaining_bytes' => 0,
+                'message' => 'Kullanıcı sistemde kayıtlı bulunamadı.',
+            ]);
         }
 
+        // Yönetici kullanıcılar için sınırsız erişim
         if ($user->isAdmin()) {
             return response()->json([
                 'allowed' => true,
                 'reason' => 'admin',
+                'has_package' => true,
                 'remaining_bytes' => 999999999999999,
-                'message' => 'Yönetici erişimi.',
+                'message' => 'Yönetici erişimi (sınırsız kota).',
             ]);
         }
 
-        $hasMainSub = $this->subscriptionService->hasActiveMainSubscription($user);
+        // 1. Paket kontrolü (Aktif ana aboneliği var mı?)
+        $hasPackage = $this->subscriptionService->hasActiveMainSubscription($user);
 
-        if (! $hasMainSub) {
+        // 2. Kalan kota kontrolü (Ana paket + ek kotalar)
+        $remainingBytes = $this->subscriptionService->getTotalRemainingBytes($user);
+
+        // Durum 1: Paketi yoksa (veya hem paket hem kota yoksa)
+        if (! $hasPackage) {
             return response()->json([
                 'allowed' => false,
                 'reason' => 'no_package',
-                'message' => 'Aktif bir abonelik paketiniz bulunmamaktadır.',
+                'has_package' => false,
+                'remaining_bytes' => max(0, $remainingBytes),
+                'message' => 'Aktif bir abonelik paketiniz bulunmamaktadır. İçerik izleyemezsiniz.',
             ]);
         }
 
-        $remainingBytes = $this->subscriptionService->getTotalRemainingBytes($user);
-
+        // Durum 2: Paketi var ama kotası tükenmişse
         if ($remainingBytes <= 0) {
             return response()->json([
                 'allowed' => false,
-                'reason' => 'quota_exceeded',
+                'reason' => 'quota_exhausted',
+                'has_package' => true,
+                'remaining_bytes' => 0,
                 'message' => 'İzleme kotanız dolmuştur. İçerik izleyemezsiniz.',
             ]);
         }
 
+        // Durum 3: Paketi var VE kotası var
         return response()->json([
             'allowed' => true,
-            'reason' => 'active_quota',
+            'reason' => 'access_granted',
+            'has_package' => true,
             'remaining_bytes' => $remainingBytes,
             'message' => 'İçerik izlemeye izin verildi.',
         ]);
@@ -108,27 +146,35 @@ class JellyfinQuotaController extends Controller
      */
     public function deductQuota(Request $request): JsonResponse
     {
+        if (! $this->validateApiKey($request)) {
+            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı.'], 401);
+        }
+
         $validated = $request->validate([
             'username' => 'required|string',
             'bytes' => 'required|integer|min:1',
         ]);
 
         /** @var User|null $user */
-        $user = User::where('name', $validated['username'])->orWhere('email', $validated['username'])->first();
+        $user = User::whereRaw('LOWER(name) = ?', [strtolower($validated['username'])])
+            ->orWhereRaw('LOWER(email) = ?', [strtolower($validated['username'])])
+            ->first();
 
         if (! $user) {
             return response()->json(['status' => 'error', 'message' => 'Kullanıcı bulunamadı.'], 404);
         }
 
-        $this->subscriptionService->deductUserQuota($user, (int) $validated['bytes']);
+        if (! $user->isAdmin()) {
+            $this->subscriptionService->deductUserQuota($user, (int) $validated['bytes']);
+        }
 
         $remainingBytes = $this->subscriptionService->getTotalRemainingBytes($user);
 
         return response()->json([
             'status' => 'success',
-            'deducted_bytes' => $validated['bytes'],
+            'deducted_bytes' => (int) $validated['bytes'],
             'remaining_bytes' => $remainingBytes,
-            'quota_exhausted' => $remainingBytes <= 0,
+            'quota_exhausted' => ! $user->isAdmin() && $remainingBytes <= 0,
         ]);
     }
 
@@ -137,6 +183,10 @@ class JellyfinQuotaController extends Controller
      */
     public function quotaExceeded(Request $request): JsonResponse
     {
+        if (! $this->validateApiKey($request)) {
+            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı.'], 401);
+        }
+
         $data = $request->validate([
             'username' => 'required|string',
             'used_bytes' => 'required|numeric',
@@ -153,5 +203,21 @@ class JellyfinQuotaController extends Controller
             'status' => 'success',
             'message' => 'Quota exceeded event logged successfully',
         ]);
+    }
+
+    /**
+     * Gelen istekteki API anahtarını doğrular.
+     */
+    protected function validateApiKey(Request $request): bool
+    {
+        $configuredKey = (string) config('services.jellyfin.plugin_api_key', '');
+
+        if ($configuredKey === '') {
+            return true;
+        }
+
+        $providedKey = (string) ($request->header('X-Api-Key') ?? $request->query('api_key') ?? '');
+
+        return hash_equals($configuredKey, $providedKey);
     }
 }

@@ -45,6 +45,7 @@ return [
     'jellyfin' => [
         'url' => env('JELLYFIN_URL', ''),
         'api_key' => env('JELLYFIN_API_KEY', ''),
+        'plugin_api_key' => env('JELLYFIN_PLUGIN_API_KEY', ''),
     ],
 
     'emby' => [
