@@ -12,6 +12,8 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\FrontController;
 use App\Http\Controllers\MediaServerController;
+use App\Http\Controllers\PaddleCheckoutController;
+use App\Http\Controllers\PaddleWebhookController;
 use App\Http\Controllers\PaymentNotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +30,10 @@ Route::get('/pricing', [FrontController::class, 'pricing'])->name('pricing');
 Route::post('/subscribe/{plan}', [FrontController::class, 'subscribePlan'])->name('subscribe.plan');
 Route::post('/subscription/cancel-perpetual', [FrontController::class, 'cancelPerpetualSubscription'])->name('subscription.cancel-perpetual');
 Route::post('/payment-notifications', [PaymentNotificationController::class, 'store'])->name('payment-notifications.store');
+
+// Paddle Virtual POS Routes
+Route::post('/paddle/checkout/init', [PaddleCheckoutController::class, 'initiate'])->name('paddle.checkout.init');
+Route::post('/webhooks/paddle', [PaddleWebhookController::class, 'handle'])->name('paddle.webhook');
 
 Route::get('/movie/{id?}', [FrontController::class, 'movieDetail'])->name('movie.detail');
 Route::get('/series/{id}', [FrontController::class, 'seriesDetail'])->name('series.detail');

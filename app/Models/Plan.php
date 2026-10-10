@@ -146,7 +146,7 @@ class Plan extends Model
     protected function formattedQuota(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => number_format($this->monthly_quota_gb, 0, ',', '.').' GB'
+            get: fn (): string => number_format((float) ($this->monthly_quota_gb ?? 0), 0, ',', '.').' GB'
         );
     }
 

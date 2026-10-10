@@ -1,5 +1,5 @@
 import React from 'react';
-import { Coins, Edit3 } from 'lucide-react';
+import { Building2, Coins, CreditCard, Edit3 } from 'lucide-react';
 
 export default function PaymentMethodsTab({
     paymentMethods = [],
@@ -20,11 +20,19 @@ export default function PaymentMethodsTab({
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-emerald-400 font-mono font-bold">
-                                        <Coins className="w-4 h-4" />
+                                        {method.driver === 'paddle' ? (
+                                            <CreditCard className="w-4 h-4 text-blue-400" />
+                                        ) : method.driver === 'bank' ? (
+                                            <Building2 className="w-4 h-4 text-emerald-400" />
+                                        ) : (
+                                            <Coins className="w-4 h-4 text-amber-400" />
+                                        )}
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-white text-sm">{method.name}</h4>
-                                        <span className="text-[10px] text-gray-500 font-mono">Driver: {method.driver}</span>
+                                        <span className="text-[10px] text-gray-500 font-mono">
+                                            Driver: {method.driver === 'paddle' ? 'Paddle Billing POS' : method.driver}
+                                        </span>
                                     </div>
                                 </div>
 

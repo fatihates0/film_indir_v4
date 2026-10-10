@@ -53,4 +53,11 @@ return [
         'api_key' => env('EMBY_API_KEY', ''),
     ],
 
+    'paddle' => [
+        'env' => env('PADDLE_ENV', 'sandbox'),
+        'client_token' => env('PADDLE_CLIENT_TOKEN', ''),
+        'api_key' => env('PADDLE_API_KEY', ''),
+        'webhook_secret' => env('PADDLE_WEBHOOK_SECRET', ''),
+        'currency' => env('PADDLE_CURRENCY', 'TRY'),
+    ],
 ];

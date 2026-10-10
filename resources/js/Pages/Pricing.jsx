@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Head, Link, usePage, router } from '@inertiajs/react';
+import axios from 'axios';
 import Layout from '../Components/Layout';
 import AuthModal from '../Components/AuthModal';
 import {
     Check, Zap, Shield, HardDrive, Download, ArrowRight,
-    Sparkles, RefreshCw, Clock, AlertCircle, Building2, Coins,
+    Sparkles, RefreshCw, Clock, AlertCircle, Building2, Coins, CreditCard,
     Copy, CheckCircle2, X, Info, Server, PlusCircle, UserCheck, Lock,
     HelpCircle, ChevronDown
 } from 'lucide-react';
@@ -30,6 +31,93 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
     const [copiedField, setCopiedField] = useState(null);
     const [isSubmittingNotice, setIsSubmittingNotice] = useState(false);
     const [isCancellingPerpetual, setIsCancellingPerpetual] = useState(false);
+    const [isPaddleLoading, setIsPaddleLoading] = useState(false);
+    const [paddleError, setPaddleError] = useState(null);
+    const [paddleSuccess, setPaddleSuccess] = useState(false);
+
+    const loadPaddleJs = () => {
+        return new Promise((resolve, reject) => {
+            if (window.Paddle) {
+                resolve(window.Paddle);
+                return;
+            }
+            const existingScript = document.getElementById('paddle-js-sdk');
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(window.Paddle));
+                existingScript.addEventListener('error', (e) => reject(e));
+                return;
+            }
+            const script = document.createElement('script');
+            script.id = 'paddle-js-sdk';
+            script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+            script.async = true;
+            script.onload = () => {
+                if (window.Paddle) {
+                    resolve(window.Paddle);
+                } else {
+                    reject(new Error('Paddle SDK yüklenemedi.'));
+                }
+            };
+            script.onerror = () => reject(new Error('Paddle SDK bağlantısı kurulamadı.'));
+            document.body.appendChild(script);
+        });
+    };
+
+    const handlePaddleCheckout = async () => {
+        if (!checkoutPlan || isPaddleLoading) return;
+        setIsPaddleLoading(true);
+        setPaddleError(null);
+
+        try {
+            const res = await axios.post('/paddle/checkout/init', {
+                plan_id: checkoutPlan.id,
+                duration_months: checkoutPlan.type === 'extra' || isUpgradeCheckout ? 1 : selectedDuration,
+                is_upgrade: isUpgradeCheckout,
+            });
+
+            if (!res.data.success) {
+                throw new Error(res.data.message || 'Paddle ödeme işlemi başlatılamadı.');
+            }
+
+            const { transaction_id, client_token, environment } = res.data;
+
+            const paddle = await loadPaddleJs();
+
+            if (environment === 'sandbox') {
+                paddle.Environment.set('sandbox');
+            }
+
+            paddle.Initialize({
+                token: client_token,
+                eventCallback: function (data) {
+                    if (data.name === 'checkout.completed') {
+                        setPaddleSuccess(true);
+                        setTimeout(() => {
+                            setCheckoutPlan(null);
+                            router.visit(window.location.pathname, {
+                                preserveScroll: false,
+                            });
+                        }, 2500);
+                    }
+                },
+            });
+
+            paddle.Checkout.open({
+                transactionId: transaction_id,
+                settings: {
+                    displayMode: 'overlay',
+                    theme: 'dark',
+                    locale: 'tr',
+                },
+            });
+        } catch (err) {
+            console.error('Paddle checkout error:', err);
+            const msg = err.response?.data?.message || err.message || 'Ödeme işlemi başlatılırken bir hata oluştu.';
+            setPaddleError(msg);
+        } finally {
+            setIsPaddleLoading(false);
+        }
+    };
 
     const handleCancelPerpetual = () => {
         if (!window.confirm("Süresiz özel kotanızı sonlandırmak istediğinize emin misiniz?\n\nKalan kotanız kapatılacak ve dilediğiniz yeni indirme paketini hemen satın alabileceksiniz.")) {
@@ -113,6 +201,8 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
 
         setCheckoutPlan(plan);
         setIsUpgradeCheckout(Boolean(isUpgrade));
+        setPaddleError(null);
+        setPaddleSuccess(false);
         if (paymentMethods.length > 0) {
             setSelectedMethodId(paymentMethods[0].id);
         }
@@ -918,7 +1008,13 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                                 >
                                                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#00B074] text-white' : 'bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-gray-400'
                                                         }`}>
-                                                        {pm.driver === 'bank' ? <Building2 className="w-5 h-5" /> : <Coins className="w-5 h-5" />}
+                                                        {pm.driver === 'paddle' ? (
+                                                            <CreditCard className="w-5 h-5" />
+                                                        ) : pm.driver === 'bank' ? (
+                                                            <Building2 className="w-5 h-5" />
+                                                        ) : (
+                                                            <Coins className="w-5 h-5" />
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <span className="text-xs font-bold block text-slate-900 dark:text-white">{pm.name}</span>
@@ -935,149 +1031,245 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                     const activeMethod = paymentMethods.find(m => m.id === selectedMethodId);
                                     if (!activeMethod) return null;
                                     const settings = activeMethod.settings || {};
+                                    const isPaddle = activeMethod.driver === 'paddle';
+                                    const currentUpgrade = isUpgradeCheckout && checkoutPlan ? upgrades[checkoutPlan.id] : null;
+                                    const checkoutAmount = isUpgradeCheckout && currentUpgrade
+                                        ? currentUpgrade.formatted_upgrade_amount
+                                        : `₺${getPrice(checkoutPlan, selectedDuration)}`;
+
+                                    if (isPaddle) {
+                                        return (
+                                            <div className="space-y-4">
+                                                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 via-emerald-500/5 to-slate-50 dark:to-[#07090E] border border-blue-500/20 dark:border-blue-500/30 space-y-3.5">
+                                                    <div className="flex items-center justify-between border-b border-blue-500/10 dark:border-white/[0.06] pb-2.5">
+                                                        <span className="text-xs font-bold text-blue-500 dark:text-blue-400 flex items-center gap-1.5">
+                                                            <CreditCard className="w-4 h-4" />
+                                                            {activeMethod.name}
+                                                        </span>
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+                                                            ● Anında Otomatik Aktivasyon
+                                                        </span>
+                                                    </div>
+
+                                                    <p className="text-xs text-slate-600 dark:text-gray-300 leading-relaxed">
+                                                        {activeMethod.description || 'Visa, MasterCard ve Troy özellikli kartlarla 3D Secure güvencesiyle anında ödeme yapabilirsiniz.'}
+                                                    </p>
+
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+                                                        <div className="p-2 rounded-xl bg-white/70 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.06] flex items-center gap-2">
+                                                            <Shield className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                                            <span className="text-slate-700 dark:text-gray-300 font-medium">3D Secure Koruma</span>
+                                                        </div>
+                                                        <div className="p-2 rounded-xl bg-white/70 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.06] flex items-center gap-2">
+                                                            <Lock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                            <span className="text-slate-700 dark:text-gray-300 font-medium">256-Bit SSL Şifreleme</span>
+                                                        </div>
+                                                        <div className="p-2 rounded-xl bg-white/70 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.06] flex items-center gap-2 col-span-2 sm:col-span-1">
+                                                            <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                            <span className="text-slate-700 dark:text-gray-300 font-medium">Anında Kotanız Açılır</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {activeMethod.instructions && (
+                                                        <div className="pt-2 text-[11px] text-slate-500 dark:text-gray-400 border-t border-slate-200 dark:border-white/[0.06] whitespace-pre-line leading-relaxed">
+                                                            {activeMethod.instructions}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {paddleError && (
+                                                    <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs flex items-center gap-2.5">
+                                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                                        <span>{paddleError}</span>
+                                                    </div>
+                                                )}
+
+                                                {paddleSuccess && (
+                                                    <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+                                                        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 animate-bounce" />
+                                                        <div>
+                                                            <strong className="block text-sm font-bold">Ödemeniz Başarıyla Alındı!</strong>
+                                                            <span>Paketiniz ve indirme kotanız hesabınıza tanımlanıyor, lütfen bekleyiniz...</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCheckoutPlan(null)}
+                                                        disabled={isPaddleLoading}
+                                                        className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-gray-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-white/[0.08] disabled:opacity-50"
+                                                    >
+                                                        İptal
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handlePaddleCheckout}
+                                                        disabled={isPaddleLoading || paddleSuccess}
+                                                        className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-[#00B074] hover:from-blue-700 hover:to-[#009663] text-white text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                                    >
+                                                        {isPaddleLoading ? (
+                                                            <>
+                                                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                                                <span>Paddle Bağlanıyor...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <CreditCard className="w-4 h-4" />
+                                                                <span>Kart ile Güvenli Öde ({checkoutAmount})</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
 
                                     return (
-                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.08] space-y-3">
-                                            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/[0.06] pb-2">
-                                                <span className="text-xs font-bold text-[#00B074] flex items-center gap-1.5">
-                                                    <Info className="w-4 h-4" />
-                                                    {activeMethod.name} Hesap Bilgileri
-                                                </span>
+                                        <div className="space-y-5">
+                                            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.08] space-y-3">
+                                                <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/[0.06] pb-2">
+                                                    <span className="text-xs font-bold text-[#00B074] flex items-center gap-1.5">
+                                                        <Info className="w-4 h-4" />
+                                                        {activeMethod.name} Hesap Bilgileri
+                                                    </span>
+                                                </div>
+
+                                                {activeMethod.driver === 'bank' && (
+                                                    <div className="space-y-2 text-xs">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-slate-500 dark:text-gray-400">Banka:</span>
+                                                            <span className="text-slate-900 dark:text-white font-semibold">{settings.bank_name || 'Banka Belirtilmedi'}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-slate-500 dark:text-gray-400">Alıcı (Hesap Sahibi):</span>
+                                                            <span className="text-slate-900 dark:text-white font-semibold">{settings.account_holder || '-'}</span>
+                                                        </div>
+                                                        <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.06] flex items-center justify-between gap-2">
+                                                            <div>
+                                                                <span className="text-[10px] text-slate-500 dark:text-gray-500 block">IBAN Numarası</span>
+                                                                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
+                                                                    {settings.iban || '-'}
+                                                                </span>
+                                                            </div>
+                                                            {settings.iban && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCopy(settings.iban, 'iban')}
+                                                                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
+                                                                >
+                                                                    {copiedField === 'iban' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                    <span>{copiedField === 'iban' ? 'Kopyalandı' : 'Kopyala'}</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {activeMethod.driver === 'crypto' && (
+                                                    <div className="space-y-2 text-xs">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-slate-500 dark:text-gray-400">Ağ (Network):</span>
+                                                            <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">{settings.network || 'TRC-20'}</span>
+                                                        </div>
+                                                        <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.06] flex items-center justify-between gap-2">
+                                                            <div className="overflow-hidden">
+                                                                <span className="text-[10px] text-slate-500 dark:text-gray-500 block">TRC-20 USDT Cüzdan Adresi</span>
+                                                                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate block">
+                                                                    {settings.wallet_address || '-'}
+                                                                </span>
+                                                            </div>
+                                                            {settings.wallet_address && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCopy(settings.wallet_address, 'wallet')}
+                                                                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
+                                                                >
+                                                                    {copiedField === 'wallet' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                    <span>{copiedField === 'wallet' ? 'Kopyalandı' : 'Kopyala'}</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {activeMethod.instructions && (
+                                                    <div className="pt-2 text-[11px] text-slate-600 dark:text-gray-400 border-t border-slate-200 dark:border-white/[0.04] whitespace-pre-line leading-relaxed">
+                                                        {activeMethod.instructions}
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {activeMethod.driver === 'bank' && (
-                                                <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-slate-500 dark:text-gray-400">Banka:</span>
-                                                        <span className="text-slate-900 dark:text-white font-semibold">{settings.bank_name || 'Banka Belirtilmedi'}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-slate-500 dark:text-gray-400">Alıcı (Hesap Sahibi):</span>
-                                                        <span className="text-slate-900 dark:text-white font-semibold">{settings.account_holder || '-'}</span>
-                                                    </div>
-                                                    <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.06] flex items-center justify-between gap-2">
-                                                        <div>
-                                                            <span className="text-[10px] text-slate-500 dark:text-gray-500 block">IBAN Numarası</span>
-                                                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
-                                                                {settings.iban || '-'}
-                                                            </span>
-                                                        </div>
-                                                        {settings.iban && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleCopy(settings.iban, 'iban')}
-                                                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
-                                                            >
-                                                                {copiedField === 'iban' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                                                <span>{copiedField === 'iban' ? 'Kopyalandı' : 'Kopyala'}</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
+                                            {/* User Notice Form Fields for manual methods */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-xs font-bold text-slate-900 dark:text-white">Ödeme Bildirimi Formu</h4>
 
-                                            {activeMethod.driver === 'crypto' && (
-                                                <div className="space-y-2 text-xs">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-slate-500 dark:text-gray-400">Ağ (Network):</span>
-                                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">{settings.network || 'TRC-20'}</span>
-                                                    </div>
-                                                    <div className="p-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.06] flex items-center justify-between gap-2">
-                                                        <div className="overflow-hidden">
-                                                            <span className="text-[10px] text-slate-500 dark:text-gray-500 block">TRC-20 USDT Cüzdan Adresi</span>
-                                                            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate block">
-                                                                {settings.wallet_address || '-'}
-                                                            </span>
-                                                        </div>
-                                                        {settings.wallet_address && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleCopy(settings.wallet_address, 'wallet')}
-                                                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white text-[10px] font-semibold flex items-center gap-1 shrink-0"
-                                                            >
-                                                                {copiedField === 'wallet' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                                                <span>{copiedField === 'wallet' ? 'Kopyalandı' : 'Kopyala'}</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
+                                                        Gönderen Ad Soyad veya Hesap Sahibi *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        placeholder="Örn: Ahmet Yılmaz"
+                                                        value={senderName}
+                                                        onChange={(e) => setSenderName(e.target.value)}
+                                                        className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
+                                                    />
                                                 </div>
-                                            )}
 
-                                            {activeMethod.instructions && (
-                                                <div className="pt-2 text-[11px] text-slate-600 dark:text-gray-400 border-t border-slate-200 dark:border-white/[0.04] whitespace-pre-line leading-relaxed">
-                                                    {activeMethod.instructions}
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
+                                                        TxID / İşlem Hash veya Dekont Referans No (Opsiyonel)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Kripto TxID veya banka dekont referansı..."
+                                                        value={txHash}
+                                                        onChange={(e) => setTxHash(e.target.value)}
+                                                        className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
+                                                    />
                                                 </div>
-                                            )}
+
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
+                                                        Not (Opsiyonel)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Varsa eklemek istediğiniz not..."
+                                                        value={userNotes}
+                                                        onChange={(e) => setUserNotes(e.target.value)}
+                                                        className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCheckoutPlan(null)}
+                                                    className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-gray-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-white/[0.08]"
+                                                >
+                                                    İptal
+                                                </button>
+                                                <button
+                                                    type="submit"
+                                                    disabled={isSubmittingNotice}
+                                                    className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-lg shadow-[#00B074]/20 flex items-center gap-2 cursor-pointer"
+                                                >
+                                                    {isSubmittingNotice ? (
+                                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                    )}
+                                                    <span>Ödeme Bildirimini Gönder</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })()}
-
-                                {/* User Notice Form Fields */}
-                                <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">Ödeme Bildirimi Formu</h4>
-
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
-                                            Gönderen Ad Soyad veya Hesap Sahibi *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            required
-                                            placeholder="Örn: Ahmet Yılmaz"
-                                            value={senderName}
-                                            onChange={(e) => setSenderName(e.target.value)}
-                                            className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
-                                            TxID / İşlem Hash veya Dekont Referans No (Opsiyonel)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Kripto TxID veya banka dekont referansı..."
-                                            value={txHash}
-                                            onChange={(e) => setTxHash(e.target.value)}
-                                            className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[11px] font-semibold text-slate-700 dark:text-gray-300 mb-1">
-                                            Not (Opsiyonel)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Varsa eklemek istediğiniz not..."
-                                            value={userNotes}
-                                            onChange={(e) => setUserNotes(e.target.value)}
-                                            className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#07090E] border border-slate-300 dark:border-white/[0.08] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] focus:bg-white dark:focus:bg-[#07090E]"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setCheckoutPlan(null)}
-                                        className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-gray-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-white/[0.08]"
-                                    >
-                                        İptal
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmittingNotice}
-                                        className="px-5 py-2.5 rounded-xl bg-[#00B074] hover:bg-[#009663] text-white text-xs font-bold shadow-lg shadow-[#00B074]/20 flex items-center gap-2 cursor-pointer"
-                                    >
-                                        {isSubmittingNotice ? (
-                                            <RefreshCw className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <CheckCircle2 className="w-4 h-4" />
-                                        )}
-                                        <span>Ödeme Bildirimini Gönder</span>
-                                    </button>
-                                </div>
                             </form>
                         )}
 
