@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("SineKutu Kota Yönetimi Eklentisi")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f4442e1d43b9adb44653691ff6c987a0cc01e94d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8be517d1f44df72b8c4cb04b24b3dadf91ab7607")]
 [assembly: System.Reflection.AssemblyProductAttribute("Jellyfin.Plugin.QuotaManager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Jellyfin.Plugin.QuotaManager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -13,15 +13,16 @@ class JellyfinQuotaController extends Controller
 {
     public function __construct(
         protected SubscriptionService $subscriptionService
-    ) {}
+    ) {
+    }
 
     /**
      * Jellyfin C# eklentisi tarafından periyodik sorgulanan kullanıcı kota ve abonelik yenilenme tarihleri.
      */
     public function index(Request $request): JsonResponse
     {
-        if (! $this->validateApiKey($request)) {
-            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı.'], 401);
+        if (!$this->validateApiKey($request)) {
+            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı. Yönetinizle iletişime geçin.'], 401);
         }
 
         $users = User::all();
@@ -57,17 +58,17 @@ class JellyfinQuotaController extends Controller
      */
     public function checkAccess(Request $request): JsonResponse
     {
-        if (! $this->validateApiKey($request)) {
+        if (!$this->validateApiKey($request)) {
             return response()->json([
                 'allowed' => false,
                 'reason' => 'unauthorized',
-                'message' => 'Yetkisiz erişim: Geçersiz API anahtarı.',
+                'message' => 'Yetkisiz erişim: Geçersiz API anahtarı. Yönetinizle iletişime geçin.',
             ], 401);
         }
 
         $username = $request->query('username') ?? $request->input('username');
 
-        if (! $username) {
+        if (!$username) {
             return response()->json([
                 'allowed' => false,
                 'reason' => 'missing_username',
@@ -82,7 +83,7 @@ class JellyfinQuotaController extends Controller
             ->orWhereRaw('LOWER(email) = ?', [strtolower($username)])
             ->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'allowed' => false,
                 'reason' => 'user_not_found',
@@ -110,7 +111,7 @@ class JellyfinQuotaController extends Controller
         $remainingBytes = $this->subscriptionService->getTotalRemainingBytes($user);
 
         // Durum 1: Paketi yoksa (veya hem paket hem kota yoksa)
-        if (! $hasPackage) {
+        if (!$hasPackage) {
             return response()->json([
                 'allowed' => false,
                 'reason' => 'no_package',
@@ -146,8 +147,8 @@ class JellyfinQuotaController extends Controller
      */
     public function deductQuota(Request $request): JsonResponse
     {
-        if (! $this->validateApiKey($request)) {
-            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı.'], 401);
+        if (!$this->validateApiKey($request)) {
+            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı. Yönetinizle iletişime geçin.'], 401);
         }
 
         $validated = $request->validate([
@@ -160,11 +161,11 @@ class JellyfinQuotaController extends Controller
             ->orWhereRaw('LOWER(email) = ?', [strtolower($validated['username'])])
             ->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json(['status' => 'error', 'message' => 'Kullanıcı bulunamadı.'], 404);
         }
 
-        if (! $user->isAdmin()) {
+        if (!$user->isAdmin()) {
             $this->subscriptionService->deductUserQuota($user, (int) $validated['bytes']);
         }
 
@@ -174,7 +175,7 @@ class JellyfinQuotaController extends Controller
             'status' => 'success',
             'deducted_bytes' => (int) $validated['bytes'],
             'remaining_bytes' => $remainingBytes,
-            'quota_exhausted' => ! $user->isAdmin() && $remainingBytes <= 0,
+            'quota_exhausted' => !$user->isAdmin() && $remainingBytes <= 0,
         ]);
     }
 
@@ -183,8 +184,8 @@ class JellyfinQuotaController extends Controller
      */
     public function quotaExceeded(Request $request): JsonResponse
     {
-        if (! $this->validateApiKey($request)) {
-            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı.'], 401);
+        if (!$this->validateApiKey($request)) {
+            return response()->json(['error' => 'Yetkisiz erişim: Geçersiz API anahtarı. Yönetinizle iletişime geçin.'], 401);
         }
 
         $data = $request->validate([
