@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\JellyfinServer;
+use App\Models\TmdbTitle;
 use App\Services\MediaServers\JellyfinLoadBalancerService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -19,44 +19,50 @@ class MediaServerController extends Controller
     /**
      * Medya Sunucum sayfası görünümü.
      */
-    public function index(Request $request): Response|RedirectResponse
+    public function index(Request $request): Response
     {
         $user = Auth::user();
-
-        if (! $user) {
-            return redirect()->route('home')->with('error', 'Medya sunucusu yönetimi için lütfen giriş yapın.');
-        }
-
-        // Kullanıcının e-posta adresiyle (veya önceden açılmışsa adıyla) aktif sunucularda hesabı var mı ara
-        $found = $this->loadBalancer->findUserAcrossServers($user->email);
-
-        if ($found === null && ! empty($user->name)) {
-            $found = $this->loadBalancer->findUserAcrossServers($user->name);
-        }
-
         $activeServersCount = JellyfinServer::where('is_active', true)->count();
 
         $accountData = null;
-        if ($found !== null) {
-            $server = $found['server'];
-            $jellyfinUser = $found['jellyfin_user'];
+        if ($user) {
+            // Kullanıcının e-posta adresiyle (veya önceden açılmışsa adıyla) aktif sunucularda hesabı var mı ara
+            $found = $this->loadBalancer->findUserAcrossServers($user->email);
 
-            $accountData = [
-                'username' => $jellyfinUser['Name'] ?? $user->email,
-                'server_id' => $server->id,
-                'server_name' => $server->name,
-                'server_url' => $server->effective_public_url,
-                'last_activity_date' => $jellyfinUser['LastActivityDate'] ?? null,
-                'date_created' => $jellyfinUser['DateCreated'] ?? null,
-            ];
+            if ($found === null && ! empty($user->name)) {
+                $found = $this->loadBalancer->findUserAcrossServers($user->name);
+            }
+
+            if ($found !== null) {
+                $server = $found['server'];
+                $jellyfinUser = $found['jellyfin_user'];
+
+                $accountData = [
+                    'username' => $jellyfinUser['Name'] ?? $user->email,
+                    'server_id' => $server->id,
+                    'server_name' => $server->name,
+                    'server_url' => $server->effective_public_url,
+                    'last_activity_date' => $jellyfinUser['LastActivityDate'] ?? null,
+                    'date_created' => $jellyfinUser['DateCreated'] ?? null,
+                ];
+            }
         }
+
+        $featuredTitles = TmdbTitle::whereNotNull('poster_path')
+            ->whereNotNull('backdrop_path')
+            ->orderByDesc('vote_average')
+            ->where('vote_count', '>', 250)
+            ->take(8)
+            ->get(['id', 'title', 'slug', 'poster_path', 'backdrop_path', 'vote_average', 'release_date', 'media_type']);
 
         return Inertia::render('MediaServer/Index', [
             'has_account' => $accountData !== null,
             'account' => $accountData,
-            'suggested_username' => $user->email,
+            'suggested_username' => $user?->email ?? '',
             'active_servers_count' => $activeServersCount,
             'has_available_servers' => $activeServersCount > 0,
+            'is_guest' => $user === null,
+            'featured_titles' => $featuredTitles,
         ]);
     }
 
