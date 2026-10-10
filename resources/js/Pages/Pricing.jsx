@@ -91,13 +91,31 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                 token: client_token,
                 eventCallback: function (data) {
                     if (data.name === 'checkout.completed') {
+                        // 1. Paddle modalını hemen kapat
+                        const closePaddleOverlay = () => {
+                            try {
+                                if (paddle?.Checkout?.close) {
+                                    paddle.Checkout.close();
+                                } else if (window.Paddle?.Checkout?.close) {
+                                    window.Paddle.Checkout.close();
+                                }
+                            } catch (e) {
+                                console.warn('Paddle overlay close error:', e);
+                            }
+                        };
+                        closePaddleOverlay();
+                        setTimeout(closePaddleOverlay, 250);
+
+                        // 2. Laravel modalı açık kalsın ve başarı ekranını göstersin
                         setPaddleSuccess(true);
-                        setTimeout(() => {
-                            setCheckoutPlan(null);
-                            router.visit(window.location.pathname, {
-                                preserveScroll: false,
-                            });
-                        }, 2500);
+                        setIsPaddleLoading(false);
+
+                        // 3. Arka planda verileri (aktif paket, yeni kota vb.) sessizce yenile
+                        router.reload({
+                            preserveScroll: true,
+                        });
+                    } else if (data.name === 'checkout.closed') {
+                        setIsPaddleLoading(false);
                     }
                 },
             });
@@ -211,6 +229,14 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
         setUserNotes('');
     };
 
+    const handleCloseCheckout = () => {
+        setCheckoutPlan(null);
+        setIsUpgradeCheckout(false);
+        setPaddleSuccess(false);
+        setPaddleError(null);
+        setIsPaddleLoading(false);
+    };
+
     const handleCopy = (text, fieldName) => {
         navigator.clipboard.writeText(text);
         setCopiedField(fieldName);
@@ -234,8 +260,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
         }, {
             preserveScroll: true,
             onSuccess: () => {
-                setCheckoutPlan(null);
-                setIsUpgradeCheckout(false);
+                handleCloseCheckout();
             },
             onFinish: () => setIsSubmittingNotice(false),
         });
@@ -860,46 +885,122 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
 
             {/* CHECKOUT & PAYMENT NOTIFICATION MODAL */}
             {checkoutPlan && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-[#0D111A] border border-slate-200 dark:border-white/10 rounded-3xl max-w-xl w-full p-6 shadow-2xl overflow-y-auto max-h-[90vh] space-y-5 text-slate-800 dark:text-gray-200">
 
-                        {/* Modal Header */}
-                        {(() => {
-                            const currentUpgrade = isUpgradeCheckout && upgrades ? upgrades[checkoutPlan.id] : null;
-                            return (
-                                <>
-                                    <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.08]">
-                                        <div>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                                                isUpgradeCheckout
-                                                    ? 'text-purple-600 dark:text-purple-400'
-                                                    : checkoutPlan.type === 'business'
-                                                        ? 'text-amber-600 dark:text-amber-400'
-                                                        : checkoutPlan.type === 'extra'
-                                                            ? 'text-sky-600 dark:text-sky-400'
-                                                            : 'text-[#00B074]'
-                                            }`}>
-                                                {isUpgradeCheckout ? 'Paket Yükseltme Bildirimi' : 'Sipariş ve Ödeme Bildirimi'}
-                                            </span>
-                                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
-                                                {isUpgradeCheckout && currentUpgrade ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <span>{currentUpgrade.current_plan.name}</span>
-                                                        <ArrowRight className="w-4 h-4 text-purple-500 shrink-0" />
-                                                        <span className="text-purple-600 dark:text-purple-400">{checkoutPlan.name}</span>
-                                                    </span>
-                                                ) : (
-                                                    <span>{checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : `(${selectedDuration} Ay)`}</span>
-                                                )}
-                                            </h3>
-                                        </div>
-                                        <button
-                                            onClick={() => setCheckoutPlan(null)}
-                                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
+                        {paddleSuccess ? (
+                            <div className="py-2 text-center space-y-6 animate-in zoom-in-95 duration-200">
+                                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/[0.08]">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        Ödeme Onayı
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleCloseCheckout}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="relative mx-auto w-20 h-20 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border-2 border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-xl shadow-emerald-500/15">
+                                    <CheckCircle2 className="w-12 h-12 text-emerald-500 animate-in zoom-in duration-300" />
+                                    <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">
+                                        Ödemeniz Başarıyla Alındı!
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-slate-600 dark:text-gray-300 max-w-md mx-auto leading-relaxed">
+                                        Tebrikler! Kart ödemeniz Paddle güvencesiyle onaylandı. <strong>{checkoutPlan.name}</strong> paketiniz ve indirme kotanız hesabınıza başarıyla tanımlandı.
+                                    </p>
+                                </div>
+
+                                {/* Order Details Summary */}
+                                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.08] text-left space-y-2.5 max-w-md mx-auto text-xs">
+                                    <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-white/[0.06]">
+                                        <span className="text-slate-500 dark:text-gray-400">Tanımlanan Paket:</span>
+                                        <strong className="text-slate-900 dark:text-white font-semibold flex items-center gap-1.5">
+                                            <Zap className="w-3.5 h-3.5 text-amber-500" />
+                                            {checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : isUpgradeCheckout ? '(Yükseltme)' : `(${selectedDuration} Ay)`}
+                                        </strong>
                                     </div>
+                                    <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-white/[0.06]">
+                                        <span className="text-slate-500 dark:text-gray-400">Yeni İndirme Kotası:</span>
+                                        <strong className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">
+                                            {checkoutPlan.monthly_quota_gb} GB
+                                        </strong>
+                                    </div>
+                                    <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-white/[0.06]">
+                                        <span className="text-slate-500 dark:text-gray-400">Ödeme Yöntemi:</span>
+                                        <span className="text-slate-700 dark:text-gray-300 font-medium flex items-center gap-1.5">
+                                            <CreditCard className="w-3.5 h-3.5 text-blue-500" />
+                                            Kredi / Banka Kartı (Paddle)
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-slate-500 dark:text-gray-400">Hesap Durumu:</span>
+                                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold border border-emerald-500/20">
+                                            ● Aktif & Kullanıma Hazır
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleCloseCheckout}
+                                        className="w-full sm:w-auto px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-[#00B074] hover:from-emerald-700 hover:to-[#009663] text-white text-xs font-bold shadow-lg shadow-emerald-500/20 inline-flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        <span>Harika, Teşekkürler</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Modal Header */}
+                                {(() => {
+                                    const currentUpgrade = isUpgradeCheckout && upgrades ? upgrades[checkoutPlan.id] : null;
+                                    return (
+                                        <>
+                                            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.08]">
+                                                <div>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                                        isUpgradeCheckout
+                                                            ? 'text-purple-600 dark:text-purple-400'
+                                                            : checkoutPlan.type === 'business'
+                                                                ? 'text-amber-600 dark:text-amber-400'
+                                                                : checkoutPlan.type === 'extra'
+                                                                    ? 'text-sky-600 dark:text-sky-400'
+                                                                    : 'text-[#00B074]'
+                                                    }`}>
+                                                        {isUpgradeCheckout ? 'Paket Yükseltme Bildirimi' : 'Sipariş ve Ödeme Bildirimi'}
+                                                    </span>
+                                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
+                                                        {isUpgradeCheckout && currentUpgrade ? (
+                                                            <span className="flex items-center gap-2">
+                                                                <span>{currentUpgrade.current_plan.name}</span>
+                                                                <ArrowRight className="w-4 h-4 text-purple-500 shrink-0" />
+                                                                <span className="text-purple-600 dark:text-purple-400">{checkoutPlan.name}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span>{checkoutPlan.name} {checkoutPlan.type === 'extra' ? '(30 Gün)' : `(${selectedDuration} Ay)`}</span>
+                                                        )}
+                                                    </h3>
+                                                </div>
+                                                <button
+                                                    onClick={handleCloseCheckout}
+                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+                                                >
+                                                    <X className="w-5 h-5" />
+                                                </button>
+                                            </div>
 
                                     {/* Order Summary Box */}
                                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#07090E] border border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
@@ -1097,7 +1198,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
                                                     <button
                                                         type="button"
-                                                        onClick={() => setCheckoutPlan(null)}
+                                                        onClick={handleCloseCheckout}
                                                         disabled={isPaddleLoading}
                                                         className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-gray-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-white/[0.08] disabled:opacity-50"
                                                     >
@@ -1249,7 +1350,7 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/[0.08]">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setCheckoutPlan(null)}
+                                                    onClick={handleCloseCheckout}
                                                     className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-slate-700 dark:text-gray-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-white/[0.08]"
                                                 >
                                                     İptal
@@ -1271,6 +1372,8 @@ export default function Pricing({ plans = [], paymentMethods = [], faqs = [], up
                                     );
                                 })()}
                             </form>
+                        )}
+                            </>
                         )}
 
                     </div>

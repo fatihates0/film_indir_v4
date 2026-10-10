@@ -13,15 +13,57 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class PaddleService
+class PaddleService extends AbstractPaymentService
 {
+    public const DRIVER = 'paddle';
+
+    public const METHOD_ID = 'paddle';
+
     public const SANDBOX_API_URL = 'https://sandbox-api.paddle.com';
 
     public const PRODUCTION_API_URL = 'https://api.paddle.com';
 
-    public function __construct(
-        protected SubscriptionService $subscriptionService
-    ) {}
+    public function getDriver(): string
+    {
+        return self::DRIVER;
+    }
+
+    public function getMethodId(): string
+    {
+        return self::METHOD_ID;
+    }
+
+    public function validateNotificationData(array $data): array
+    {
+        return $data;
+    }
+
+    public function createNotification(
+        User $user,
+        Plan $plan,
+        array $data,
+        float $amount,
+        int $durationMonths,
+        bool $isUpgrade = false,
+        ?int $oldPlanId = null
+    ): PaymentNotification {
+        $referenceCode = $this->generateReferenceCode('PAY-PAD');
+
+        return PaymentNotification::create([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'is_upgrade' => $isUpgrade,
+            'old_plan_id' => $oldPlanId,
+            'payment_method_id' => $this->getMethodId(),
+            'duration_months' => $durationMonths,
+            'amount' => $amount,
+            'reference_code' => $referenceCode,
+            'sender_name' => $user->name,
+            'tx_hash' => $data['tx_hash'] ?? null,
+            'user_notes' => 'Paddle Güvenli Kart Ödemesi',
+            'status' => 'pending',
+        ]);
+    }
 
     /**
      * Get the active Paddle configuration merging DB settings and config/services.php.

@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\PaymentMethod;
 use App\Models\PaymentNotification;
 use App\Models\Plan;
+use App\Services\Payment\PaymentManager;
 use App\Services\SubscriptionService;
+use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class PaymentNotificationController extends Controller
 {
     /**
      * Submit a new payment notification (User side).
      */
-    public function store(Request $request, SubscriptionService $subscriptionService)
+    public function store(Request $request, SubscriptionService $subscriptionService, PaymentManager $paymentManager)
     {
         $user = $request->user();
         if (! $user) {
@@ -39,6 +39,11 @@ class PaymentNotificationController extends Controller
         if (! $paymentMethod) {
             return redirect()->back()->with('error', 'Seçilen ödeme yöntemi şu anda aktif değildir.');
         }
+
+        $paymentService = $paymentManager->forMethod($paymentMethod);
+
+        // Driver-specific validation (sender_name for bank, tx_hash for crypto, etc.)
+        $paymentService->validateNotificationData($request->all());
 
         $plan = Plan::findOrFail($validated['plan_id']);
         $isUpgrade = $request->boolean('is_upgrade');
@@ -73,26 +78,19 @@ class PaymentNotificationController extends Controller
             $amount = $plan->getPriceForDuration($durationMonths);
         }
 
-        $referenceCode = 'PAY-'.date('Ymd').'-'.strtoupper(Str::random(6));
-
-        PaymentNotification::create([
-            'user_id' => $user->id,
-            'plan_id' => $plan->id,
-            'is_upgrade' => $isUpgrade,
-            'old_plan_id' => $oldPlanId,
-            'payment_method_id' => $paymentMethod->id,
-            'duration_months' => $durationMonths,
-            'amount' => $amount,
-            'reference_code' => $referenceCode,
-            'sender_name' => $validated['sender_name'] ?? null,
-            'tx_hash' => $validated['tx_hash'] ?? null,
-            'user_notes' => $validated['user_notes'] ?? null,
-            'status' => 'pending',
-        ]);
+        $notification = $paymentService->createNotification(
+            $user,
+            $plan,
+            $validated,
+            $amount,
+            $durationMonths,
+            $isUpgrade,
+            $oldPlanId
+        );
 
         $successMsg = $isUpgrade
-            ? "Paket yükseltme bildiriminiz başarıyla alındı! Referans Kodunuz: {$referenceCode}. Admin onayının ardından yeni paketiniz aktif edilecektir."
-            : "Ödeme bildiriminiz başarıyla alındı! Referans Kodunuz: {$referenceCode}. Admin onayının ardından paketiniz tanımlanacaktır.";
+            ? "Paket yükseltme bildiriminiz başarıyla alındı! Referans Kodunuz: {$notification->reference_code}. Admin onayının ardından yeni paketiniz aktif edilecektir."
+            : "Ödeme bildiriminiz başarıyla alındı! Referans Kodunuz: {$notification->reference_code}. Admin onayının ardından paketiniz tanımlanacaktır.";
 
         return redirect()->back()->with('success', $successMsg);
     }
@@ -100,54 +98,19 @@ class PaymentNotificationController extends Controller
     /**
      * Approve a payment notification (Admin side).
      */
-    public function approve(Request $request, PaymentNotification $notification, SubscriptionService $subscriptionService)
+    public function approve(Request $request, PaymentNotification $notification, PaymentManager $paymentManager)
     {
         if ($notification->status === 'approved') {
             return redirect()->back()->with('error', 'Bu ödeme bildirimi zaten onaylanmış.');
         }
 
-        $admin = $request->user();
-        $user = $notification->user;
-        $plan = $notification->plan;
-
-        if (! $user) {
-            return redirect()->back()->with('error', 'Kullanıcı bulunamadı.');
-        }
-
         try {
-            DB::transaction(function () use ($notification, $subscriptionService, $user, $plan, $admin, $request) {
-                if ($notification->is_upgrade) {
-                    $subscriptionService->upgradeSubscription(
-                        $user,
-                        $plan,
-                        (float) $notification->amount,
-                        "Ödeme Bildirimi #{$notification->reference_code} (Paket Yükseltme) onaylandı"
-                    );
-                } elseif ($plan && $plan->isExtra()) {
-                    $subscriptionService->purchaseExtraQuota(
-                        $user,
-                        $plan,
-                        (float) $notification->amount,
-                        "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
-                    );
-                } else {
-                    $subscriptionService->subscribe(
-                        $user,
-                        $plan,
-                        $notification->duration_months,
-                        (float) $notification->amount,
-                        "Ödeme Bildirimi #{$notification->reference_code} onaylandı"
-                    );
-                }
-
-                $notification->update([
-                    'status' => 'approved',
-                    'processed_at' => now(),
-                    'processed_by' => $admin?->id,
-                    'admin_notes' => $request->input('admin_notes', 'Ödeme doğrulandı ve onaylandı.'),
-                ]);
-            });
-        } catch (\Exception $e) {
+            $paymentManager->forNotification($notification)->approve(
+                $notification,
+                $request->user(),
+                $request->input('admin_notes', 'Ödeme doğrulandı ve onaylandı.')
+            );
+        } catch (Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
@@ -161,16 +124,13 @@ class PaymentNotificationController extends Controller
     /**
      * Reject a payment notification (Admin side).
      */
-    public function reject(Request $request, PaymentNotification $notification)
+    public function reject(Request $request, PaymentNotification $notification, PaymentManager $paymentManager)
     {
-        $admin = $request->user();
-
-        $notification->update([
-            'status' => 'rejected',
-            'processed_at' => now(),
-            'processed_by' => $admin?->id,
-            'admin_notes' => $request->input('admin_notes', 'Ödeme doğrulanamadı veya yetersiz tutar.'),
-        ]);
+        $paymentManager->forNotification($notification)->reject(
+            $notification,
+            $request->user(),
+            $request->input('admin_notes', 'Ödeme doğrulanamadı veya yetersiz tutar.')
+        );
 
         return redirect()->back()->with('success', "#{$notification->reference_code} referanslı ödeme bildirimi reddedildi.");
     }
