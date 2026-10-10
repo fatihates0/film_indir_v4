@@ -251,6 +251,63 @@ class PaddleService extends AbstractPaymentService
     }
 
     /**
+     * Get PDF invoice / receipt URL for a Paddle transaction.
+     *
+     * @return string|null Temporary URL (valid for 1 hour) to the PDF invoice/receipt
+     */
+    public function getTransactionInvoiceUrl(string $transactionId): ?string
+    {
+        $config = $this->getConfig();
+
+        if (empty($config['api_key'])) {
+            return null;
+        }
+
+        try {
+            $response = Http::withToken($config['api_key'])
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                ])
+                ->timeout(15)
+                ->get("{$config['base_url']}/transactions/{$transactionId}/invoice", [
+                    'disposition' => 'inline',
+                ]);
+
+            if ($response->successful()) {
+                $url = $response->json('data.url');
+                if (! empty($url)) {
+                    return (string) $url;
+                }
+            }
+
+            Log::warning('Paddle getTransactionInvoiceUrl failed', [
+                'transaction_id' => $transactionId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Paddle invoice retrieval exception', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the Paddle vendor dashboard direct link for a transaction.
+     */
+    public function getDashboardTransactionUrl(string $transactionId): string
+    {
+        $config = $this->getConfig();
+        $isSandbox = $config['environment'] === 'sandbox';
+        $base = $isSandbox ? 'https://sandbox-vendors.paddle.com' : 'https://vendors.paddle.com';
+
+        return "{$base}/transactions/{$transactionId}";
+    }
+
+    /**
      * Verify the raw Paddle Billing webhook signature.
      */
     public function verifyWebhookSignature(string $rawPayload, ?string $signatureHeader): bool

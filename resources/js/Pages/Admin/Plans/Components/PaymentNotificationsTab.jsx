@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import Pagination from '../../../../Components/Pagination';
-import { BellRing, Search, Check } from 'lucide-react';
+import { BellRing, Search, Check, FileText } from 'lucide-react';
 
 export default function PaymentNotificationsTab({
     paymentNotifications = { data: [] },
@@ -174,8 +174,21 @@ export default function PaymentNotificationsTab({
                                     <td className="px-5 py-3.5">
                                         <div className="text-gray-200 font-medium">{pn.sender_name || '-'}</div>
                                         {pn.tx_hash && (
-                                            <div className="text-[10px] text-gray-500 font-mono truncate max-w-[150px]" title={pn.tx_hash}>
-                                                {pn.tx_hash}
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <span className="text-[10px] text-gray-500 font-mono truncate max-w-[130px]" title={pn.tx_hash}>
+                                                    {pn.tx_hash}
+                                                </span>
+                                                {pn.method_driver === 'paddle' && (
+                                                    <a
+                                                        href={`/admin/payment-notifications/${pn.id}/paddle-invoice`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="Paddle PDF Dekontunu Aç"
+                                                        className="p-1 rounded-md bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition-all hover:scale-110 flex items-center justify-center shrink-0 shadow-sm"
+                                                    >
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                    </a>
+                                                )}
                                             </div>
                                         )}
                                     </td>
@@ -195,6 +208,17 @@ export default function PaymentNotificationsTab({
                                     <td className="px-5 py-3.5 text-right">
                                         {pn.status === 'pending' ? (
                                             <div className="flex items-center justify-end gap-2">
+                                                {pn.method_driver === 'paddle' && pn.tx_hash && (
+                                                    <a
+                                                        href={`/admin/payment-notifications/${pn.id}/paddle-invoice`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="Paddle PDF Dekontunu Aç"
+                                                        className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition-all hover:scale-110 flex items-center justify-center shrink-0 shadow-sm"
+                                                    >
+                                                        <FileText className="w-4 h-4" />
+                                                    </a>
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => onApproveNotification(pn)}
@@ -212,9 +236,22 @@ export default function PaymentNotificationsTab({
                                                 </button>
                                             </div>
                                         ) : (
-                                            <span className="text-[11px] text-gray-500 font-mono">
-                                                {pn.processed_at}
-                                            </span>
+                                            <div className="flex items-center justify-end gap-2.5">
+                                                <span className="text-[11px] text-gray-500 font-mono">
+                                                    {pn.processed_at}
+                                                </span>
+                                                {pn.method_driver === 'paddle' && pn.tx_hash && (
+                                                    <a
+                                                        href={`/admin/payment-notifications/${pn.id}/paddle-invoice`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="Paddle PDF Dekontunu Aç"
+                                                        className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition-all hover:scale-110 flex items-center justify-center shrink-0 shadow-sm"
+                                                    >
+                                                        <FileText className="w-4 h-4" />
+                                                    </a>
+                                                )}
+                                            </div>
                                         )}
                                     </td>
                                 </tr>

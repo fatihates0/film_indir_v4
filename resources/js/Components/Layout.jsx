@@ -28,8 +28,8 @@ export default function Layout({ children, transparentNavbar = false }) {
                 {children}
             </main>
             <Footer />
-            
-            <AuthModal 
+
+            <AuthModal
                 isOpen={authModalState.isOpen}
                 mode={authModalState.mode}
                 onClose={handleCloseAuth}

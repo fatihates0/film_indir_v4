@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PaymentMethod;
 use App\Models\PaymentNotification;
 use App\Models\Plan;
+use App\Services\Payment\PaddleService;
 use App\Services\Payment\PaymentManager;
 use App\Services\SubscriptionService;
 use Exception;
@@ -133,5 +134,28 @@ class PaymentNotificationController extends Controller
         );
 
         return redirect()->back()->with('success', "#{$notification->reference_code} referanslı ödeme bildirimi reddedildi.");
+    }
+
+    /**
+     * View or download Paddle invoice PDF for a payment notification.
+     */
+    public function paddleInvoice(PaymentNotification $notification, PaddleService $paddleService)
+    {
+        $transactionId = $notification->tx_hash;
+
+        if (empty($transactionId)) {
+            return redirect()->back()->with('error', 'Bu bildirime ait bir Paddle işlem kodu (Transaction ID) bulunamadı.');
+        }
+
+        $invoiceUrl = $paddleService->getTransactionInvoiceUrl($transactionId);
+
+        if (! empty($invoiceUrl)) {
+            return redirect()->away($invoiceUrl);
+        }
+
+        // Fallback to Paddle Vendor Dashboard transaction page
+        $dashboardUrl = $paddleService->getDashboardTransactionUrl($transactionId);
+
+        return redirect()->away($dashboardUrl);
     }
 }

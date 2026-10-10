@@ -132,6 +132,7 @@ Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function ()
     Route::put('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
     Route::post('/payment-notifications/{notification}/approve', [PaymentNotificationController::class, 'approve'])->name('payment-notifications.approve');
     Route::post('/payment-notifications/{notification}/reject', [PaymentNotificationController::class, 'reject'])->name('payment-notifications.reject');
+    Route::get('/payment-notifications/{notification}/paddle-invoice', [PaymentNotificationController::class, 'paddleInvoice'])->name('payment-notifications.paddle-invoice');
 
     // Jellyfin Media Server Nodes Management Routes
     Route::get('/jellyfin-servers', [JellyfinServerController::class, 'index'])->name('jellyfin-servers.index');
