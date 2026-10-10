@@ -45,7 +45,7 @@ export default function SeriesDetail({ series, episodes, similarSeries, comments
         return (
             <Layout title="Dizi Bulunamadı - SineKutu">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center space-y-4">
-                    <div className="w-16 h-16 bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-center mx-auto text-slate-400 dark:text-gray-500">
+                    <div className="w-16 h-16 bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-center mx-auto text-slate-400 dark:text-gray-500">
                         <Play className="w-8 h-8" />
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dizi Bulunamadı</h1>
@@ -313,13 +313,13 @@ export default function SeriesDetail({ series, episodes, similarSeries, comments
                     >
                         {/* Quality Badge & Multi-Trailer Switcher */}
                         <div className="flex flex-wrap items-center gap-2.5 mb-3.5">
-                            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#131722]/80 backdrop-blur-md border border-white/15 text-white shadow-sm">
+                            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0A0D14]/80 backdrop-blur-md border border-white/15 text-white shadow-sm">
                                 <Sparkles className="w-3.5 h-3.5 text-[#00B074]" />
                                 <span>{defaultSeries.quality || defaultSeries.seasonNotice || '1080p Full HD'}</span>
                             </div>
 
                             {!isMuted && trailersList.length > 1 && (
-                                <div className="inline-flex items-center p-1 rounded-full bg-slate-900/10 dark:bg-[#131722]/80 backdrop-blur-md border border-slate-900/20 dark:border-white/15 shadow-sm gap-1 animate-in fade-in duration-300">
+                                <div className="inline-flex items-center p-1 rounded-full bg-slate-900/10 dark:bg-[#0A0D14]/80 backdrop-blur-md border border-slate-900/20 dark:border-white/15 shadow-sm gap-1 animate-in fade-in duration-300">
                                     {trailersList.map((t, idx) => {
                                         const isActive = activeTrailer?.key === t.key;
                                         return (
@@ -771,7 +771,7 @@ export default function SeriesDetail({ series, episodes, similarSeries, comments
                                     return (
                                         <div
                                             key={ep.id || epIdx}
-                                            className={`group relative bg-white dark:bg-[#0c0e14]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5 ${isAvail
+                                            className={`group relative bg-white dark:bg-[#0A0D14]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5 ${isAvail
                                                 ? 'border-slate-200 dark:border-white/10 hover:border-[#00B074]/50'
                                                 : 'border-slate-200/60 dark:border-white/5 opacity-60 hover:opacity-85'
                                                 }`}
@@ -929,7 +929,7 @@ export default function SeriesDetail({ series, episodes, similarSeries, comments
                     {/* UNIVERSE TAB */}
                     {activeTab === 'universe' && (
                         <div className="space-y-6">
-                            <div className="bg-white dark:bg-[#131722] p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+                            <div className="bg-white dark:bg-[#0A0D14] p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
                                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{defaultSeries.title} Evreni</h3>
                                 <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">Kronolojik bağlantılı yapımlar ve evren genişlemeleri.</p>
 
@@ -958,7 +958,7 @@ export default function SeriesDetail({ series, episodes, similarSeries, comments
                     {activeTab === 'news' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {mockNews.map((item) => (
-                                <div key={item.id} className="bg-white dark:bg-[#131722] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/5 flex flex-col sm:flex-row hover:border-slate-300 dark:hover:border-white/15 transition-all shadow-sm">
+                                <div key={item.id} className="bg-white dark:bg-[#0A0D14] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/5 flex flex-col sm:flex-row hover:border-slate-300 dark:hover:border-white/15 transition-all shadow-sm">
                                     <img src={item.image} alt={item.title} className="sm:w-52 h-48 sm:h-auto object-cover" />
                                     <div className="p-6 flex flex-col justify-between flex-1">
                                         <div>

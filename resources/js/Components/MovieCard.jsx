@@ -90,7 +90,7 @@ export default function MovieCard({
                 href={cardHref}
                 className={`group block select-none ${className}`}
             >
-                <div className="aspect-[2/3] rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-[#131722] border border-slate-300/60 dark:border-white/5 hover:border-[#00B074]/50 transition-all duration-300 shadow-sm hover:shadow-lg">
+                <div className="aspect-[2/3] rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-[#0A0D14] border border-slate-300/60 dark:border-white/5 hover:border-[#00B074]/50 transition-all duration-300 shadow-sm hover:shadow-lg">
                     {/* Poster Image */}
                     {cardPoster ? (
                         <img
@@ -100,7 +100,7 @@ export default function MovieCard({
                             loading="lazy"
                         />
                     ) : (
-                        <div className="w-full h-full bg-slate-200 dark:bg-[#131722] flex items-center justify-center text-slate-400 dark:text-gray-500 text-xs">
+                        <div className="w-full h-full bg-slate-200 dark:bg-[#0A0D14] flex items-center justify-center text-slate-400 dark:text-gray-500 text-xs">
                             Görsel Yok
                         </div>
                     )}
@@ -152,7 +152,7 @@ export default function MovieCard({
             href={cardHref}
             className={`group block select-none ${className}`}
         >
-            <div className="aspect-[2/3] rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-[#131722] border border-slate-300/60 dark:border-white/5 group-hover:border-[#00B074]/50 group-hover:shadow-lg dark:group-hover:shadow-xl dark:group-hover:shadow-[#00B074]/10 transition-all duration-300">
+            <div className="aspect-[2/3] rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-[#0A0D14] border border-slate-300/60 dark:border-white/5 group-hover:border-[#00B074]/50 group-hover:shadow-lg dark:group-hover:shadow-xl dark:group-hover:shadow-[#00B074]/10 transition-all duration-300">
                 {/* Poster Image */}
                 {cardPoster ? (
                     <img
@@ -162,7 +162,7 @@ export default function MovieCard({
                         loading="lazy"
                     />
                 ) : (
-                    <div className="w-full h-full bg-slate-200 dark:bg-[#131722] flex items-center justify-center text-slate-400 dark:text-gray-500 text-xs">
+                    <div className="w-full h-full bg-slate-200 dark:bg-[#0A0D14] flex items-center justify-center text-slate-400 dark:text-gray-500 text-xs">
                         Görsel Yok
                     </div>
                 )}

@@ -148,7 +148,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
                 </div>
 
                 {userRatingAvg ? (
-                    <div className="flex items-center gap-3 bg-white dark:bg-[#0c0e14] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 self-start sm:self-auto">
+                    <div className="flex items-center gap-3 bg-white dark:bg-[#0A0D14] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 self-start sm:self-auto">
                         <div className="flex items-center gap-1.5 text-amber-400 font-black text-lg">
                             <Star className="w-5 h-5 fill-amber-400" />
                             <span>{userRatingAvg}</span>
@@ -172,7 +172,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
             )}
 
             {/* Write Main Review/Comment Box */}
-            <form onSubmit={handleMainSubmit} className="bg-white dark:bg-[#0c0e14] p-6 rounded-2xl border border-slate-200 dark:border-white/10 space-y-4 shadow-sm">
+            <form onSubmit={handleMainSubmit} className="bg-white dark:bg-[#0A0D14] p-6 rounded-2xl border border-slate-200 dark:border-white/10 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between">
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-[#00B074]" />
@@ -273,7 +273,7 @@ export default function MovieComments({ movieId, comments = [], userRatingAvg, u
             {/* Comments List */}
             <div className="space-y-4">
                 {comments.length === 0 ? (
-                    <div className="bg-white dark:bg-[#0c0e14] p-10 rounded-2xl border border-slate-200 dark:border-white/10 text-center space-y-3">
+                    <div className="bg-white dark:bg-[#0A0D14] p-10 rounded-2xl border border-slate-200 dark:border-white/10 text-center space-y-3">
                         <MessageSquare className="w-10 h-10 text-slate-300 dark:text-gray-600 mx-auto" />
                         <h4 className="text-base font-bold text-slate-900 dark:text-white">Henüz Yorum Yapılmamış</h4>
                         <p className="text-xs text-slate-500 dark:text-gray-400 max-w-sm mx-auto">
@@ -319,7 +319,7 @@ function CommentItem({
     const [showSpoiler, setShowSpoiler] = useState(false);
 
     return (
-        <div className={`bg-white dark:bg-[#0c0e14] p-5 sm:p-6 rounded-2xl border ${isReply ? 'border-slate-200/80 dark:border-white/5 bg-slate-50/50 dark:bg-[#0F131C]' : 'border-slate-200 dark:border-white/10'
+        <div className={`bg-white dark:bg-[#0A0D14] p-5 sm:p-6 rounded-2xl border ${isReply ? 'border-slate-200/80 dark:border-white/5 bg-slate-50/50 dark:bg-[#0F131C]' : 'border-slate-200 dark:border-white/10'
             } space-y-4 shadow-sm transition-all hover:border-slate-300 dark:hover:border-white/20`}>
 
             {/* Comment Author Header */}
@@ -480,7 +480,7 @@ function CommentItem({
                             value={replyGuestName}
                             onChange={(e) => setReplyGuestName(e.target.value)}
                             placeholder="Adınız (İsteğe bağlı)"
-                            className="w-full sm:w-64 bg-white dark:bg-[#0c0e14] border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074]"
+                            className="w-full sm:w-64 bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074]"
                         />
                     )}
 
@@ -489,7 +489,7 @@ function CommentItem({
                         onChange={(e) => replyForm.setData('content', e.target.value)}
                         placeholder="Yanıtınızı yazın..."
                         rows={2}
-                        className="w-full bg-white dark:bg-[#0c0e14] border border-slate-200 dark:border-white/10 rounded-lg p-3 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074] resize-y min-h-[70px]"
+                        className="w-full bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-lg p-3 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-[#00B074] resize-y min-h-[70px]"
                     />
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">

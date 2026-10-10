@@ -145,12 +145,6 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                         Paketler
                     </Link>
                     <Link
-                        href="/releases"
-                        className={`transition-colors relative py-1 ${isActive('/releases') ? activeNavLinkTextClass : navLinkTextClass}`}
-                    >
-                        Yeni Çıkanlar
-                    </Link>
-                    <Link
                         href="/forum"
                         className={`transition-colors relative py-1 ${isActive('/forum') ? activeNavLinkTextClass : navLinkTextClass}`}
                     >
@@ -423,7 +417,7 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                         {/* Header: Dynamic Active Title / Logo + Close Button */}
                         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-white/10">
                             <span className="text-lg font-bold text-slate-900 dark:text-white">
-                                {url === '/' ? 'Ana Sayfa' : (url.startsWith('/movies') ? 'Filmler' : (url.startsWith('/series') ? 'Diziler' : (url.startsWith('/pricing') ? 'Paketler' : (url.startsWith('/releases') ? 'Yeni Çıkanlar' : (url.startsWith('/forum') ? 'Forum' : (url.startsWith('/about') ? 'Hakkımızda' : 'Menü'))))))}
+                                {url === '/' ? 'Ana Sayfa' : (url.startsWith('/movies') ? 'Filmler' : (url.startsWith('/series') ? 'Diziler' : (url.startsWith('/pricing') ? 'Paketler' : (url.startsWith('/forum') ? 'Forum' : (url.startsWith('/about') ? 'Hakkımızda' : 'Menü')))))}
                             </span>
                             <button
                                 onClick={() => setIsMobileMenuOpen(false)}
@@ -479,17 +473,6 @@ export default function Navbar({ onOpenAuth, transparent = false }) {
                                 }`}
                             >
                                 Paketler
-                            </Link>
-                            <Link
-                                href="/releases"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-4 py-2 rounded-xl text-base font-semibold transition-all ${
-                                    isActive('/releases')
-                                        ? 'bg-[#00B074]/10 text-[#00B074]'
-                                        : 'text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
-                                }`}
-                            >
-                                Yeni Çıkanlar
                             </Link>
                             <Link
                                 href="/forum"

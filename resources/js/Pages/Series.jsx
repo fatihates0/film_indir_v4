@@ -18,7 +18,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
             if (cached && [4, 5, 6].includes(Number(cached))) {
                 return Number(cached);
             }
-        } catch (e) {}
+        } catch (e) { }
         return 5;
     });
 
@@ -48,7 +48,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
                     }, { preserveState: true, replace: true });
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     }, []);
 
     const handleColumnsChange = (newCols) => {
@@ -56,7 +56,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
         setColumns(newCols);
         try {
             localStorage.setItem('catalog_grid_columns', newCols.toString());
-        } catch (e) {}
+        } catch (e) { }
 
         router.get('/series', {
             q: searchQuery,
@@ -123,7 +123,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
                             placeholder="Dizi adı veya türü ara..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-all shadow-sm dark:shadow-none"
+                            className="w-full bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-all shadow-sm dark:shadow-none"
                         />
                         <Search className="w-4 h-4 text-slate-400 dark:text-gray-400 absolute left-3.5" />
                     </form>
@@ -132,7 +132,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
 
                 {/* FILTER TABS & SORT DROPDOWN & POSTERS GRID */}
                 <section id="catalog-section" className="space-y-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-200/60 dark:bg-[#131722]/60 p-3 rounded-2xl border border-slate-300/60 dark:border-white/5">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-200/60 dark:bg-[#0A0D14]/60 p-3 rounded-2xl border border-slate-300/60 dark:border-white/5">
                         {/* Genre Tabs */}
                         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto no-scrollbar py-1 text-xs font-semibold">
                             {(availableGenres || ['Tümü', 'Aksiyon', 'Animasyon', 'Komedi', 'Dram', 'Fantezi', 'Korku', 'Gizem', 'Sci-Fi']).map((genre) => (
@@ -165,7 +165,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
                                 </button>
 
                                 {isSortOpen && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl py-1 z-30 animate-in fade-in duration-150">
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl py-1 z-30 animate-in fade-in duration-150">
                                         {sortOptions.map((opt) => (
                                             <button
                                                 key={opt}
@@ -190,7 +190,7 @@ export default function Series({ hero, popularOfWeek, grid, totalCount, availabl
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-[#131722] p-12 rounded-3xl border border-white/5 text-center space-y-3">
+                        <div className="bg-[#0A0D14] p-12 rounded-3xl border border-white/5 text-center space-y-3">
                             <Tv className="w-10 h-10 text-gray-500 mx-auto" />
                             <h3 className="text-lg font-bold text-white">Dizi Bulunamadı</h3>
                             <p className="text-xs text-gray-400">Arama veya filtre kriterlerinize uygun dizi bulunamadı.</p>

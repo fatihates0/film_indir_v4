@@ -53,7 +53,7 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                     <h2 className="text-xl font-bold text-white mb-6">Haftanın Popülerleri</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {popularOfWeek.map((item) => (
-                            <Link key={item.id} href={`/movie/${item.id}`} className="flex items-center gap-4 bg-[#131722] p-3 rounded-2xl border border-white/5 hover:border-[#00B074]/50 transition-all group">
+                            <Link key={item.id} href={`/movie/${item.id}`} className="flex items-center gap-4 bg-[#0A0D14] p-3 rounded-2xl border border-white/5 hover:border-[#00B074]/50 transition-all group">
                                 <span className="text-4xl font-black text-white/80 group-hover:text-[#00B074] w-8 text-center">{item.rank}</span>
                                 <img src={item.poster} alt={item.title} className="w-16 h-24 rounded-xl object-cover" />
                                 <div className="min-w-0 flex-1">
@@ -74,7 +74,7 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                 <section>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                         {/* Filter Tabs */}
-                        <div className="flex items-center gap-2 bg-[#131722] p-1 rounded-xl border border-white/5 text-xs font-semibold">
+                        <div className="flex items-center gap-2 bg-[#0A0D14] p-1 rounded-xl border border-white/5 text-xs font-semibold">
                             {['Tümü', 'Movie', 'Series'].map((tab) => (
                                 <button
                                     key={tab}
@@ -90,14 +90,14 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                         <div className="relative">
                             <button
                                 onClick={() => setIsSortOpen(!isSortOpen)}
-                                className="flex items-center gap-2 px-4 py-2 bg-[#131722] border border-white/10 rounded-xl text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 bg-[#0A0D14] border border-white/10 rounded-xl text-xs font-semibold text-gray-300 hover:text-white transition-colors"
                             >
                                 <span>{selectedSort}</span>
                                 <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                             </button>
 
                             {isSortOpen && (
-                                <div className="absolute right-0 mt-2 w-44 bg-[#131722] border border-white/10 rounded-xl shadow-2xl py-1 z-30">
+                                <div className="absolute right-0 mt-2 w-44 bg-[#0A0D14] border border-white/10 rounded-xl shadow-2xl py-1 z-30">
                                     {sortOptions.map((opt) => (
                                         <button
                                             key={opt}
@@ -131,7 +131,7 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                 </section>
 
                 {/* FEATURED SPOTLIGHT BANNER */}
-                <section className="relative rounded-3xl overflow-hidden border border-white/10 bg-[#131722]">
+                <section className="relative rounded-3xl overflow-hidden border border-white/10 bg-[#0A0D14]">
                     <div className="relative h-[420px] w-full">
                         <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&q=80&w=1920" alt="Batman v Superman" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] via-[#0A0D14]/70 to-transparent" />
@@ -168,7 +168,7 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                     {/* Movies on Awards */}
                     <div className="space-y-4">
                         <h2 className="text-base font-bold text-white">Ödüllü Yapımlar</h2>
-                        <div className="bg-[#131722] rounded-2xl overflow-hidden border border-white/5 p-4">
+                        <div className="bg-[#0A0D14] rounded-2xl overflow-hidden border border-white/5 p-4">
                             <img src={moviesOnAwards.poster} alt={moviesOnAwards.title} className="w-full h-48 object-cover rounded-xl mb-4" />
                             <span className="px-2.5 py-1 bg-white/10 rounded text-[10px] font-semibold text-gray-300">
                                 {moviesOnAwards.badge}
@@ -196,7 +196,7 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                         <h2 className="text-base font-bold text-white">Öne Çıkanlar</h2>
                         <div className="space-y-3">
                             {morePopular.map((item) => (
-                                <Link key={item.id} href={`/movie/${item.id}`} className="flex items-center gap-3 bg-[#131722] p-2.5 rounded-xl border border-white/5 hover:border-[#00B074]/50 transition-all">
+                                <Link key={item.id} href={`/movie/${item.id}`} className="flex items-center gap-3 bg-[#0A0D14] p-2.5 rounded-xl border border-white/5 hover:border-[#00B074]/50 transition-all">
                                     <img src={item.poster} alt={item.title} className="w-12 h-16 rounded-lg object-cover" />
                                     <div className="min-w-0 flex-1">
                                         <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
@@ -220,7 +220,7 @@ export default function Discover({ hero, popularOfWeek, grid, moviesOnAwards, mo
                         <h2 className="text-base font-bold text-white">En Yeniler</h2>
                         <div className="space-y-3">
                             {newest.map((item) => (
-                                <Link key={item.id} href={`/movie/${item.id}`} className="flex items-center gap-3 bg-[#131722] p-2.5 rounded-xl border border-white/5 hover:border-[#00B074]/50 transition-all">
+                                <Link key={item.id} href={`/movie/${item.id}`} className="flex items-center gap-3 bg-[#0A0D14] p-2.5 rounded-xl border border-white/5 hover:border-[#00B074]/50 transition-all">
                                     <img src={item.poster} alt={item.title} className="w-12 h-16 rounded-lg object-cover" />
                                     <div className="min-w-0 flex-1">
                                         <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>

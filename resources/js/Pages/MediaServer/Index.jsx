@@ -219,7 +219,7 @@ export default function MediaServerIndex({
 
                 {/* CASE A: USER HAS ACTIVE JELLYFIN ACCOUNT (FULL WIDTH) */}
                 {has_account && account && (
-                    <div className="bg-white dark:bg-[#131722] border-2 border-[#00B074]/40 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-6">
+                    <div className="bg-white dark:bg-[#0A0D14] border-2 border-[#00B074]/40 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-6">
                         <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full blur-3xl pointer-events-none" />
 
                         {/* Header & Launch Bar */}
@@ -359,7 +359,7 @@ export default function MediaServerIndex({
 
                 {/* CASE B: AUTHENTICATED USER - FULL WIDTH ACCOUNT CREATION */}
                 {!has_account && !is_guest && (
-                    <div className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-8">
+                    <div className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-8">
                         <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full blur-3xl pointer-events-none" />
 
                         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-white/5">
@@ -495,7 +495,7 @@ export default function MediaServerIndex({
 
                 {/* CASE C: GUEST USER - FULL WIDTH CARD */}
                 {!has_account && is_guest && (
-                    <div className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-6">
+                    <div className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-6">
                         <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full blur-3xl pointer-events-none" />
 
                         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-white/5">
@@ -541,7 +541,7 @@ export default function MediaServerIndex({
                 {/* ============================================================== */}
                 {/* 2. SECTION: JELLYFIN SHOWCASE & FEATURES (HESAP ALTI)          */}
                 {/* ============================================================== */}
-                <div className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl transition-colors space-y-8">
+                <div className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl transition-colors space-y-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
@@ -638,7 +638,7 @@ export default function MediaServerIndex({
                 {/* ============================================================== */}
                 {/* 3. SECTION: DEVICE ECOSYSTEM & SETUP (CİHAZLAR)                 */}
                 {/* ============================================================== */}
-                <div className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl transition-colors space-y-6">
+                <div className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl transition-colors space-y-6">
                     <div>
                         <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
                             <Laptop className="w-6 h-6 text-[#00B074]" />
@@ -711,7 +711,7 @@ export default function MediaServerIndex({
                                 <Link
                                     key={title.id}
                                     href={title.detail_url || `/movie/${title.slug}`}
-                                    className="group relative rounded-2xl overflow-hidden aspect-[2/3] bg-slate-100 dark:bg-[#131722] border border-slate-200 dark:border-white/5 shadow-md hover:border-[#00B074]/50 transition-all duration-300"
+                                    className="group relative rounded-2xl overflow-hidden aspect-[2/3] bg-slate-100 dark:bg-[#0A0D14] border border-slate-200 dark:border-white/5 shadow-md hover:border-[#00B074]/50 transition-all duration-300"
                                 >
                                     <img
                                         src={title.poster_url}
@@ -745,7 +745,7 @@ export default function MediaServerIndex({
                 >
                     <div
                         onClick={e => e.stopPropagation()}
-                        className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+                        className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
                     >
                         <div className="px-6 py-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -831,7 +831,7 @@ export default function MediaServerIndex({
                 >
                     <div
                         onClick={e => e.stopPropagation()}
-                        className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+                        className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
                     >
                         <div className="p-6">
                             <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 mb-4">

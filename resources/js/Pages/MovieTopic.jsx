@@ -64,7 +64,7 @@ export default function MovieTopic({ topic, discussions }) {
 
             {/* Topic Header Details */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10 mb-8">
-                <div className="bg-[#131722] p-6 sm:p-8 rounded-2xl border border-gray-800/80 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="bg-[#0A0D14] p-6 sm:p-8 rounded-2xl border border-gray-800/80 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                     <div className="flex items-center gap-6">
                         <img src={defaultTopic.avatar} alt={defaultTopic.title} className="w-24 h-24 rounded-2xl object-cover border-4 border-[#0A0D14] shadow-xl" />
                         <div className="space-y-2">
@@ -81,11 +81,10 @@ export default function MovieTopic({ topic, discussions }) {
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         <button
                             onClick={() => setIsJoined(!isJoined)}
-                            className={`flex-1 md:flex-initial px-6 py-3 rounded-xl font-bold text-sm transition-all ${
-                                isJoined
+                            className={`flex-1 md:flex-initial px-6 py-3 rounded-xl font-bold text-sm transition-all ${isJoined
                                     ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
                                     : 'bg-[#00B074] hover:bg-[#009663] text-black shadow-lg shadow-[#00B074]/20'
-                            }`}
+                                }`}
                         >
                             {isJoined ? 'Topluluğa Katılındı' : '+ Topluluğa Katıl'}
                         </button>
@@ -96,7 +95,7 @@ export default function MovieTopic({ topic, discussions }) {
             {/* Main Forum Feed & Filters */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-6">
                 {/* Search & New Post Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#131722] p-4 rounded-xl border border-gray-800/60">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0A0D14] p-4 rounded-xl border border-gray-800/60">
                     <div className="relative w-full sm:w-80">
                         <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
@@ -114,9 +113,8 @@ export default function MovieTopic({ topic, discussions }) {
                                 <button
                                     key={f}
                                     onClick={() => setActiveFilter(f)}
-                                    className={`px-3 py-1.5 rounded-md font-semibold capitalize transition-colors ${
-                                        activeFilter === f ? 'bg-[#00B074] text-black' : 'text-gray-400 hover:text-white'
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-md font-semibold capitalize transition-colors ${activeFilter === f ? 'bg-[#00B074] text-black' : 'text-gray-400 hover:text-white'
+                                        }`}
                                 >
                                     {f === 'all' ? 'Tümü' : f === 'theories' ? 'Teoriler' : f === 'guides' ? 'Rehberler' : f === 'music' ? 'Müzik' : f}
                                 </button>
@@ -135,7 +133,7 @@ export default function MovieTopic({ topic, discussions }) {
                         <Link
                             key={disc.id}
                             href={`/forum/discussion/${disc.id}`}
-                            className="block bg-[#131722] hover:bg-[#181d2b] p-6 rounded-2xl border border-gray-800/60 hover:border-gray-700 transition-all group"
+                            className="block bg-[#0A0D14] hover:bg-[#181d2b] p-6 rounded-2xl border border-gray-800/60 hover:border-gray-700 transition-all group"
                         >
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-start gap-4">

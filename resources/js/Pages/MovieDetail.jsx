@@ -44,7 +44,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
         return (
             <Layout title="Film Bulunamadı - SineKutu">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center space-y-4">
-                    <div className="w-16 h-16 bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-center mx-auto text-slate-400 dark:text-gray-500">
+                    <div className="w-16 h-16 bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-center mx-auto text-slate-400 dark:text-gray-500">
                         <Play className="w-8 h-8" />
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Film Bulunamadı</h1>
@@ -300,13 +300,13 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
                     >
                         {/* Quality / Status Badge & Multi-Trailer Switcher */}
                         <div className="flex flex-wrap items-center gap-2.5 mb-3.5">
-                            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#131722]/80 backdrop-blur-md border border-white/15 text-white shadow-sm">
+                            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0A0D14]/80 backdrop-blur-md border border-white/15 text-white shadow-sm">
                                 <Sparkles className="w-3.5 h-3.5 text-[#00B074]" />
                                 <span>{defaultMovie.quality || '4K Ultra HD'}</span>
                             </div>
 
                             {!isMuted && trailersList.length > 1 && (
-                                <div className="inline-flex items-center p-1 rounded-full bg-slate-900/10 dark:bg-[#131722]/80 backdrop-blur-md border border-slate-900/20 dark:border-white/15 shadow-sm gap-1 animate-in fade-in duration-300">
+                                <div className="inline-flex items-center p-1 rounded-full bg-slate-900/10 dark:bg-[#0A0D14]/80 backdrop-blur-md border border-slate-900/20 dark:border-white/15 shadow-sm gap-1 animate-in fade-in duration-300">
                                     {trailersList.map((t, idx) => {
                                         const isActive = activeTrailer?.key === t.key;
                                         return (
@@ -710,7 +710,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
                                 return (
                                     <div
                                         key={file.id || idx}
-                                        className="group relative bg-white dark:bg-[#0c0e14]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border border-slate-200 dark:border-white/10 hover:border-[#00B074]/50 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5"
+                                        className="group relative bg-white dark:bg-[#0A0D14]/90 hover:bg-slate-50 dark:hover:bg-[#181D2A] border border-slate-200 dark:border-white/10 hover:border-[#00B074]/50 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-xl backdrop-blur-md overflow-hidden hover:-translate-y-0.5"
                                     >
                                         {/* Subtle top accent line on hover */}
                                         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#00B074]/0 to-transparent group-hover:via-[#00B074] transition-all duration-500" />
@@ -844,7 +844,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
                             {collection && collection.parts && collection.parts.length > 0 ? (
                                 <>
                                     {/* Header Banner */}
-                                    <div className="relative overflow-hidden bg-gradient-to-br from-slate-100 via-white to-slate-200 dark:from-[#131722] dark:via-[#10141e] dark:to-[#0A0D14] p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-md dark:shadow-xl">
+                                    <div className="relative overflow-hidden bg-gradient-to-br from-slate-100 via-white to-slate-200 dark:from-[#0A0D14] dark:via-[#10141e] dark:to-[#0A0D14] p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-white/5 shadow-md dark:shadow-xl">
                                         {collection.backdrop && (
                                             <div
                                                 className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none filter blur-sm"
@@ -890,7 +890,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
                                         {collection.parts.map((item, idx) => (
                                             <div
                                                 key={item.id || idx}
-                                                className={`group relative rounded-2xl overflow-hidden bg-white dark:bg-[#131722] border transition-all duration-300 flex flex-col justify-between ${item.is_current
+                                                className={`group relative rounded-2xl overflow-hidden bg-white dark:bg-[#0A0D14] border transition-all duration-300 flex flex-col justify-between ${item.is_current
                                                     ? 'border-[#00B074] ring-2 ring-[#00B074]/30 shadow-lg shadow-[#00B074]/10'
                                                     : item.is_available
                                                         ? 'border-slate-200 dark:border-white/10 hover:border-[#00B074]/60 hover:shadow-xl hover:shadow-black/20 dark:hover:shadow-black/40 hover:-translate-y-1'
@@ -1001,7 +1001,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
                                     </div>
                                 </>
                             ) : (
-                                <div className="bg-white dark:bg-[#131722] p-8 rounded-2xl border border-slate-200 dark:border-white/5 text-center space-y-3 shadow-sm">
+                                <div className="bg-white dark:bg-[#0A0D14] p-8 rounded-2xl border border-slate-200 dark:border-white/5 text-center space-y-3 shadow-sm">
                                     <Film className="w-10 h-10 text-slate-400 dark:text-gray-600 mx-auto" />
                                     <h4 className="text-lg font-bold text-slate-900 dark:text-white">Seri Bilgisi Bulunamadı</h4>
                                     <p className="text-sm text-slate-500 dark:text-gray-400 max-w-md mx-auto">Bu filme ait bağlantılı bir devam filmi veya film serisi koleksiyonu bulunmamaktadır.</p>
@@ -1014,7 +1014,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
                     {activeTab === 'news' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {mockNews.map((item) => (
-                                <div key={item.id} className="bg-white dark:bg-[#131722] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/5 flex flex-col sm:flex-row hover:border-slate-300 dark:hover:border-white/15 transition-all shadow-sm">
+                                <div key={item.id} className="bg-white dark:bg-[#0A0D14] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/5 flex flex-col sm:flex-row hover:border-slate-300 dark:hover:border-white/15 transition-all shadow-sm">
                                     <img src={item.image} alt={item.title} className="sm:w-52 h-48 sm:h-auto object-cover" />
                                     <div className="p-6 flex flex-col justify-between flex-1">
                                         <div>
@@ -1053,7 +1053,7 @@ export default function MovieDetail({ movie, similarMovies, comments = [], userR
             {/* Trailer Modal */}
             {showTrailerModal && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-[#131722] border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl">
+                    <div className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl">
                         <div className="flex items-center justify-between">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-white">{defaultMovie.title} - Fragman</h3>
                             <button

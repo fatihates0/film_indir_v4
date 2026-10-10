@@ -58,7 +58,7 @@ export default function SearchResult({ query = '', results = [], pagination = nu
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Film veya dizi ara..."
-                            className="w-full bg-[#131722] border border-white/10 rounded-2xl pl-4 pr-11 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-all"
+                            className="w-full bg-[#0A0D14] border border-white/10 rounded-2xl pl-4 pr-11 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] transition-all"
                         />
                         <button
                             type="submit"
@@ -83,7 +83,7 @@ export default function SearchResult({ query = '', results = [], pagination = nu
                         <Pagination pagination={pagination} onPageChange={handlePageChange} />
                     </div>
                 ) : (
-                    <div className="bg-[#131722] p-16 rounded-3xl border border-white/5 text-center space-y-4 my-8">
+                    <div className="bg-[#0A0D14] p-16 rounded-3xl border border-white/5 text-center space-y-4 my-8">
                         <Search className="w-12 h-12 text-gray-500 mx-auto" />
                         <h2 className="text-xl font-bold text-white">Sonuç Bulunamadı</h2>
                         <p className="text-sm text-gray-400 max-w-md mx-auto">

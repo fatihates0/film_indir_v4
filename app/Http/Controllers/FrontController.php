@@ -14,7 +14,6 @@ use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\TmdbCast;
 use App\Models\TmdbTitle;
-use App\Services\ReleaseCalendarService;
 use App\Services\SubscriptionService;
 use App\Services\TitleRecommendationService;
 use App\Services\TmdbService;
@@ -918,29 +917,6 @@ class FrontController extends Controller
                 'total' => $total,
                 'from' => $total > 0 ? (($page - 1) * $perPage) + 1 : null,
                 'to' => $total > 0 ? min($page * $perPage, $total) : null,
-            ],
-        ]));
-    }
-
-    public function releases(Request $request, ReleaseCalendarService $releaseService)
-    {
-        $type = (string) $request->query('type', 'all');
-        $platform = (string) $request->query('platform', 'all');
-        $availability = (string) $request->query('availability', 'all');
-        $month = (string) $request->query('month', 'all');
-
-        $calendarData = $releaseService->getCalendarData($type, $platform, $availability, $month);
-
-        return Inertia::render('ReleaseSchedule', array_merge($this->getCommonData(), [
-            'months' => $calendarData['months'],
-            'featured' => $calendarData['featured'],
-            'totalCount' => $calendarData['totalCount'],
-            'availableMonths' => $calendarData['availableMonths'],
-            'filters' => [
-                'type' => $type,
-                'platform' => $platform,
-                'availability' => $availability,
-                'month' => $month,
             ],
         ]));
     }

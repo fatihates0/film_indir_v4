@@ -21,7 +21,6 @@ Route::get('/discover', function () {
 })->name('discover');
 Route::get('/movies', [FrontController::class, 'movies'])->name('movies');
 Route::get('/series', [FrontController::class, 'series'])->name('series');
-Route::get('/releases', [FrontController::class, 'releases'])->name('releases');
 Route::get('/forum', [FrontController::class, 'forum'])->name('forum');
 Route::get('/about', [FrontController::class, 'about'])->name('about');
 Route::get('/settings', [FrontController::class, 'settings'])->name('settings');

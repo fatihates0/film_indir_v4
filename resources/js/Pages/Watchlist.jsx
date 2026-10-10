@@ -82,7 +82,7 @@ export default function Watchlist({ items }) {
                                 onClick={() => setActiveFilter(f.id)}
                                 className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${activeFilter === f.id
                                     ? 'bg-[#00B074] border-[#00B074] text-black shadow-lg shadow-[#00B074]/20'
-                                    : 'bg-[#131722] border-gray-800 text-gray-400 hover:text-white'
+                                    : 'bg-[#0A0D14] border-gray-800 text-gray-400 hover:text-white'
                                     }`}
                             >
                                 {f.label}
@@ -95,7 +95,7 @@ export default function Watchlist({ items }) {
                 {filteredItems.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                         {filteredItems.map((item) => (
-                            <div key={item.id} className="bg-[#0c0e14] rounded-2xl overflow-hidden border border-gray-800/60 hover:border-[#00B074]/50 transition-all group flex flex-col relative">
+                            <div key={item.id} className="bg-[#0A0D14] rounded-2xl overflow-hidden border border-gray-800/60 hover:border-[#00B074]/50 transition-all group flex flex-col relative">
                                 {/* Poster with Overlay */}
                                 <div className="relative aspect-[2/3] overflow-hidden">
                                     <img src={item.poster} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -148,7 +148,7 @@ export default function Watchlist({ items }) {
                         ))}
                     </div>
                 ) : (
-                    <div className="bg-[#0c0e14] p-12 rounded-3xl border border-gray-800 text-center space-y-4">
+                    <div className="bg-[#0A0D14] p-12 rounded-3xl border border-gray-800 text-center space-y-4">
                         <Film className="w-12 h-12 text-gray-600 mx-auto" />
                         <h3 className="text-xl font-bold text-white">İzleme Listeniz Boş</h3>
                         <p className="text-gray-400 text-sm">Film ve dizileri keşfedin ve izleme listenize ekleyin.</p>

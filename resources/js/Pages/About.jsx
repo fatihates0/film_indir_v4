@@ -8,13 +8,13 @@ export default function About() {
         <Layout>
             {/* HERO BANNER */}
             <div className="relative w-full h-[540px] bg-[#0A0D14] overflow-hidden">
-                <img 
-                    src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&q=80&w=1920" 
-                    alt="Theater Seats" 
-                    className="w-full h-full object-cover filter brightness-50" 
+                <img
+                    src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&q=80&w=1920"
+                    alt="Theater Seats"
+                    className="w-full h-full object-cover filter brightness-50"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] via-[#0A0D14]/60 to-transparent" />
-                
+
                 <div className="relative max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
                     <div className="max-w-xl space-y-4">
                         <span className="px-3 py-1 bg-[#00B074]/20 border border-[#00B074]/40 rounded-md text-[11px] font-bold text-[#00B074]">
@@ -39,7 +39,7 @@ export default function About() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24">
-                
+
                 {/* ABOUT SINEKUTU */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
                     <div>
@@ -56,10 +56,10 @@ export default function About() {
 
                 {/* IMAGE BANNER */}
                 <div className="rounded-3xl overflow-hidden border border-white/10 aspect-[21/9]">
-                    <img 
-                        src="https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=1600" 
-                        alt="Cinema view" 
-                        className="w-full h-full object-cover" 
+                    <img
+                        src="https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=1600"
+                        alt="Cinema view"
+                        className="w-full h-full object-cover"
                     />
                 </div>
 
@@ -84,11 +84,11 @@ export default function About() {
 
                 {/* SAINTS FEATURES */}
                 <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    <div className="rounded-3xl overflow-hidden border border-white/10 aspect-[4/5] bg-[#131722]">
-                        <img 
-                            src="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&q=80&w=800" 
-                            alt="Neon theater sign" 
-                            className="w-full h-full object-cover" 
+                    <div className="rounded-3xl overflow-hidden border border-white/10 aspect-[4/5] bg-[#0A0D14]">
+                        <img
+                            src="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&q=80&w=800"
+                            alt="Neon theater sign"
+                            className="w-full h-full object-cover"
                         />
                     </div>
 
@@ -159,7 +159,7 @@ export default function About() {
                         </h2>
                     </div>
 
-                    <div className="bg-[#131722] border border-white/10 rounded-3xl p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div className="bg-[#0A0D14] border border-white/10 rounded-3xl p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
                         <div className="space-y-4">
                             <h3 className="text-xl font-bold text-white">Riverdale Hakkında Her Şey: Gizemler ve Oyuncu Röportajı</h3>
                             <p className="text-xs text-gray-400 leading-relaxed">
@@ -171,7 +171,7 @@ export default function About() {
                         {/* Video Player Card */}
                         <div className="relative rounded-2xl overflow-hidden bg-black border border-white/10 group">
                             <img src="https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=800" alt="Interview" className="w-full h-64 object-cover filter brightness-75" />
-                            
+
                             {/* Player Bar Overlay */}
                             <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent flex items-center gap-3 text-xs text-white">
                                 <button className="p-1.5 bg-white/20 hover:bg-[#00B074] rounded-full transition-colors">

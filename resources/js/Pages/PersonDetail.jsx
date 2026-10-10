@@ -37,7 +37,7 @@ export default function PersonDetail({ person }) {
         return (
             <Layout title="Sanatçı Bulunamadı - SineKutu">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center space-y-4">
-                    <div className="w-16 h-16 bg-[#131722] border border-white/10 rounded-2xl flex items-center justify-center mx-auto text-gray-500">
+                    <div className="w-16 h-16 bg-[#0A0D14] border border-white/10 rounded-2xl flex items-center justify-center mx-auto text-gray-500">
                         <User className="w-8 h-8" />
                     </div>
                     <h1 className="text-2xl font-bold text-white">Sanatçı Bulunamadı</h1>
@@ -140,7 +140,7 @@ export default function PersonDetail({ person }) {
                 </nav>
 
                 {/* Hero Profile Header */}
-                <div className="relative bg-[gradient]-to-br from-[#0c0e14] via-[#0c0e14] to-[#0c0e14] rounded-3xl p-6 sm:p-10 border border-gray-800/80 shadow-2xl overflow-hidden">
+                <div className="relative bg-[gradient]-to-br from-[#0A0D14] via-[#0A0D14] to-[#0A0D14] rounded-3xl p-6 sm:p-10 border border-gray-800/80 shadow-2xl overflow-hidden">
                     {/* Background accent glow */}
                     <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full filter blur-3xl pointer-events-none -mr-20 -mt-20" />
                     <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-blue-500/5 rounded-full filter blur-3xl pointer-events-none" />
@@ -323,7 +323,7 @@ export default function PersonDetail({ person }) {
                                 <div key={item.id} className="flex flex-col">
                                     <MovieCard item={item} />
                                     {item.character && (
-                                        <div className="mt-1 px-2 py-1 bg-[#0c0e14] border border-gray-800 rounded-lg text-center">
+                                        <div className="mt-1 px-2 py-1 bg-[#0A0D14] border border-gray-800 rounded-lg text-center">
                                             <span className="text-[11px] text-[#00B074] font-semibold line-clamp-1">
                                                 {item.character}
                                             </span>
@@ -357,7 +357,7 @@ export default function PersonDetail({ person }) {
                                     <CardWrapper
                                         key={idx}
                                         {...cardProps}
-                                        className="group bg-[#0c0e14] rounded-xl overflow-hidden border border-gray-800/80 hover:border-[#00B074]/60 transition-all flex flex-col cursor-pointer"
+                                        className="group bg-[#0A0D14] rounded-xl overflow-hidden border border-gray-800/80 hover:border-[#00B074]/60 transition-all flex flex-col cursor-pointer"
                                     >
                                         <div className="relative aspect-[2/3] overflow-hidden bg-[#0A0D14]">
                                             <img
@@ -394,7 +394,7 @@ export default function PersonDetail({ person }) {
                 )}
 
                 {/* Section 3: Full Filmography */}
-                <section id="filmography-section" className="bg-[#0c0e14] rounded-3xl p-6 sm:p-8 border border-gray-800/80 shadow-2xl space-y-6 scroll-mt-24">
+                <section id="filmography-section" className="bg-[#0A0D14] rounded-3xl p-6 sm:p-8 border border-gray-800/80 shadow-2xl space-y-6 scroll-mt-24">
                     {/* Top Row: Title, Subtitle, View Switcher & PerPage */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                         <div>
@@ -464,7 +464,7 @@ export default function PersonDetail({ person }) {
                                     setCurrentPage(1);
                                 }}
                                 placeholder="Film veya karakter adı ile ara..."
-                                className="w-full pl-10 pr-9 py-2 bg-[#131722] border border-gray-800 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] shadow-inner transition-colors"
+                                className="w-full pl-10 pr-9 py-2 bg-[#0A0D14] border border-gray-800 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00B074] shadow-inner transition-colors"
                             />
                             {searchQuery && (
                                 <button
@@ -488,7 +488,7 @@ export default function PersonDetail({ person }) {
                                     setSelectedTab('all');
                                     setCurrentPage(1);
                                 }}
-                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${selectedTab === 'all' ? 'bg-[#00B074] text-black font-black shadow-md shadow-[#00B074]/20' : 'bg-[#131722] text-gray-400 hover:text-white border border-gray-800'}`}
+                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${selectedTab === 'all' ? 'bg-[#00B074] text-black font-black shadow-md shadow-[#00B074]/20' : 'bg-[#0A0D14] text-gray-400 hover:text-white border border-gray-800'}`}
                             >
                                 Tümü ({allCredits.length})
                             </button>
@@ -498,7 +498,7 @@ export default function PersonDetail({ person }) {
                                     setSelectedTab('movie');
                                     setCurrentPage(1);
                                 }}
-                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${selectedTab === 'movie' ? 'bg-[#00B074] text-black font-black shadow-md shadow-[#00B074]/20' : 'bg-[#131722] text-gray-400 hover:text-white border border-gray-800'}`}
+                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${selectedTab === 'movie' ? 'bg-[#00B074] text-black font-black shadow-md shadow-[#00B074]/20' : 'bg-[#0A0D14] text-gray-400 hover:text-white border border-gray-800'}`}
                             >
                                 Filmler ({movieCreditsCount})
                             </button>
@@ -508,7 +508,7 @@ export default function PersonDetail({ person }) {
                                     setSelectedTab('tv');
                                     setCurrentPage(1);
                                 }}
-                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${selectedTab === 'tv' ? 'bg-[#00B074] text-black font-black shadow-md shadow-[#00B074]/20' : 'bg-[#131722] text-gray-400 hover:text-white border border-gray-800'}`}
+                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap ${selectedTab === 'tv' ? 'bg-[#00B074] text-black font-black shadow-md shadow-[#00B074]/20' : 'bg-[#0A0D14] text-gray-400 hover:text-white border border-gray-800'}`}
                             >
                                 Diziler ({tvCreditsCount})
                             </button>
@@ -534,7 +534,7 @@ export default function PersonDetail({ person }) {
                                 setSortBy(e.target.value);
                                 setCurrentPage(1);
                             }}
-                            className="bg-[#131722] border border-gray-800 text-gray-300 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-[#00B074] cursor-pointer shadow-inner"
+                            className="bg-[#0A0D14] border border-gray-800 text-gray-300 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-[#00B074] cursor-pointer shadow-inner"
                         >
                             <option value="year_desc">Yıl (Yeniden Eskiye)</option>
                             <option value="year_asc">Yıl (Eskiden Yeniye)</option>
@@ -773,7 +773,7 @@ export default function PersonDetail({ person }) {
 
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                             {images.map((img, idx) => (
-                                <div key={idx} className="aspect-[2/3] rounded-2xl overflow-hidden border border-gray-800 bg-[#131722] group">
+                                <div key={idx} className="aspect-[2/3] rounded-2xl overflow-hidden border border-gray-800 bg-[#0A0D14] group">
                                     <img
                                         src={img.url}
                                         alt={`${person.name} ${idx + 1}`}

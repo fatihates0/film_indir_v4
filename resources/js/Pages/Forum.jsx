@@ -34,13 +34,13 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-                
+
                 {/* LOGGED IN USER PROFILE & LIKES SECTIONS */}
                 {isLoggedIn && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left column: New likes & Liked movies */}
                         <div className="lg:col-span-2 space-y-8">
-                            
+
                             {/* New Likes */}
                             <div>
                                 <div className="flex items-center justify-between mb-4">
@@ -52,7 +52,7 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
                                 <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2">
                                     {userLikes.map((item) => (
                                         <div key={item.id} className="w-28 flex-shrink-0 group cursor-pointer">
-                                            <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#131722] border border-white/5 group-hover:border-[#00B074]/50 transition-all">
+                                            <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#0A0D14] border border-white/5 group-hover:border-[#00B074]/50 transition-all">
                                                 <img src={item.poster} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                             </div>
                                         </div>
@@ -71,7 +71,7 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
                                 <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2">
                                     {likedMovies.map((item) => (
                                         <div key={item.id} className="w-28 flex-shrink-0 group cursor-pointer">
-                                            <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#131722] border border-white/5 group-hover:border-[#00B074]/50 transition-all">
+                                            <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#0A0D14] border border-white/5 group-hover:border-[#00B074]/50 transition-all">
                                                 <img src={item.poster} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                             </div>
                                         </div>
@@ -87,7 +87,7 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
 
                         {/* Right column: User Profile Card */}
                         <div>
-                            <div className="bg-[#131722] border border-white/10 rounded-2xl p-6 space-y-4">
+                            <div className="bg-[#0A0D14] border border-white/10 rounded-2xl p-6 space-y-4">
                                 <div className="flex items-center gap-4">
                                     <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full object-cover border-2 border-[#00B074]" />
                                     <div className="flex items-center gap-6 text-center">
@@ -129,7 +129,7 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {hotTopics.map((item) => (
-                            <Link key={item.id} href={`/forum/topic/${item.id}`} className="flex items-center gap-3 bg-[#131722] p-3 rounded-2xl border border-white/5 hover:border-[#00B074]/50 transition-all group">
+                            <Link key={item.id} href={`/forum/topic/${item.id}`} className="flex items-center gap-3 bg-[#0A0D14] p-3 rounded-2xl border border-white/5 hover:border-[#00B074]/50 transition-all group">
                                 <img src={item.poster} alt={item.title} className="w-14 h-14 rounded-xl object-cover" />
                                 <div className="min-w-0 flex-1">
                                     <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
@@ -156,8 +156,8 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
 
                     <div className="space-y-4">
                         {discussions.map((d) => (
-                            <div key={d.id} className="bg-[#131722] border border-white/5 hover:border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 transition-all">
-                                
+                            <div key={d.id} className="bg-[#0A0D14] border border-white/5 hover:border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 transition-all">
+
                                 {/* Upvote / Downvote Counter */}
                                 <div className="flex sm:flex-col items-center justify-center gap-2 bg-[#0B0D14] px-3 py-2 sm:py-3 rounded-xl">
                                     <button onClick={() => handleVote(d.id, 1)} className="text-gray-400 hover:text-[#00B074]">
@@ -175,7 +175,7 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
                                         {d.title}
                                     </Link>
                                     <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{d.excerpt}</p>
-                                    
+
                                     <div className="flex items-center gap-4 pt-2 text-xs text-gray-400">
                                         <span className="text-[#00B074] font-semibold">{d.author}</span>
                                         <span>• {d.time}</span>
@@ -204,13 +204,13 @@ export default function Forum({ isLoggedIn = true, user, userLikes, likedMovies,
                 {/* MOVIE PREMIERE EVENT */}
                 <section className="space-y-6">
                     <h2 className="text-xl font-bold text-white">Film Gala Etkinlikleri</h2>
-                    
+
                     {premiereEvents.map((pe) => (
                         <div key={pe.month} className="space-y-4">
                             <h3 className="text-sm font-bold text-gray-300">{pe.month}</h3>
                             <div className="space-y-4">
                                 {pe.events.map((ev, idx) => (
-                                    <div key={idx} className="bg-[#131722] border border-white/5 rounded-2xl p-5 flex gap-4">
+                                    <div key={idx} className="bg-[#0A0D14] border border-white/5 rounded-2xl p-5 flex gap-4">
                                         <div className="w-12 h-12 rounded-full bg-white text-black font-extrabold text-base flex items-center justify-center flex-shrink-0">
                                             {ev.day}
                                         </div>

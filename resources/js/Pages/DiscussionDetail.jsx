@@ -88,7 +88,7 @@ Key points I want to discuss:
                     {/* Main Discussion Area */}
                     <div className="lg:col-span-2 space-y-8">
                         {/* Discussion Card */}
-                        <div className="bg-[#131722] rounded-2xl border border-gray-800/60 p-6 sm:p-8 space-y-6">
+                        <div className="bg-[#0A0D14] rounded-2xl border border-gray-800/60 p-6 sm:p-8 space-y-6">
                             {/* Header & Author Info */}
                             <div className="flex items-start justify-between gap-4 border-b border-gray-800/80 pb-6">
                                 <div className="flex items-center gap-4">
@@ -134,18 +134,16 @@ Key points I want to discuss:
                                 <div className="flex items-center gap-2 bg-[#0A0D14] border border-gray-800 rounded-xl p-1">
                                     <button
                                         onClick={() => handleVote('up')}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            userVote === 'up' ? 'bg-[#00B074] text-black font-bold' : 'text-gray-400 hover:text-white'
-                                        }`}
+                                        className={`p-2 rounded-lg transition-colors ${userVote === 'up' ? 'bg-[#00B074] text-black font-bold' : 'text-gray-400 hover:text-white'
+                                            }`}
                                     >
                                         <ArrowUp className="w-5 h-5" />
                                     </button>
                                     <span className="px-3 font-bold text-sm text-white">{upvotes}</span>
                                     <button
                                         onClick={() => handleVote('down')}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            userVote === 'down' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'
-                                        }`}
+                                        className={`p-2 rounded-lg transition-colors ${userVote === 'down' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'
+                                            }`}
                                     >
                                         <ArrowDown className="w-5 h-5" />
                                     </button>
@@ -163,7 +161,7 @@ Key points I want to discuss:
                         </div>
 
                         {/* Reply Composer */}
-                        <div className="bg-[#131722] rounded-2xl border border-gray-800/60 p-6 space-y-4">
+                        <div className="bg-[#0A0D14] rounded-2xl border border-gray-800/60 p-6 space-y-4">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <MessageSquare className="w-5 h-5 text-[#00B074]" /> Tartışmaya Katılın
                             </h3>
@@ -185,7 +183,7 @@ Key points I want to discuss:
                             <h3 className="text-xl font-bold text-white">Yanıtlar ({mockComments.length + 1})</h3>
 
                             {mockComments.map((comment) => (
-                                <div key={comment.id} className="bg-[#131722] rounded-2xl border border-gray-800/60 p-6 space-y-4">
+                                <div key={comment.id} className="bg-[#0A0D14] rounded-2xl border border-gray-800/60 p-6 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <img src={comment.avatar} alt={comment.user} className="w-10 h-10 rounded-full object-cover" />
@@ -236,7 +234,7 @@ Key points I want to discuss:
 
                     {/* Right Sidebar */}
                     <div className="space-y-6">
-                        <div className="bg-[#131722] p-6 rounded-2xl border border-gray-800/60 space-y-4">
+                        <div className="bg-[#0A0D14] p-6 rounded-2xl border border-gray-800/60 space-y-4">
                             <h3 className="text-lg font-bold text-white border-b border-gray-800 pb-3">İlgili Konular</h3>
                             <div className="space-y-3">
                                 {[
@@ -255,7 +253,7 @@ Key points I want to discuss:
                         </div>
 
                         {/* Rules Box */}
-                        <div className="bg-[#131722] p-6 rounded-2xl border border-gray-800/60 space-y-3">
+                        <div className="bg-[#0A0D14] p-6 rounded-2xl border border-gray-800/60 space-y-3">
                             <h3 className="text-lg font-bold text-white">Topluluk Kuralları</h3>
                             <ul className="text-xs text-gray-400 space-y-2 list-disc list-inside">
                                 <li>Tartışmalarda saygılı ve yapıcı olun.</li>

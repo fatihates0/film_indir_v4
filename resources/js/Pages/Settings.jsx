@@ -10,28 +10,28 @@ export default function Settings({ user }) {
         <Layout>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    
+
                     {/* LEFT SIDEBAR NAVIGATION */}
                     <div className="space-y-1">
-                        <button 
+                        <button
                             onClick={() => setActiveSection('account')}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all ${activeSection === 'account' ? 'bg-[#181D2A] text-[#00B074] border border-[#00B074]/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                         >
                             <User className="w-4 h-4" /> Hesap
                         </button>
-                        <button 
+                        <button
                             onClick={() => setActiveSection('membership')}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all ${activeSection === 'membership' ? 'bg-[#181D2A] text-[#00B074] border border-[#00B074]/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                         >
                             <CreditCard className="w-4 h-4" /> Üyelik
                         </button>
-                        <button 
+                        <button
                             onClick={() => setActiveSection('security')}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all ${activeSection === 'security' ? 'bg-[#181D2A] text-[#00B074] border border-[#00B074]/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                         >
                             <Shield className="w-4 h-4" /> Güvenlik
                         </button>
-                        <button 
+                        <button
                             onClick={() => setActiveSection('devices')}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all ${activeSection === 'devices' ? 'bg-[#181D2A] text-[#00B074] border border-[#00B074]/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                         >
@@ -41,12 +41,12 @@ export default function Settings({ user }) {
 
                     {/* MAIN CONTENT AREA */}
                     <div className="lg:col-span-3 space-y-10">
-                        
+
                         {/* SECTION 1: ACCOUNT */}
                         <div id="account" className="space-y-4">
                             <h2 className="text-base font-bold text-white">Hesap</h2>
-                            <div className="bg-[#131722] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
-                                
+                            <div className="bg-[#0A0D14] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
+
                                 <div className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer">
                                     <div className="flex items-center gap-3">
                                         <User className="w-4 h-4 text-gray-400" />
@@ -60,7 +60,7 @@ export default function Settings({ user }) {
                                         <Globe className="w-4 h-4 text-gray-400" />
                                         <span className="font-bold text-white">Diller</span>
                                     </div>
-                                    <select 
+                                    <select
                                         value={language}
                                         onChange={(e) => setLanguage(e.target.value)}
                                         className="bg-[#1B202E] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-[#00B074]"
@@ -100,9 +100,9 @@ export default function Settings({ user }) {
                         {/* SECTION 2: MEMBERSHIP */}
                         <div id="membership" className="space-y-4">
                             <h2 className="text-base font-bold text-white">Üyelik</h2>
-                            
+
                             {/* Current Plan Card */}
-                            <div className="bg-[#131722] border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="bg-[#0A0D14] border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-gray-300">
                                         <CreditCard className="w-5 h-5" />
@@ -117,7 +117,7 @@ export default function Settings({ user }) {
                                 </button>
                             </div>
 
-                            <div className="bg-[#131722] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
+                            <div className="bg-[#0A0D14] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
                                 <div className="p-4 flex items-center justify-between">
                                     <div>
                                         <span className="font-bold text-white block">23 Temmuz 2026</span>
@@ -141,8 +141,8 @@ export default function Settings({ user }) {
                         {/* SECTION 3: SECURITY */}
                         <div id="security" className="space-y-4">
                             <h2 className="text-base font-bold text-white">Güvenlik</h2>
-                            <div className="bg-[#131722] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
-                                
+                            <div className="bg-[#0A0D14] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
+
                                 <div className="p-4 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <Key className="w-4 h-4 text-gray-400" />
@@ -188,8 +188,8 @@ export default function Settings({ user }) {
                         {/* SECTION 4: ACCESS AND DEVICES */}
                         <div id="devices" className="space-y-4">
                             <h2 className="text-base font-bold text-white">Erişim ve cihazlar</h2>
-                            <div className="bg-[#131722] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
-                                
+                            <div className="bg-[#0A0D14] border border-white/5 rounded-2xl divide-y divide-white/5 text-xs">
+
                                 <div className="p-4 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <Laptop className="w-5 h-5 text-gray-400" />

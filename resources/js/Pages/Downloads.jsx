@@ -79,7 +79,7 @@ export default function Downloads({ activeDownloads, completedDownloads }) {
         <Layout title="Offline Downloads - SineKutu">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
                 {/* Header & Storage Indicator */}
-                <div className="bg-[#131722] p-8 rounded-3xl border border-gray-800/60 shadow-xl space-y-6">
+                <div className="bg-[#0A0D14] p-8 rounded-3xl border border-gray-800/60 shadow-xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
@@ -125,10 +125,10 @@ export default function Downloads({ activeDownloads, completedDownloads }) {
                             const strokeDashoffset = circumference - (item.progress / 100) * circumference;
 
                             return (
-                                <div key={item.id} className="bg-[#131722] rounded-2xl p-6 border border-gray-800/60 hover:border-gray-700 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden group">
+                                <div key={item.id} className="bg-[#0A0D14] rounded-2xl p-6 border border-gray-800/60 hover:border-gray-700 transition-all flex flex-col justify-between space-y-6 relative overflow-hidden group">
                                     <div className="flex items-start gap-4">
                                         <img src={item.poster} alt={item.title} className="w-16 h-24 rounded-xl object-cover shrink-0 border border-gray-800" />
-                                        
+
                                         <div className="space-y-1 flex-1">
                                             <span className="bg-[#00B074]/20 text-[#00B074] text-[10px] font-extrabold px-2 py-0.5 rounded">
                                                 {item.quality}
@@ -207,7 +207,7 @@ export default function Downloads({ activeDownloads, completedDownloads }) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {completedList.map((comp) => (
-                            <div key={comp.id} className="bg-[#131722] p-5 rounded-2xl border border-gray-800/60 hover:border-gray-700 transition-all flex items-center justify-between gap-4">
+                            <div key={comp.id} className="bg-[#0A0D14] p-5 rounded-2xl border border-gray-800/60 hover:border-gray-700 transition-all flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-4">
                                     <img src={comp.poster} alt={comp.title} className="w-16 h-20 rounded-xl object-cover shrink-0" />
                                     <div>

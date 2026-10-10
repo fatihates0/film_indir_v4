@@ -37,8 +37,6 @@ export default function Footer() {
                             <span>/</span>
                             <Link href="/series" className="hover:text-[#00B074] transition-colors">Diziler</Link>
                             <span>/</span>
-                            <Link href="/releases" className="hover:text-[#00B074] transition-colors">Film Takvimi</Link>
-                            <span>/</span>
                             <Link href="/forum" className="hover:text-[#00B074] transition-colors">Forum</Link>
                             <span>/</span>
                             <Link href="/about" className="hover:text-[#00B074] transition-colors">Hakkımızda</Link>

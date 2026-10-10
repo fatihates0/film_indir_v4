@@ -62,11 +62,10 @@ export default function Pagination({ pagination, onPageChange, className = '' })
                     onClick={() => onPageChange(1)}
                     disabled={current_page === 1}
                     title="İlk Sayfa"
-                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${
-                        current_page === 1
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${current_page === 1
                             ? 'opacity-30 cursor-not-allowed bg-transparent'
-                            : 'bg-white dark:bg-[#131722] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
-                    }`}
+                            : 'bg-white dark:bg-[#0A0D14] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
+                        }`}
                 >
                     <ChevronsLeft className="w-4 h-4" />
                 </button>
@@ -77,11 +76,10 @@ export default function Pagination({ pagination, onPageChange, className = '' })
                     onClick={() => onPageChange(current_page - 1)}
                     disabled={current_page === 1}
                     title="Önceki Sayfa"
-                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${
-                        current_page === 1
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${current_page === 1
                             ? 'opacity-30 cursor-not-allowed bg-transparent'
-                            : 'bg-white dark:bg-[#131722] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
-                    }`}
+                            : 'bg-white dark:bg-[#0A0D14] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
+                        }`}
                 >
                     <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -111,11 +109,10 @@ export default function Pagination({ pagination, onPageChange, className = '' })
                             key={item}
                             type="button"
                             onClick={() => onPageChange(item)}
-                            className={`w-9 h-9 rounded-xl text-xs font-bold transition-all ${
-                                isActive
+                            className={`w-9 h-9 rounded-xl text-xs font-bold transition-all ${isActive
                                     ? 'bg-[#00B074] text-white shadow-lg shadow-[#00B074]/25 scale-105 pointer-events-none'
-                                    : 'bg-white dark:bg-[#131722] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1C2233] border border-slate-200 dark:border-white/5 active:scale-95 shadow-sm dark:shadow-none'
-                            }`}
+                                    : 'bg-white dark:bg-[#0A0D14] text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1C2233] border border-slate-200 dark:border-white/5 active:scale-95 shadow-sm dark:shadow-none'
+                                }`}
                         >
                             {item}
                         </button>
@@ -128,11 +125,10 @@ export default function Pagination({ pagination, onPageChange, className = '' })
                     onClick={() => onPageChange(current_page + 1)}
                     disabled={current_page === last_page}
                     title="Sonraki Sayfa"
-                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${
-                        current_page === last_page
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${current_page === last_page
                             ? 'opacity-30 cursor-not-allowed bg-transparent'
-                            : 'bg-white dark:bg-[#131722] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
-                    }`}
+                            : 'bg-white dark:bg-[#0A0D14] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
+                        }`}
                 >
                     <ChevronRight className="w-4 h-4" />
                 </button>
@@ -143,11 +139,10 @@ export default function Pagination({ pagination, onPageChange, className = '' })
                     onClick={() => onPageChange(last_page)}
                     disabled={current_page === last_page}
                     title="Son Sayfa"
-                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${
-                        current_page === last_page
+                    className={`w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-white/5 transition-all ${current_page === last_page
                             ? 'opacity-30 cursor-not-allowed bg-transparent'
-                            : 'bg-white dark:bg-[#131722] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
-                    }`}
+                            : 'bg-white dark:bg-[#0A0D14] hover:bg-slate-100 dark:hover:bg-[#1C2233] hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/10 active:scale-95 shadow-sm dark:shadow-none'
+                        }`}
                 >
                     <ChevronsRight className="w-4 h-4" />
                 </button>
