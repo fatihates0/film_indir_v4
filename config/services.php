@@ -51,6 +51,7 @@ return [
     'emby' => [
         'url' => env('EMBY_URL', ''),
         'api_key' => env('EMBY_API_KEY', ''),
+        'plugin_api_key' => env('EMBY_PLUGIN_API_KEY', env('JELLYFIN_PLUGIN_API_KEY', '')),
     ],
 
     'paddle' => [

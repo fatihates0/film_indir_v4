@@ -1,0 +1,13 @@
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.csproj.AssemblyReference.cache
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.GeneratedMSBuildEditorConfig.editorconfig
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.AssemblyInfoInputs.cache
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.AssemblyInfo.cs
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.csproj.CoreCompileInputs.cache
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.sourcelink.json
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\bin\Release\net8.0\Emby.Plugin.QuotaManager.deps.json
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\bin\Release\net8.0\Emby.Plugin.QuotaManager.dll
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\bin\Release\net8.0\Emby.Plugin.QuotaManager.pdb
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.dll
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\refint\Emby.Plugin.QuotaManager.dll
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\Emby.Plugin.QuotaManager.pdb
+C:\film_indir\film_indir_v4\emby-plugins\Emby.Plugin.QuotaManager\obj\Release\net8.0\ref\Emby.Plugin.QuotaManager.dll

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <title>SineKutu Kota Yönetimi</title>
+</head>
+<body>
+    <div id="SineKutuConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox" data-controller="__plugin/SineKutuConfig.js">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="SineKutuConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">SineKutu Kota Yönetimi (Emby Server)</h2>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="LaravelApiUrl">Laravel API Base URL:</label>
+                        <input is="emby-input" type="url" id="LaravelApiUrl" name="LaravelApiUrl" placeholder="http://localhost:8000/api/jellyfin" required />
+                        <div class="fieldDescription">Laravel uygulamasındaki kota entegrasyon API adresi (Örn: http://localhost:8000/api/jellyfin veya http://localhost:8000/api/emby).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="LaravelApiKey">Laravel API Anahtarı (X-Api-Key):</label>
+                        <input is="emby-input" type="text" id="LaravelApiKey" name="LaravelApiKey" />
+                        <div class="fieldDescription">Laravel .env dosyasındaki JELLYFIN_PLUGIN_API_KEY anahtarı (isteğe bağlı).</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="BlockPlaybackOnApiFailure" name="BlockPlaybackOnApiFailure" />
+                            <span>Laravel API'ye Ulaşılamadığında Yayını Engelle (Güvenlik Önlemi)</span>
+                        </label>
+                        <div class="fieldDescription">Etkinleştirildiğinde, Laravel sunucusuna ulaşılamazsa kaçak izlemeyi önlemek için yayın başlatılmaz.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableSessionTermination" name="EnableSessionTermination" />
+                            <span>Kota Dolduğunda Aktif Oynatma Oturumlarını Otomatik Kapat (Stop Stream)</span>
+                        </label>
+                        <div class="fieldDescription">Kullanıcının izleme kotası tükendiğinde video akışı canlı olarak sonlandırılır.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableAutoDisable" name="EnableAutoDisable" />
+                            <span>Kota Dolduğunda Kullanıcı Hesabını Emby Üzerinde Pasife Al</span>
+                        </label>
+                        <div class="fieldDescription">Kota dolunca kullanıcı Emby hesabı devre dışı bırakılır (kota/paket yenilendiğinde otomatik açılır).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="BatchDeductThresholdMB">Toplu Kota Düşüm Eşiği (MB):</label>
+                        <input is="emby-input" type="number" id="BatchDeductThresholdMB" name="BatchDeductThresholdMB" min="1" max="100" step="1" />
+                        <div class="fieldDescription">İzleme esnasında kaç MB biriktiğinde Laravel'e tek seferde düşüm yapılacağı (Varsayılan: 15 MB).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="BatchDeductIntervalSeconds">Toplu Düşüm Zaman Aralığı (Saniye):</label>
+                        <input is="emby-input" type="number" id="BatchDeductIntervalSeconds" name="BatchDeductIntervalSeconds" min="5" max="300" step="5" />
+                        <div class="fieldDescription">MB eşiğine ulaşılmasa bile kaç saniyede bir Laravel kotasından düşüleceği (Varsayılan: 30 sn).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="SyncIntervalMinutes">Otomatik Periyodik Senkronizasyon (Dakika):</label>
+                        <input is="emby-input" type="number" id="SyncIntervalMinutes" name="SyncIntervalMinutes" min="5" max="1440" step="5" />
+                        <div class="fieldDescription">Laravel veritabanından kullanıcı kotalarının çekilme aralığı (Varsayılan: 30 dk).</div>
+                    </div>
+
+                    <div style="margin-top: 2em;">
+                        <button is="emby-button" type="submit" class="raised button-submit block"><span>Kaydet</span></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var pluginUniqueId = 'c1f2e3d4-5678-90ab-cdef-1234567890ab';
+
+                function loadConfigDirect(page) {
+                    var apiClient = window.ApiClient || (window.Dashboard ? window.Dashboard.getCurrentApiClient() : null);
+                    if (!apiClient) return;
+
+                    if (window.Dashboard && window.Dashboard.showLoadingMsg) {
+                        window.Dashboard.showLoadingMsg();
+                    }
+
+                    apiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
+                        config = config || {};
+                        var urlEl = page.querySelector('#LaravelApiUrl');
+                        var keyEl = page.querySelector('#LaravelApiKey');
+                        var blockEl = page.querySelector('#BlockPlaybackOnApiFailure');
+                        var termEl = page.querySelector('#EnableSessionTermination');
+                        var autoEl = page.querySelector('#EnableAutoDisable');
+                        var threshEl = page.querySelector('#BatchDeductThresholdMB');
+                        var intEl = page.querySelector('#BatchDeductIntervalSeconds');
+                        var syncEl = page.querySelector('#SyncIntervalMinutes');
+
+                        if (urlEl) urlEl.value = config.LaravelApiUrl || config.laravelApiUrl || 'http://localhost:8000/api/jellyfin';
+                        if (keyEl) keyEl.value = config.LaravelApiKey || config.laravelApiKey || '';
+                        if (blockEl) blockEl.checked = (config.BlockPlaybackOnApiFailure !== undefined) ? config.BlockPlaybackOnApiFailure : (config.blockPlaybackOnApiFailure !== undefined ? config.blockPlaybackOnApiFailure : true);
+                        if (termEl) termEl.checked = (config.EnableSessionTermination !== undefined) ? config.EnableSessionTermination : (config.enableSessionTermination !== undefined ? config.enableSessionTermination : true);
+                        if (autoEl) autoEl.checked = !!(config.EnableAutoDisable || config.enableAutoDisable);
+                        if (threshEl) threshEl.value = config.BatchDeductThresholdMB || config.batchDeductThresholdMB || 15;
+                        if (intEl) intEl.value = config.BatchDeductIntervalSeconds || config.batchDeductIntervalSeconds || 30;
+                        if (syncEl) syncEl.value = config.SyncIntervalMinutes || config.syncIntervalMinutes || 30;
+
+                        if (window.Dashboard && window.Dashboard.hideLoadingMsg) {
+                            window.Dashboard.hideLoadingMsg();
+                        }
+                    }).catch(function (err) {
+                        if (window.Dashboard && window.Dashboard.hideLoadingMsg) {
+                            window.Dashboard.hideLoadingMsg();
+                        }
+                    });
+                }
+
+                function saveConfigDirect(page, e) {
+                    if (e) e.preventDefault();
+                    var apiClient = window.ApiClient || (window.Dashboard ? window.Dashboard.getCurrentApiClient() : null);
+                    if (!apiClient) return false;
+
+                    if (window.Dashboard && window.Dashboard.showLoadingMsg) {
+                        window.Dashboard.showLoadingMsg();
+                    }
+
+                    apiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
+                        config = config || {};
+                        var url = page.querySelector('#LaravelApiUrl').value;
+                        var key = page.querySelector('#LaravelApiKey').value;
+                        var blockApi = page.querySelector('#BlockPlaybackOnApiFailure').checked;
+                        var termSession = page.querySelector('#EnableSessionTermination').checked;
+                        var autoDisable = page.querySelector('#EnableAutoDisable').checked;
+                        var threshold = parseInt(page.querySelector('#BatchDeductThresholdMB').value, 10) || 15;
+                        var interval = parseInt(page.querySelector('#BatchDeductIntervalSeconds').value, 10) || 30;
+                        var syncMins = parseInt(page.querySelector('#SyncIntervalMinutes').value, 10) || 30;
+
+                        config.LaravelApiUrl = url;
+                        config.laravelApiUrl = url;
+                        config.LaravelApiKey = key;
+                        config.laravelApiKey = key;
+                        config.BlockPlaybackOnApiFailure = blockApi;
+                        config.blockPlaybackOnApiFailure = blockApi;
+                        config.EnableSessionTermination = termSession;
+                        config.enableSessionTermination = termSession;
+                        config.EnableAutoDisable = autoDisable;
+                        config.enableAutoDisable = autoDisable;
+                        config.BatchDeductThresholdMB = threshold;
+                        config.batchDeductThresholdMB = threshold;
+                        config.BatchDeductIntervalSeconds = interval;
+                        config.batchDeductIntervalSeconds = interval;
+                        config.SyncIntervalMinutes = syncMins;
+                        config.syncIntervalMinutes = syncMins;
+
+                        apiClient.updatePluginConfiguration(pluginUniqueId, config).then(function (result) {
+                            if (window.Dashboard && window.Dashboard.hideLoadingMsg) {
+                                window.Dashboard.hideLoadingMsg();
+                            }
+                            if (window.Dashboard && window.Dashboard.processPluginConfigurationUpdateResult) {
+                                window.Dashboard.processPluginConfigurationUpdateResult(result);
+                            } else if (window.Dashboard && window.Dashboard.alert) {
+                                window.Dashboard.alert('Ayarlar başarıyla kaydedildi.');
+                            }
+                        }).catch(function (err) {
+                            if (window.Dashboard && window.Dashboard.hideLoadingMsg) {
+                                window.Dashboard.hideLoadingMsg();
+                            }
+                            if (window.Dashboard && window.Dashboard.alert) {
+                                window.Dashboard.alert('Ayarlar kaydedilirken hata oluştu.');
+                            }
+                        });
+                    });
+                    return false;
+                }
+
+                document.addEventListener('viewshow', function (e) {
+                    if (e.target && (e.target.id === 'SineKutuConfigPage' || e.target.querySelector('#SineKutuConfigPage'))) {
+                        var p = e.target.id === 'SineKutuConfigPage' ? e.target : e.target.querySelector('#SineKutuConfigPage');
+                        loadConfigDirect(p);
+                    }
+                });
+
+                document.addEventListener('pageshow', function (e) {
+                    if (e.target && (e.target.id === 'SineKutuConfigPage' || e.target.querySelector('#SineKutuConfigPage'))) {
+                        var p = e.target.id === 'SineKutuConfigPage' ? e.target : e.target.querySelector('#SineKutuConfigPage');
+                        loadConfigDirect(p);
+                    }
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

@@ -33,3 +33,11 @@ Route::prefix('jellyfin')->group(function () {
     Route::post('/deduct-quota', [JellyfinQuotaController::class, 'deductQuota'])->name('api.jellyfin.deduct_quota');
     Route::post('/quota-exceeded', [JellyfinQuotaController::class, 'quotaExceeded'])->name('api.jellyfin.quota_exceeded');
 });
+
+// Emby Quota Sync Endpoints (Emby plugin entegrasyonu)
+Route::prefix('emby')->group(function () {
+    Route::get('/quotas', [JellyfinQuotaController::class, 'index'])->name('api.emby.quotas');
+    Route::get('/check-access', [JellyfinQuotaController::class, 'checkAccess'])->name('api.emby.check_access');
+    Route::post('/deduct-quota', [JellyfinQuotaController::class, 'deductQuota'])->name('api.emby.deduct_quota');
+    Route::post('/quota-exceeded', [JellyfinQuotaController::class, 'quotaExceeded'])->name('api.emby.quota_exceeded');
+});

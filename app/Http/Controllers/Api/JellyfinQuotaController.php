@@ -210,14 +210,23 @@ class JellyfinQuotaController extends Controller
      */
     protected function validateApiKey(Request $request): bool
     {
-        $configuredKey = (string) config('services.jellyfin.plugin_api_key', '');
+        $jellyfinKey = (string) config('services.jellyfin.plugin_api_key', '');
+        $embyKey = (string) config('services.emby.plugin_api_key', '');
 
-        if ($configuredKey === '') {
+        if ($jellyfinKey === '' && $embyKey === '') {
             return true;
         }
 
         $providedKey = (string) ($request->header('X-Api-Key') ?? $request->query('api_key') ?? '');
 
-        return hash_equals($configuredKey, $providedKey);
+        if ($jellyfinKey !== '' && hash_equals($jellyfinKey, $providedKey)) {
+            return true;
+        }
+
+        if ($embyKey !== '' && hash_equals($embyKey, $providedKey)) {
+            return true;
+        }
+
+        return false;
     }
 }
