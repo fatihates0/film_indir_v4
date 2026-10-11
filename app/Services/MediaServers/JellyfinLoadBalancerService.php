@@ -12,13 +12,18 @@ use Illuminate\Support\Facades\Log;
 class JellyfinLoadBalancerService
 {
     /**
-     * Aktif tüm Jellyfin sunucuları arasından kullanıcının hesabını arar.
+     * Aktif medya sunucuları arasından kullanıcının hesabını arar.
      *
      * @return array{server: JellyfinServer, jellyfin_user: array}|null
      */
-    public function findUserAcrossServers(string $username): ?array
+    public function findUserAcrossServers(string $username, ?string $serverType = null): ?array
     {
-        $servers = JellyfinServer::where('is_active', true)->get();
+        $query = JellyfinServer::where('is_active', true);
+        if ($serverType) {
+            $query->where('type', $serverType);
+        }
+
+        $servers = $query->get();
 
         foreach ($servers as $server) {
             $user = $server->findUser($username);
@@ -36,10 +41,15 @@ class JellyfinLoadBalancerService
     /**
      * Yük dengeleme (Least Loaded + Random Tie-Break) ile en uygun sunucuyu seçer.
      */
-    public function selectBestServer(): ?JellyfinServer
+    public function selectBestServer(?string $serverType = null): ?JellyfinServer
     {
+        $query = JellyfinServer::where('is_active', true);
+        if ($serverType) {
+            $query->where('type', $serverType);
+        }
+
         /** @var Collection<int, JellyfinServer> $servers */
-        $servers = JellyfinServer::where('is_active', true)->get();
+        $servers = $query->get();
 
         if ($servers->isEmpty()) {
             return null;
@@ -67,33 +77,38 @@ class JellyfinLoadBalancerService
         /** @var array{server: JellyfinServer, count: int} $selected */
         $selected = $candidates->random();
 
-        Log::info("Jellyfin Yük Dengeleyici: Sunucu seçildi: {$selected['server']->name} (Mevcut kullanıcı: {$selected['count']})");
+        $brand = $selected['server']->isEmby() ? 'Emby' : 'Jellyfin';
+        Log::info("Medya Sunucusu Yük Dengeleyici ({$brand}): Sunucu seçildi: {$selected['server']->name} (Mevcut kullanıcı: {$selected['count']})");
 
         return $selected['server'];
     }
 
     /**
-     * Dengeli dağıtım ile yeni Jellyfin hesabı açar.
+     * Dengeli dağıtım ile yeni medya sunucusu (Jellyfin veya Emby) hesabı açar.
      *
      * @return array{success: bool, message: string, server?: JellyfinServer, user_id?: string}
      */
-    public function createBalancedUser(string $username, string $password, ?int $userId = null): array
+    public function createBalancedUser(string $username, string $password, ?int $userId = null, string $serverType = 'jellyfin'): array
     {
-        // 1. Zaten var mı kontrol et
-        $existing = $this->findUserAcrossServers($username);
+        // 1. Zaten bu sunucu tipinde var mı kontrol et
+        $existing = $this->findUserAcrossServers($username, $serverType);
         if ($existing !== null) {
+            $brand = $existing['server']->isEmby() ? 'Emby' : 'Jellyfin';
+
             return [
                 'success' => false,
-                'message' => "Bu kullanıcı adı ({$username}) zaten '{$existing['server']->name}' sunucusunda tanımlı.",
+                'message' => "Bu kullanıcı adı ({$username}) zaten '{$existing['server']->name}' ({$brand}) sunucusunda tanımlı.",
             ];
         }
 
         // 2. En uygun sunucuyu seç
-        $targetServer = $this->selectBestServer();
+        $targetServer = $this->selectBestServer($serverType);
         if ($targetServer === null) {
+            $brand = $serverType === 'emby' ? 'Emby' : 'Jellyfin';
+
             return [
                 'success' => false,
-                'message' => 'Sistemde kayıtlı veya aktif bir Jellyfin sunucusu bulunamadı. Lütfen yönetici ile iletişime geçin.',
+                'message' => "Sistemde kayıtlı veya aktif bir {$brand} sunucusu bulunamadı. Lütfen yönetici ile iletişime geçin.",
             ];
         }
 
@@ -101,27 +116,30 @@ class JellyfinLoadBalancerService
         $result = $targetServer->createUser($username, $password);
 
         if (! empty($result['success'])) {
-            $jellyfinUserId = $result['user_id'] ?? null;
+            $externalUserId = $result['user_id'] ?? null;
+            $finalType = $targetServer->type ?? $serverType;
 
-            if ($userId && $jellyfinUserId) {
+            if ($userId && $externalUserId) {
                 MediaServerAccount::updateOrCreate(
                     [
                         'user_id' => $userId,
-                        'server_type' => 'jellyfin',
+                        'server_type' => $finalType,
                     ],
                     [
-                        'external_user_id' => $jellyfinUserId,
+                        'external_user_id' => $externalUserId,
                         'external_username' => $username,
                         'is_active' => true,
                     ]
                 );
             }
 
+            $brand = $targetServer->isEmby() ? 'Emby' : 'Jellyfin';
+
             return [
                 'success' => true,
-                'message' => "'{$targetServer->name}' sunucusunda hesabınız başarıyla oluşturuldu.",
+                'message' => "'{$targetServer->name}' ({$brand}) sunucusunda hesabınız başarıyla oluşturuldu.",
                 'server' => $targetServer,
-                'user_id' => $jellyfinUserId,
+                'user_id' => $externalUserId,
             ];
         }
 
@@ -134,9 +152,9 @@ class JellyfinLoadBalancerService
     /**
      * Kullanıcının şifresini bulunduğu sunucuda sıfırlar.
      */
-    public function resetUserPassword(string $username, string $newPassword): array
+    public function resetUserPassword(string $username, string $newPassword, ?string $serverType = null): array
     {
-        $found = $this->findUserAcrossServers($username);
+        $found = $this->findUserAcrossServers($username, $serverType);
         if ($found === null) {
             return [
                 'success' => false,
@@ -151,34 +169,40 @@ class JellyfinLoadBalancerService
         if (! $userId) {
             return [
                 'success' => false,
-                'message' => 'Jellyfin kullanıcı kimliği okunamadı.',
+                'message' => 'Kullanıcı kimliği okunamadı.',
             ];
         }
 
         $success = $server->resetPassword($userId, $newPassword);
 
         if ($success) {
+            $brand = $server->isEmby() ? 'Emby' : 'Jellyfin';
+
             return [
                 'success' => true,
-                'message' => "'{$server->name}' sunucusundaki şifreniz başarıyla güncellendi.",
+                'message' => "'{$server->name}' ({$brand}) sunucusundaki şifreniz başarıyla güncellendi.",
                 'server' => $server,
             ];
         }
 
         return [
             'success' => false,
-            'message' => 'Şifre sıfırlanırken Jellyfin sunucusu hata verdi.',
+            'message' => 'Şifre sıfırlanırken sunucu hata verdi.',
         ];
     }
 
     /**
      * Kullanıcının hesabını bulunduğu sunucudan siler.
      */
-    public function deleteUserAccount(string $username): array
+    public function deleteUserAccount(string $username, ?string $serverType = null): array
     {
-        $found = $this->findUserAcrossServers($username);
+        $found = $this->findUserAcrossServers($username, $serverType);
         if ($found === null) {
-            MediaServerAccount::where('external_username', $username)->delete();
+            $query = MediaServerAccount::where('external_username', $username);
+            if ($serverType) {
+                $query->where('server_type', $serverType);
+            }
+            $query->delete();
 
             return [
                 'success' => false,
@@ -200,19 +224,26 @@ class JellyfinLoadBalancerService
         $deleted = $server->deleteUser($userId);
 
         if ($deleted) {
-            MediaServerAccount::where('external_username', $username)
-                ->orWhere('external_user_id', $userId)
-                ->delete();
+            $query = MediaServerAccount::where(function ($q) use ($username, $userId) {
+                $q->where('external_username', $username)
+                    ->orWhere('external_user_id', $userId);
+            });
+            if ($serverType) {
+                $query->where('server_type', $serverType);
+            }
+            $query->delete();
+
+            $brand = $server->isEmby() ? 'Emby' : 'Jellyfin';
 
             return [
                 'success' => true,
-                'message' => "'{$server->name}' sunucusundaki hesabınız başarıyla silindi.",
+                'message' => "'{$server->name}' ({$brand}) sunucusundaki hesabınız başarıyla silindi.",
             ];
         }
 
         return [
             'success' => false,
-            'message' => 'Hesap silinirken Jellyfin sunucusu hata verdi.',
+            'message' => 'Hesap silinirken sunucu hata verdi.',
         ];
     }
 

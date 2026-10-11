@@ -33,6 +33,9 @@ import {
 export default function MediaServerIndex({
     has_account = false,
     account = null,
+    accounts = { jellyfin: null, emby: null },
+    available_server_types = { jellyfin: false, emby: false },
+    counts = { jellyfin_servers: 0, emby_servers: 0 },
     suggested_username = '',
     active_servers_count = 0,
     has_available_servers = false,
@@ -42,6 +45,15 @@ export default function MediaServerIndex({
 }) {
     const { flash } = usePage().props;
 
+    // Active Server Tab for viewing/creating (jellyfin or emby)
+    const initialTab = accounts?.jellyfin ? 'jellyfin' : (accounts?.emby ? 'emby' : (available_server_types?.emby && !available_server_types?.jellyfin ? 'emby' : 'jellyfin'));
+    const [activeTab, setActiveTab] = useState(initialTab);
+
+    // Which account is currently being viewed:
+    const currentAccount = accounts?.[activeTab] || (account?.server_type === activeTab ? account : (accounts?.jellyfin || accounts?.emby || account));
+    const hasCurrentAccount = Boolean(currentAccount && currentAccount.server_type === activeTab);
+    const hasAnyAccount = Boolean(accounts?.jellyfin || accounts?.emby || account);
+
     // Guest Auth Modal State
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -49,6 +61,9 @@ export default function MediaServerIndex({
     const [createPassword, setCreatePassword] = useState('');
     const [showCreatePassword, setShowCreatePassword] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [creationServerType, setCreationServerType] = useState(
+        available_server_types?.emby && !available_server_types?.jellyfin ? 'emby' : 'jellyfin'
+    );
 
     // Password Reset Modal State
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -88,13 +103,16 @@ export default function MediaServerIndex({
             return;
         }
 
+        const targetType = activeTab || creationServerType;
         setIsCreating(true);
         router.post('/media-server/account', {
             password: createPassword,
+            server_type: targetType,
         }, {
             onFinish: () => setIsCreating(false),
             onSuccess: () => {
                 setCreatePassword('');
+                setActiveTab(targetType);
             }
         });
     };
@@ -109,8 +127,9 @@ export default function MediaServerIndex({
 
         setIsResetting(true);
         router.post('/media-server/password', {
-            username: account?.username || suggested_username,
+            username: currentAccount?.username || suggested_username,
             password: newPassword,
+            server_type: currentAccount?.server_type || activeTab,
         }, {
             onFinish: () => setIsResetting(false),
             onSuccess: () => {
@@ -125,7 +144,8 @@ export default function MediaServerIndex({
         setIsDeleting(true);
         router.delete('/media-server/account', {
             data: {
-                username: account?.username || suggested_username,
+                username: currentAccount?.username || suggested_username,
+                server_type: currentAccount?.server_type || activeTab,
             },
             onFinish: () => setIsDeleting(false),
             onSuccess: () => {
@@ -218,29 +238,84 @@ export default function MediaServerIndex({
                 {/* 1. SECTION: FULL-WIDTH ACCOUNT SECTION (HER ZAMAN EN ÜSTTE)     */}
                 {/* ============================================================== */}
 
-                {/* CASE A: USER HAS ACTIVE JELLYFIN ACCOUNT (FULL WIDTH) */}
-                {has_account && account && (
-                    <div className="bg-white dark:bg-[#0A0D14] border-2 border-[#00B074]/40 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-6">
-                        <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full blur-3xl pointer-events-none" />
+                {/* ============================================================== */}
+                {/* 1. SECTION: FULL-WIDTH ACCOUNT SECTION (HER ZAMAN EN ÜSTTE)     */}
+                {/* ============================================================== */}
+
+                {/* SERVER SELECTION TABS (AUTHENTICATED USERS) */}
+                {!is_guest && (
+                    <div className="flex flex-wrap items-center gap-3 pb-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveTab('jellyfin');
+                                setCreationServerType('jellyfin');
+                            }}
+                            className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                                activeTab === 'jellyfin'
+                                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300 shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/30'
+                                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            <span className={`w-2 h-2 rounded-full ${accounts?.jellyfin ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
+                            <span>Jellyfin {accounts?.jellyfin ? 'Hesabım (Aktif)' : '(Hesap Yok)'}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setActiveTab('emby');
+                                setCreationServerType('emby');
+                            }}
+                            className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                                activeTab === 'emby'
+                                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            <span className={`w-2 h-2 rounded-full ${accounts?.emby ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
+                            <span>Emby Server {accounts?.emby ? 'Hesabım (Aktif)' : '(Hesap Yok)'}</span>
+                        </button>
+                    </div>
+                )}
+
+                {/* CASE A: USER HAS ACTIVE ACCOUNT ON SELECTED TAB */}
+                {!is_guest && hasCurrentAccount && currentAccount && (
+                    <div className={`bg-white dark:bg-[#0A0D14] border-2 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-6 ${
+                        currentAccount.server_type === 'emby' ? 'border-[#00B074]/40' : 'border-purple-500/40'
+                    }`}>
+                        <div className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl pointer-events-none ${
+                            currentAccount.server_type === 'emby' ? 'bg-[#00B074]/10' : 'bg-purple-500/10'
+                        }`} />
 
                         {/* Header & Launch Bar */}
                         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-white/5">
                             <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-2xl bg-[#00B074]/15 border border-[#00B074]/30 flex items-center justify-center text-[#00B074] shrink-0">
+                                <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center shrink-0 ${
+                                    currentAccount.server_type === 'emby'
+                                        ? 'bg-[#00B074]/15 border-[#00B074]/30 text-[#00B074]'
+                                        : 'bg-purple-500/15 border-purple-500/30 text-purple-400'
+                                }`}>
                                     <ShieldCheck className="w-7 h-7" />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2.5">
                                         <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                                            Jellyfin Hesabınız Aktif
+                                            {currentAccount.server_type === 'emby' ? 'Emby Hesabınız Aktif' : 'Jellyfin Hesabınız Aktif'}
                                         </h2>
-                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#00B074]/15 text-[#00B074] border border-[#00B074]/30 flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B074] animate-pulse" />
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+                                            currentAccount.server_type === 'emby'
+                                                ? 'bg-[#00B074]/15 text-[#00B074] border-[#00B074]/30'
+                                                : 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                                        }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                                                currentAccount.server_type === 'emby' ? 'bg-[#00B074]' : 'bg-purple-400'
+                                            }`} />
                                             Bağlı & Hazır
                                         </span>
                                     </div>
                                     <p className="text-xs sm:text-sm text-slate-500 dark:text-gray-400 mt-1">
-                                        Aktif Sunucu: <span className="text-[#00B074] font-bold">{account.server_name}</span> · Hesabınız tüm cihazlarda izlemeye hazır
+                                        Aktif Sunucu: <span className={`font-bold ${currentAccount.server_type === 'emby' ? 'text-[#00B074]' : 'text-purple-400'}`}>{currentAccount.server_name}</span> · Hesabınız tüm cihazlarda izlemeye hazır
                                     </p>
                                 </div>
                             </div>
@@ -248,13 +323,17 @@ export default function MediaServerIndex({
                             {/* Launch Button */}
                             <div className="flex items-center gap-3">
                                 <a
-                                    href={account.server_url}
+                                    href={currentAccount.server_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-extrabold text-white bg-[#00B074] hover:bg-[#009663] active:scale-[0.99] transition-all shadow-xl shadow-[#00B074]/30 group"
+                                    className={`inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-extrabold text-white active:scale-[0.99] transition-all shadow-xl group ${
+                                        currentAccount.server_type === 'emby'
+                                            ? 'bg-[#00B074] hover:bg-[#009663] shadow-[#00B074]/30'
+                                            : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/30'
+                                    }`}
                                 >
                                     <Play className="w-4 h-4 fill-white" />
-                                    <span>Jellyfin Web Player'ı Aç & İzle</span>
+                                    <span>{currentAccount.server_type === 'emby' ? "Emby Web Player'ı Aç & İzle" : "Jellyfin Web Player'ı Aç & İzle"}</span>
                                     <ExternalLink className="w-4 h-4 ml-1 opacity-75 group-hover:opacity-100" />
                                 </a>
                             </div>
@@ -270,7 +349,7 @@ export default function MediaServerIndex({
                                     </span>
                                     <button
                                         type="button"
-                                        onClick={() => handleCopy(account.server_url, 'url')}
+                                        onClick={() => handleCopy(currentAccount.server_url, 'url')}
                                         className="hover:text-slate-900 dark:hover:text-white transition-colors text-slate-500 dark:text-gray-400 flex items-center gap-1 text-xs font-semibold cursor-pointer"
                                     >
                                         {copiedKey === 'url' ? (
@@ -284,8 +363,10 @@ export default function MediaServerIndex({
                                         )}
                                     </button>
                                 </div>
-                                <div className="font-mono text-sm sm:text-base text-[#00B074] font-bold truncate select-all">
-                                    {account.server_url}
+                                <div className={`font-mono text-sm sm:text-base font-bold truncate select-all ${
+                                    currentAccount.server_type === 'emby' ? 'text-[#00B074]' : 'text-purple-400'
+                                }`}>
+                                    {currentAccount.server_url}
                                 </div>
                                 <p className="text-[11px] text-slate-500 dark:text-gray-500">
                                     Mobil veya TV uygulamasında sunucu adresi alanına bu adresi yapıştırın.
@@ -300,7 +381,7 @@ export default function MediaServerIndex({
                                     </span>
                                     <button
                                         type="button"
-                                        onClick={() => handleCopy(account.username, 'user')}
+                                        onClick={() => handleCopy(currentAccount.username, 'user')}
                                         className="hover:text-slate-900 dark:hover:text-white transition-colors text-slate-500 dark:text-gray-400 flex items-center gap-1 text-xs font-semibold cursor-pointer"
                                     >
                                         {copiedKey === 'user' ? (
@@ -315,10 +396,10 @@ export default function MediaServerIndex({
                                     </button>
                                 </div>
                                 <div className="font-mono text-sm sm:text-base text-slate-900 dark:text-white font-bold truncate select-all">
-                                    {account.username}
+                                    {currentAccount.username}
                                 </div>
                                 <p className="text-[11px] text-slate-500 dark:text-gray-500">
-                                    Jellyfin girişinde belirlediğiniz şifreniz ile oturum açın.
+                                    Girişte belirlediğiniz şifreniz ile oturum açın.
                                 </p>
                             </div>
 
@@ -329,7 +410,7 @@ export default function MediaServerIndex({
                                         <Lock className="w-4 h-4 text-slate-400" /> Hesap Güvenliği & Ayarlar
                                     </span>
                                     <p className="text-[11px] leading-relaxed">
-                                        Şifrenizi dilediğiniz an güncelleyebilir veya hesabınızı silebilirsiniz.
+                                        Şifrenizi dilediğiniz an güncelleyebilir veya bu hesabı silebilirsiniz.
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 pt-1">
@@ -358,8 +439,8 @@ export default function MediaServerIndex({
                     </div>
                 )}
 
-                {/* CASE B: AUTHENTICATED USER - FULL WIDTH ACCOUNT CREATION */}
-                {!has_account && !is_guest && (
+                {/* CASE B: AUTHENTICATED USER - ACCOUNT CREATION (NO ACCOUNT ON CURRENT TAB) */}
+                {!is_guest && !hasCurrentAccount && (
                     <div className="bg-white dark:bg-[#0A0D14] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden transition-colors space-y-8">
                         <div className="absolute top-0 right-0 w-96 h-96 bg-[#00B074]/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -369,10 +450,12 @@ export default function MediaServerIndex({
                                     <Sparkles className="w-3.5 h-3.5" /> Anında Otomatik Tanımlama
                                 </div>
                                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                                    Jellyfin Medya Hesabınızı Oluşturun
+                                    {activeTab === 'emby' ? 'Emby Medya Hesabınızı Oluşturun' : 'Jellyfin Medya Hesabınızı Oluşturun'}
                                 </h2>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-gray-400">
-                                    Tek bir tıkla aktif sunucu havuzumuzdan en hızlı ve en düşük yüke sahip olan node'a hesabınız açılır.
+                                    {activeTab === 'emby'
+                                        ? 'Tek bir tıkla aktif Emby sunucu havuzumuzdan en hızlı ve en düşük yüke sahip node üzerinde hesabınız anında açılır.'
+                                        : 'Tek bir tıkla aktif Jellyfin sunucu havuzumuzdan en hızlı ve en düşük yüke sahip node üzerinde hesabınız anında açılır.'}
                                 </p>
                             </div>
 
@@ -407,7 +490,7 @@ export default function MediaServerIndex({
                                         Aktif Abonelik Paketi Gereklidir
                                     </h3>
                                     <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">
-                                        Jellyfin medya sunucumuzda hesap oluşturabilmek ve yüksek hızlı yayın akışını kullanabilmek için aktif bir abonelik paketinizin olması gerekir. Paketinizin süresi dolmuş veya henüz bir paket tanımlanmamış olabilir.
+                                        Medya sunucumuzda hesap oluşturabilmek ve yüksek hızlı yayın akışını kullanabilmek için aktif bir abonelik paketinizin olması gerekir. Paketinizin süresi dolmuş veya henüz bir paket tanımlanmamış olabilir.
                                     </p>
                                 </div>
                                 <div className="pt-2">
@@ -427,7 +510,7 @@ export default function MediaServerIndex({
                                     <div>
                                         <div className="flex items-center justify-between mb-1.5">
                                             <label className="text-xs font-bold text-slate-700 dark:text-gray-300">
-                                                Jellyfin Kullanıcı Adınız (E-posta)
+                                                Kullanıcı Adınız (E-posta)
                                             </label>
                                             <span className="text-[11px] text-[#00B074] font-semibold flex items-center gap-1">
                                                 <CheckCircle2 className="w-3.5 h-3.5" /> Kayıtlı E-Postanız
@@ -444,7 +527,7 @@ export default function MediaServerIndex({
                                             <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
                                         </div>
                                         <p className="text-[11px] text-slate-500 dark:text-gray-400 mt-1">
-                                            Jellyfin istemcilerinde oturum açarken bu e-posta adresinizi kullanacaksınız.
+                                            {activeTab === 'emby' ? 'Emby' : 'Jellyfin'} istemcilerinde oturum açarken bu e-posta adresinizi kullanacaksınız.
                                         </p>
                                     </div>
 
@@ -452,7 +535,7 @@ export default function MediaServerIndex({
                                     <div>
                                         <div className="flex items-center justify-between mb-1.5">
                                             <label className="text-xs font-bold text-slate-700 dark:text-gray-300">
-                                                Jellyfin Şifreniz <span className="text-rose-500">*</span>
+                                                {activeTab === 'emby' ? 'Emby Şifreniz' : 'Jellyfin Şifreniz'} <span className="text-rose-500">*</span>
                                             </label>
                                             <button
                                                 type="button"
@@ -487,7 +570,7 @@ export default function MediaServerIndex({
                                     </div>
                                 </div>
 
-                                {/* Features Checklist (No Transcoding) */}
+                                {/* Features Checklist */}
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-[#0c0e15] rounded-2xl border border-slate-200/80 dark:border-white/5 text-xs text-slate-600 dark:text-gray-300">
                                     <div className="flex items-center gap-2">
                                         <CheckCircle2 className="w-4 h-4 text-[#00B074] shrink-0" />
@@ -507,10 +590,14 @@ export default function MediaServerIndex({
                                 <button
                                     type="submit"
                                     disabled={isCreating}
-                                    className="w-full py-4 px-8 rounded-2xl text-sm sm:text-base font-extrabold text-white bg-[#00B074] hover:bg-[#009663] active:scale-[0.99] transition-all shadow-xl shadow-[#00B074]/30 disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer"
+                                    className={`w-full py-4 px-8 rounded-2xl text-sm sm:text-base font-extrabold text-white active:scale-[0.99] transition-all shadow-xl disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer ${
+                                        activeTab === 'emby'
+                                            ? 'bg-[#00B074] hover:bg-[#009663] shadow-[#00B074]/30'
+                                            : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/30'
+                                    }`}
                                 >
                                     <Tv className={`w-5 h-5 ${isCreating ? 'animate-bounce' : ''}`} />
-                                    <span>{isCreating ? 'Medya Hesabınız Oluşturuluyor...' : 'Medya Hesabımı Başlat'}</span>
+                                    <span>{isCreating ? 'Medya Hesabınız Oluşturuluyor...' : `${activeTab === 'emby' ? 'Emby' : 'Jellyfin'} Hesabımı Başlat`}</span>
                                 </button>
                             </form>
                         )}
@@ -669,7 +756,7 @@ export default function MediaServerIndex({
                             <span>Cihazlarınızda Nasıl İzlersiniz?</span>
                         </h3>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-gray-400 mt-1">
-                            Jellyfin, favori tüm platformlarınızda resmi uygulamalarıyla sorunsuz çalışır.
+                            Emby ve Jellyfin, favori tüm platformlarınızda resmi uygulamalarıyla sorunsuz çalışır.
                         </p>
                     </div>
 
@@ -680,7 +767,7 @@ export default function MediaServerIndex({
                             </div>
                             <h4 className="text-sm font-black text-slate-900 dark:text-white">Tarayıcı & Bilgisayar</h4>
                             <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">
-                                Ekstra bir program kurmanıza gerek kalmadan yukarıdaki <strong className="text-[#00B074]">Jellyfin'e Git</strong> butonu ile doğrudan web üzerinden izleyin.
+                                Ekstra bir program kurmanıza gerek kalmadan yukarıdaki <strong className="text-[#00B074]">Web Player'ı Aç</strong> butonu ile doğrudan web üzerinden izleyin.
                             </p>
                         </div>
 
@@ -690,7 +777,7 @@ export default function MediaServerIndex({
                             </div>
                             <h4 className="text-sm font-black text-slate-900 dark:text-white">iOS & Android</h4>
                             <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">
-                                App Store veya Google Play'den ücretsiz resmi <strong className="text-slate-800 dark:text-gray-200">Jellyfin</strong> uygulamasını indirin ve sunucu adresinizi girin.
+                                App Store veya Google Play'den resmi <strong className="text-slate-800 dark:text-gray-200">Emby</strong> veya <strong className="text-slate-800 dark:text-gray-200">Jellyfin</strong> uygulamasını indirin ve sunucu adresinizi girin.
                             </p>
                         </div>
 
@@ -698,9 +785,9 @@ export default function MediaServerIndex({
                             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
                                 <Cast className="w-5 h-5" />
                             </div>
-                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Android TV & Apple TV</h4>
+                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Android TV, LG & Samsung</h4>
                             <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">
-                                Televizyonunuzun uygulama mağazasından Jellyfin uygulamasını kurup kumandanız ile dev ekranda sinema keyfi yaşayın.
+                                Smart TV mağazalarından Emby veya Jellyfin uygulamasını kurup kumandanız ile dev ekranda sinema keyfi yaşayın.
                             </p>
                         </div>
                     </div>

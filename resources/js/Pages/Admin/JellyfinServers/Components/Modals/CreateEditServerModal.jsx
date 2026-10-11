@@ -14,6 +14,7 @@ export default function CreateEditServerModal({
     if (!isOpen) return null;
 
     const isEdit = Boolean(server);
+    const isEmby = formData.type === 'emby';
 
     const handleChange = (field, value) => {
         setFormData(prev => ({
@@ -24,16 +25,23 @@ export default function CreateEditServerModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#0B0F19] border border-white/[0.12] rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl shadow-black/80">
+            <div className="bg-[#0B0F19] border border-white/[0.12] rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl shadow-black/80 max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="px-6 py-5 border-b border-white/[0.08] flex items-center justify-between">
+                <div className="px-6 py-5 border-b border-white/[0.08] flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${
+                            isEmby
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                : 'bg-purple-500/15 border-purple-500/30 text-purple-400'
+                        }`}>
                             <Tv className="w-5 h-5" />
                         </div>
                         <div>
                             <h3 className="text-lg font-bold text-white">
-                                {isEdit ? 'Jellyfin Sunucusunu Düzenle' : 'Yeni Jellyfin Sunucusu Ekle'}
+                                {isEdit 
+                                    ? (isEmby ? 'Emby Sunucusunu Düzenle' : 'Jellyfin Sunucusunu Düzenle')
+                                    : (isEmby ? 'Yeni Emby Sunucusu Ekle' : 'Yeni Jellyfin Sunucusu Ekle')
+                                }
                             </h3>
                             <p className="text-xs text-gray-400">
                                 Medya akışı ve kullanıcı yük dengelemesi için sunucu parametreleri
@@ -50,7 +58,41 @@ export default function CreateEditServerModal({
                 </div>
 
                 {/* Body Form */}
-                <form onSubmit={onSubmit} className="p-6 space-y-4">
+                <form onSubmit={onSubmit} className="p-6 space-y-4 overflow-y-auto">
+                    {/* Server Type Selection */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                            Sunucu Türü / Altyapısı <span className="text-rose-400">*</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => handleChange('type', 'jellyfin')}
+                                className={`flex items-center justify-center gap-2.5 p-3 rounded-2xl border text-xs font-bold transition-all ${
+                                    !isEmby
+                                        ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/30'
+                                        : 'bg-white/[0.03] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]'
+                                }`}
+                            >
+                                <span className={`w-2.5 h-2.5 rounded-full ${!isEmby ? 'bg-purple-400 animate-pulse' : 'bg-gray-600'}`} />
+                                <span>Jellyfin Media Server</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleChange('type', 'emby')}
+                                className={`flex items-center justify-center gap-2.5 p-3 rounded-2xl border text-xs font-bold transition-all ${
+                                    isEmby
+                                        ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                                        : 'bg-white/[0.03] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]'
+                                }`}
+                            >
+                                <span className={`w-2.5 h-2.5 rounded-full ${isEmby ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`} />
+                                <span>Emby Server</span>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Server Name */}
                     <div>
                         <label className="block text-xs font-semibold text-gray-300 mb-1.5">
@@ -62,7 +104,7 @@ export default function CreateEditServerModal({
                                 type="text"
                                 value={formData.name}
                                 onChange={e => handleChange('name', e.target.value)}
-                                placeholder="Örn: Frankfurt Jellyfin Node-01"
+                                placeholder={isEmby ? 'Örn: Ubuntu Emby Node-01' : 'Örn: Frankfurt Jellyfin Node-01'}
                                 required
                                 className="w-full bg-[#121622] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60"
                             />
@@ -83,7 +125,7 @@ export default function CreateEditServerModal({
                                 type="url"
                                 value={formData.url}
                                 onChange={e => handleChange('url', e.target.value)}
-                                placeholder="http://192.168.1.100:8096 veya https://jellyfin.domain.com"
+                                placeholder={isEmby ? 'http://204.168.224.225:8097 veya https://emby.domain.com' : 'http://192.168.1.100:8096 veya https://jellyfin.domain.com'}
                                 required
                                 className="w-full bg-[#121622] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 font-mono focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60"
                             />
@@ -109,7 +151,7 @@ export default function CreateEditServerModal({
                                 className="w-full bg-[#121622] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 font-mono focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60"
                             />
                         </div>
-                        <p className="text-[11px] text-gray-400 mt-1">Kullanıcıların tarayıcıda veya Jellyfin uygulamasında yazacağı web adresi.</p>
+                        <p className="text-[11px] text-gray-400 mt-1">Kullanıcıların tarayıcıda veya mobil/TV uygulamasında yazacağı web adresi.</p>
                         {formErrors.public_url && (
                             <p className="text-xs text-rose-400 mt-1">{formErrors.public_url}</p>
                         )}
@@ -118,7 +160,7 @@ export default function CreateEditServerModal({
                     {/* API Key */}
                     <div>
                         <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                            Jellyfin Admin API Anahtarı <span className="text-rose-400">*</span>
+                            {isEmby ? 'Emby Admin API Anahtarı' : 'Jellyfin Admin API Anahtarı'} <span className="text-rose-400">*</span>
                         </label>
                         <div className="relative">
                             <Key className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -126,7 +168,7 @@ export default function CreateEditServerModal({
                                 type="text"
                                 value={formData.api_key}
                                 onChange={e => handleChange('api_key', e.target.value)}
-                                placeholder="Jellyfin Kontrol Paneli > Gelişmiş > API Anahtarları"
+                                placeholder={isEmby ? 'Emby Yönetim Paneli > Gelişmiş > API Anahtarları' : 'Jellyfin Kontrol Paneli > Gelişmiş > API Anahtarları'}
                                 required
                                 className="w-full bg-[#121622] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-500 font-mono focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/60"
                             />

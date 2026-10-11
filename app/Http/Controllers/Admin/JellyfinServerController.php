@@ -36,6 +36,9 @@ class JellyfinServerController extends Controller
                 return [
                     'id' => $server->id,
                     'name' => $server->name,
+                    'type' => $server->type ?? 'jellyfin',
+                    'type_label' => $server->type_label,
+                    'is_emby' => $server->isEmby(),
                     'url' => $server->url,
                     'public_url' => $server->public_url,
                     'effective_public_url' => $server->effective_public_url,
@@ -52,12 +55,20 @@ class JellyfinServerController extends Controller
 
         $totalServers = $servers->count();
         $activeServers = $servers->where('is_active', true)->count();
+        $jellyfinCount = $servers->where('type', 'jellyfin')->count();
+        $embyCount = $servers->where('type', 'emby')->count();
+        $activeJellyfinCount = $servers->where('type', 'jellyfin')->where('is_active', true)->count();
+        $activeEmbyCount = $servers->where('type', 'emby')->where('is_active', true)->count();
         $totalUsers = $servers->sum('cached_users_count');
         $avgUsers = $activeServers > 0 ? round($totalUsers / $activeServers, 1) : 0;
 
         $stats = [
             'total_servers' => $totalServers,
             'active_servers' => $activeServers,
+            'jellyfin_count' => $jellyfinCount,
+            'emby_count' => $embyCount,
+            'active_jellyfin_count' => $activeJellyfinCount,
+            'active_emby_count' => $activeEmbyCount,
             'total_users' => $totalUsers,
             'avg_users_per_server' => $avgUsers,
         ];
@@ -72,6 +83,7 @@ class JellyfinServerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'nullable|in:jellyfin,emby',
             'url' => 'required|url|max:255',
             'public_url' => 'nullable|url|max:255',
             'api_key' => 'required|string|max:500',
@@ -82,6 +94,7 @@ class JellyfinServerController extends Controller
 
         $server = JellyfinServer::create([
             'name' => $validated['name'],
+            'type' => $validated['type'] ?? 'jellyfin',
             'url' => rtrim($validated['url'], '/'),
             'public_url' => ! empty($validated['public_url']) ? rtrim($validated['public_url'], '/') : null,
             'api_key' => trim($validated['api_key']),
@@ -89,22 +102,25 @@ class JellyfinServerController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        $brand = $server->isEmby() ? 'Emby Server' : 'Jellyfin';
+
         if (! empty($validated['test_immediately'])) {
             $testResult = $server->testConnection();
             if ($testResult['success']) {
-                return redirect()->back()->with('success', "Sunucu başarıyla eklendi ve bağlantı doğrulandı ({$testResult['latency_ms']} ms).");
+                return redirect()->back()->with('success', "{$brand} başarıyla eklendi ve bağlantı doğrulandı ({$testResult['latency_ms']} ms).");
             }
 
-            return redirect()->back()->with('warning', "Sunucu eklendi fakat bağlantı testi başarısız oldu: {$testResult['message']}");
+            return redirect()->back()->with('warning', "{$brand} eklendi fakat bağlantı testi başarısız oldu: {$testResult['message']}");
         }
 
-        return redirect()->back()->with('success', 'Jellyfin sunucusu başarıyla eklendi.');
+        return redirect()->back()->with('success', "{$brand} sunucusu başarıyla eklendi.");
     }
 
     public function update(Request $request, JellyfinServer $jellyfinServer)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'nullable|in:jellyfin,emby',
             'url' => 'required|url|max:255',
             'public_url' => 'nullable|url|max:255',
             'api_key' => 'required|string|max:500',
@@ -114,6 +130,7 @@ class JellyfinServerController extends Controller
 
         $jellyfinServer->update([
             'name' => $validated['name'],
+            'type' => $validated['type'] ?? $jellyfinServer->type ?? 'jellyfin',
             'url' => rtrim($validated['url'], '/'),
             'public_url' => ! empty($validated['public_url']) ? rtrim($validated['public_url'], '/') : null,
             'api_key' => trim($validated['api_key']),

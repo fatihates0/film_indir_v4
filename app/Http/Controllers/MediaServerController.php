@@ -23,7 +23,10 @@ class MediaServerController extends Controller
     {
         $user = Auth::user();
         $hasActiveSub = $user ? ($user->isAdmin() || $user->hasActiveSubscription()) : false;
-        $activeServersCount = JellyfinServer::where('is_active', true)->count();
+
+        $jellyfinServersCount = JellyfinServer::where('is_active', true)->where('type', 'jellyfin')->count();
+        $embyServersCount = JellyfinServer::where('is_active', true)->where('type', 'emby')->count();
+        $activeServersCount = $jellyfinServersCount + $embyServersCount;
 
         // Eğer kullanıcı giriş yapmış ancak aktif aboneliği bitmişse ve admin değilse:
         // Sunuculardaki ve DB'deki hesabı anında temizle
@@ -31,26 +34,47 @@ class MediaServerController extends Controller
             $this->loadBalancer->purgeUserAccount($user);
         }
 
-        $accountData = null;
-        if ($user && $hasActiveSub) {
-            // Kullanıcının e-posta adresiyle (veya önceden açılmışsa adıyla) aktif sunucularda hesabı var mı ara
-            $found = $this->loadBalancer->findUserAcrossServers($user->email);
+        $jellyfinAccount = null;
+        $embyAccount = null;
 
-            if ($found === null && ! empty($user->name)) {
-                $found = $this->loadBalancer->findUserAcrossServers($user->name);
+        if ($user && $hasActiveSub) {
+            // 1. Jellyfin hesabı var mı ara
+            $foundJellyfin = $this->loadBalancer->findUserAcrossServers($user->email, 'jellyfin');
+            if ($foundJellyfin === null && ! empty($user->name)) {
+                $foundJellyfin = $this->loadBalancer->findUserAcrossServers($user->name, 'jellyfin');
+            }
+            if ($foundJellyfin !== null) {
+                $srv = $foundJellyfin['server'];
+                $jUser = $foundJellyfin['jellyfin_user'];
+                $jellyfinAccount = [
+                    'username' => $jUser['Name'] ?? $user->email,
+                    'server_type' => 'jellyfin',
+                    'server_type_label' => 'Jellyfin',
+                    'server_id' => $srv->id,
+                    'server_name' => $srv->name,
+                    'server_url' => $srv->effective_public_url,
+                    'last_activity_date' => $jUser['LastActivityDate'] ?? null,
+                    'date_created' => $jUser['DateCreated'] ?? null,
+                ];
             }
 
-            if ($found !== null) {
-                $server = $found['server'];
-                $jellyfinUser = $found['jellyfin_user'];
-
-                $accountData = [
-                    'username' => $jellyfinUser['Name'] ?? $user->email,
-                    'server_id' => $server->id,
-                    'server_name' => $server->name,
-                    'server_url' => $server->effective_public_url,
-                    'last_activity_date' => $jellyfinUser['LastActivityDate'] ?? null,
-                    'date_created' => $jellyfinUser['DateCreated'] ?? null,
+            // 2. Emby hesabı var mı ara
+            $foundEmby = $this->loadBalancer->findUserAcrossServers($user->email, 'emby');
+            if ($foundEmby === null && ! empty($user->name)) {
+                $foundEmby = $this->loadBalancer->findUserAcrossServers($user->name, 'emby');
+            }
+            if ($foundEmby !== null) {
+                $srv = $foundEmby['server'];
+                $eUser = $foundEmby['jellyfin_user'];
+                $embyAccount = [
+                    'username' => $eUser['Name'] ?? $user->email,
+                    'server_type' => 'emby',
+                    'server_type_label' => 'Emby Server',
+                    'server_id' => $srv->id,
+                    'server_name' => $srv->name,
+                    'server_url' => $srv->effective_public_url,
+                    'last_activity_date' => $eUser['LastActivityDate'] ?? null,
+                    'date_created' => $eUser['DateCreated'] ?? null,
                 ];
             }
         }
@@ -62,9 +86,23 @@ class MediaServerController extends Controller
             ->take(8)
             ->get(['id', 'title', 'slug', 'poster_path', 'backdrop_path', 'vote_average', 'release_date', 'media_type']);
 
+        $primaryAccount = $embyAccount ?? $jellyfinAccount;
+
         return Inertia::render('MediaServer/Index', [
-            'has_account' => $accountData !== null,
-            'account' => $accountData,
+            'has_account' => ($jellyfinAccount !== null || $embyAccount !== null),
+            'account' => $primaryAccount,
+            'accounts' => [
+                'jellyfin' => $jellyfinAccount,
+                'emby' => $embyAccount,
+            ],
+            'available_server_types' => [
+                'jellyfin' => $jellyfinServersCount > 0,
+                'emby' => $embyServersCount > 0,
+            ],
+            'counts' => [
+                'jellyfin_servers' => $jellyfinServersCount,
+                'emby_servers' => $embyServersCount,
+            ],
             'suggested_username' => $user?->email ?? '',
             'active_servers_count' => $activeServersCount,
             'has_available_servers' => $activeServersCount > 0,
@@ -75,7 +113,7 @@ class MediaServerController extends Controller
     }
 
     /**
-     * Dengeli dağıtımlı yeni Jellyfin hesabı açma.
+     * Dengeli dağıtımlı yeni medya sunucusu (Jellyfin veya Emby) hesabı açma.
      */
     public function createAccount(Request $request)
     {
@@ -85,17 +123,29 @@ class MediaServerController extends Controller
         }
 
         if (! $user->isAdmin() && ! $user->hasActiveSubscription()) {
-            return redirect()->back()->with('error', 'Jellyfin hesabı oluşturmak için aktif bir abonelik paketinizin olması gerekir.');
+            return redirect()->back()->with('error', 'Medya sunucusu hesabı oluşturmak için aktif bir abonelik paketinizin olması gerekir.');
         }
 
         $validated = $request->validate([
             'password' => 'required|string|min:4|max:100',
+            'server_type' => 'nullable|in:jellyfin,emby',
         ]);
+
+        $serverType = $validated['server_type'] ?? 'jellyfin';
+
+        // Eğer sistemde sadece Emby varsa ve tip belirtilmemişse Emby seç
+        if (empty($validated['server_type'])) {
+            $hasJellyfin = JellyfinServer::where('is_active', true)->where('type', 'jellyfin')->exists();
+            $hasEmby = JellyfinServer::where('is_active', true)->where('type', 'emby')->exists();
+            if ($hasEmby && ! $hasJellyfin) {
+                $serverType = 'emby';
+            }
+        }
 
         // Kullanıcı adı her zaman kullanıcının e-posta adresidir
         $username = $user->email;
 
-        $result = $this->loadBalancer->createBalancedUser($username, $validated['password'], $user->id);
+        $result = $this->loadBalancer->createBalancedUser($username, $validated['password'], $user->id, $serverType);
 
         if (! empty($result['success'])) {
             return redirect()->back()->with('success', $result['message']);
@@ -120,16 +170,19 @@ class MediaServerController extends Controller
 
         $validated = $request->validate([
             'password' => 'required|string|min:4|max:100',
+            'server_type' => 'nullable|in:jellyfin,emby',
         ]);
+
+        $serverType = $validated['server_type'] ?? null;
 
         // Kullanıcı adı her zaman e-posta adresidir (eski hesaplar için name fallback)
         $username = $user->email;
-        $found = $this->loadBalancer->findUserAcrossServers($username);
+        $found = $this->loadBalancer->findUserAcrossServers($username, $serverType);
         if ($found === null && ! empty($user->name)) {
             $username = $user->name;
         }
 
-        $result = $this->loadBalancer->resetUserPassword($username, $validated['password']);
+        $result = $this->loadBalancer->resetUserPassword($username, $validated['password'], $serverType);
 
         if (! empty($result['success'])) {
             return redirect()->back()->with('success', $result['message']);
@@ -139,7 +192,7 @@ class MediaServerController extends Controller
     }
 
     /**
-     * Kullanıcının Jellyfin hesabını silme.
+     * Kullanıcının medya hesabını silme.
      */
     public function deleteAccount(Request $request)
     {
@@ -148,8 +201,20 @@ class MediaServerController extends Controller
             return redirect()->route('home')->with('error', 'Lütfen önce giriş yapın.');
         }
 
+        $serverType = $request->input('server_type');
+
+        if ($serverType) {
+            $username = $user->email;
+            $result = $this->loadBalancer->deleteUserAccount($username, $serverType);
+            if (! empty($result['success'])) {
+                return redirect()->back()->with('success', $result['message']);
+            }
+
+            return redirect()->back()->with('error', $result['message']);
+        }
+
         $this->loadBalancer->purgeUserAccount($user);
 
-        return redirect()->back()->with('success', 'Jellyfin hesabınız sunuculardan ve veritabanından başarıyla silindi.');
+        return redirect()->back()->with('success', 'Medya sunucusu hesaplarınız sunuculardan ve veritabanından başarıyla silindi.');
     }
 }

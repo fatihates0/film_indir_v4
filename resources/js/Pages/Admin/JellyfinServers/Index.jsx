@@ -10,6 +10,7 @@ import DeleteServerModal from './Components/Modals/DeleteServerModal';
 
 const initialFormState = {
     name: '',
+    type: 'jellyfin',
     url: '',
     public_url: '',
     api_key: '',
@@ -19,8 +20,9 @@ const initialFormState = {
 };
 
 export default function JellyfinServersIndex({ servers = [], stats }) {
-    // Search
+    // Search & Type Filter
     const [searchQuery, setSearchQuery] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'jellyfin', 'emby'
 
     // Modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -48,13 +50,16 @@ export default function JellyfinServersIndex({ servers = [], stats }) {
     // Filter servers
     const filteredServers = useMemo(() => {
         const query = searchQuery.toLowerCase().trim();
-        if (!query) return servers;
         return servers.filter(s => {
+            const matchesType = typeFilter === 'all' || (s.type || 'jellyfin') === typeFilter;
+            if (!matchesType) return false;
+
+            if (!query) return true;
             return (s.name || '').toLowerCase().includes(query) ||
                 (s.url || '').toLowerCase().includes(query) ||
                 (s.effective_public_url || '').toLowerCase().includes(query);
         });
-    }, [servers, searchQuery]);
+    }, [servers, searchQuery, typeFilter]);
 
     // Handle Open Create Modal
     const handleOpenCreateModal = () => {
@@ -69,6 +74,7 @@ export default function JellyfinServersIndex({ servers = [], stats }) {
         setEditingServer(server);
         setFormData({
             name: server.name || '',
+            type: server.type || 'jellyfin',
             url: server.url || '',
             public_url: server.public_url || '',
             api_key: server.api_key || '',
@@ -162,25 +168,67 @@ export default function JellyfinServersIndex({ servers = [], stats }) {
 
     return (
         <AdminLayout
-            title="Jellyfin Sunucuları"
-            subtitle="Kullanıcı akış yükünü dengelemek için çoklu Jellyfin sunucusu yönetimi"
+            title="Medya Sunucuları (Jellyfin & Emby)"
+            subtitle="Kullanıcı akış yükünü dengelemek için Jellyfin ve Emby sunucu kümelerinin yönetimi"
         >
             <div className="space-y-6">
                 {/* Stats Cards */}
                 <StatsCards stats={stats} />
 
                 {/* Filter and Actions Bar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-[#0D111A] border border-white/[0.08] p-4 rounded-2xl">
-                    {/* Search Bar */}
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Sunucu adı veya URL ile ara..."
-                            className="w-full bg-[#121622] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/60"
-                        />
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-[#0D111A] border border-white/[0.08] p-4 rounded-2xl">
+                    {/* Search & Type Tabs */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 max-w-sm">
+                            <Search className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Sunucu adı veya URL ile ara..."
+                                className="w-full bg-[#121622] border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/60"
+                            />
+                        </div>
+
+                        {/* Type Tabs */}
+                        <div className="flex items-center gap-1.5 bg-[#121622] p-1 rounded-xl border border-white/5 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setTypeFilter('all')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    typeFilter === 'all'
+                                        ? 'bg-white/10 text-white shadow-sm'
+                                        : 'text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                Tümü ({servers.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTypeFilter('jellyfin')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    typeFilter === 'jellyfin'
+                                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-sm'
+                                        : 'text-gray-400 hover:text-purple-300'
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-purple-400" />
+                                <span>Jellyfin ({servers.filter(s => (s.type || 'jellyfin') === 'jellyfin').length})</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTypeFilter('emby')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    typeFilter === 'emby'
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm'
+                                        : 'text-gray-400 hover:text-emerald-300'
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                <span>Emby ({servers.filter(s => s.type === 'emby').length})</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Action Buttons */}

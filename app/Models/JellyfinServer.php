@@ -14,6 +14,7 @@ class JellyfinServer extends Model
 
     protected $fillable = [
         'name',
+        'type',
         'url',
         'public_url',
         'api_key',
@@ -59,6 +60,30 @@ class JellyfinServer extends Model
     }
 
     /**
+     * Emby sunucusu mu?
+     */
+    public function isEmby(): bool
+    {
+        return $this->type === 'emby';
+    }
+
+    /**
+     * Jellyfin sunucusu mu?
+     */
+    public function isJellyfin(): bool
+    {
+        return $this->type !== 'emby';
+    }
+
+    /**
+     * Sunucu türü etiketi.
+     */
+    public function getTypeLabelAttribute(): string
+    {
+        return $this->isEmby() ? 'Emby Server' : 'Jellyfin';
+    }
+
+    /**
      * Sunucu bağlantısını test eder ve durumunu günceller.
      *
      * @return array{success: bool, message: string, server_info?: array, users_count?: int, latency_ms?: int}
@@ -97,9 +122,11 @@ class JellyfinServer extends Model
                     'cached_users_count' => $usersCount,
                 ]);
 
+                $brandName = $this->isEmby() ? 'Emby Server' : 'Jellyfin';
+
                 return [
                     'success' => true,
-                    'message' => 'Bağlantı başarılı! (Sürüm: '.($serverInfo['Version'] ?? 'Bilinmiyor').')',
+                    'message' => "Bağlantı başarılı! ({$brandName} Sürüm: ".($serverInfo['Version'] ?? 'Bilinmiyor').')',
                     'server_info' => $serverInfo,
                     'users_count' => $usersCount,
                     'latency_ms' => $latency,

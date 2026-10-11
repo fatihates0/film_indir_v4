@@ -34,9 +34,9 @@ export default function ServersGrid({
                 <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto mb-4">
                     <Tv className="w-8 h-8" />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">Henüz Jellyfin Sunucusu Eklenmemiş</h3>
+                <h3 className="text-lg font-bold text-white mb-2">Henüz Medya Sunucusu Eklenmemiş</h3>
                 <p className="text-xs text-gray-400 max-w-md mx-auto mb-6">
-                    Kullanıcılarınıza medya akışı sağlamak ve yükü sunucular arasında dengeli paylaştırmak için ilk Jellyfin sunucunuzu ekleyin.
+                    Kullanıcılarınıza medya akışı sağlamak ve yükü sunucular arasında dengeli paylaştırmak için ilk Jellyfin veya Emby sunucunuzu ekleyin.
                 </p>
             </div>
         );
@@ -48,13 +48,14 @@ export default function ServersGrid({
                 const isOnline = server.last_status === 'online';
                 const isOffline = server.last_status === 'offline';
                 const isTesting = testingServerId === server.id;
+                const isEmby = server.type === 'emby';
 
                 return (
                     <div 
                         key={server.id}
                         className={`bg-[#0D111A] border rounded-3xl p-5 flex flex-col justify-between transition-all duration-300 relative group ${
                             server.is_active 
-                                ? 'border-white/[0.08] hover:border-emerald-500/40 shadow-xl shadow-black/40' 
+                                ? (isEmby ? 'border-white/[0.08] hover:border-emerald-500/40 shadow-xl shadow-black/40' : 'border-white/[0.08] hover:border-purple-500/40 shadow-xl shadow-black/40')
                                 : 'border-white/[0.04] opacity-75 hover:opacity-100'
                         }`}
                     >
@@ -65,15 +66,27 @@ export default function ServersGrid({
                                 <div className="flex items-center gap-3 overflow-hidden">
                                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
                                         server.is_active 
-                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                            ? (isEmby 
+                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                                : 'bg-purple-500/10 border-purple-500/30 text-purple-400')
                                             : 'bg-gray-800/40 border-white/10 text-gray-400'
                                     }`}>
                                         <Tv className="w-5 h-5" />
                                     </div>
                                     <div className="overflow-hidden">
-                                        <h4 className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
-                                            {server.name}
-                                        </h4>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                                                {server.name}
+                                            </h4>
+                                            {/* Brand Type Tag */}
+                                            <span className={`text-[9px] font-black tracking-wider uppercase px-2 py-0.5 rounded-md border shrink-0 ${
+                                                isEmby
+                                                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                                    : 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                                            }`}>
+                                                {isEmby ? 'EMBY' : 'JELLYFIN'}
+                                            </span>
+                                        </div>
                                         <div className="flex items-center gap-2 mt-1">
                                             {/* Status Badge */}
                                             {isOnline && (
